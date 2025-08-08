@@ -8,12 +8,10 @@ import { ZapperConfig, Process } from "../types";
 
 export class Zapper {
   private config: ZapperConfig | null = null;
-  private planExecutor: PlanExecutor;
+  private planExecutor: PlanExecutor | null = null;
 
   constructor() {
-    const strategy = new SequentialStrategy();
-    const executor = new Pm2Executor();
-    this.planExecutor = new PlanExecutor(strategy, executor);
+    // PlanExecutor will be initialized after config is loaded
   }
 
   async loadConfig(configPath: string = "zap.yaml"): Promise<void> {
@@ -21,6 +19,11 @@ export class Zapper {
       this.config = YamlParser.parse(configPath);
       ConfigValidator.validate(this.config);
       this.config = EnvResolver.resolve(this.config);
+
+      // Initialize planExecutor with project name
+      const strategy = new SequentialStrategy();
+      const executor = new Pm2Executor(this.config.project);
+      this.planExecutor = new PlanExecutor(strategy, executor);
     } catch (error) {
       throw new Error(`Failed to load config: ${error}`);
     }
@@ -35,8 +38,8 @@ export class Zapper {
       ? this.config.processes.filter((p) => processNames.includes(p.name))
       : this.config.processes;
 
-    const plan = this.planExecutor.createPlan(processesToStart);
-    await this.planExecutor.executePlan(plan, "start");
+    const plan = this.planExecutor!.createPlan(processesToStart);
+    await this.planExecutor!.executePlan(plan, "start", this.config.project);
   }
 
   async stopProcesses(processNames?: string[]): Promise<void> {
@@ -48,8 +51,8 @@ export class Zapper {
       ? this.config.processes.filter((p) => processNames.includes(p.name))
       : this.config.processes;
 
-    const plan = this.planExecutor.createPlan(processesToStop);
-    await this.planExecutor.executePlan(plan, "stop");
+    const plan = this.planExecutor!.createPlan(processesToStop);
+    await this.planExecutor!.executePlan(plan, "stop");
   }
 
   async restartProcesses(processNames?: string[]): Promise<void> {
@@ -61,8 +64,8 @@ export class Zapper {
       ? this.config.processes.filter((p) => processNames.includes(p.name))
       : this.config.processes;
 
-    const plan = this.planExecutor.createPlan(processesToRestart);
-    await this.planExecutor.executePlan(plan, "restart");
+    const plan = this.planExecutor!.createPlan(processesToRestart);
+    await this.planExecutor!.executePlan(plan, "restart");
   }
 
   async getProcessStatus(processName?: string): Promise<Process[]> {

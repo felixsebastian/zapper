@@ -19,7 +19,7 @@ export interface ExecutionStrategy {
 }
 
 export interface ProcessExecutor {
-  startProcess(process: Process): Promise<void>;
+  startProcess(process: Process, projectName: string): Promise<void>;
   stopProcess(processName: string): Promise<void>;
   restartProcess(processName: string): Promise<void>;
 }

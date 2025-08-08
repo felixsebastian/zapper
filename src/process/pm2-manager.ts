@@ -2,8 +2,12 @@ import { spawn } from "child_process";
 import { Process, ProcessInfo } from "../types";
 
 export class Pm2Manager {
-  static async startProcess(processConfig: Process): Promise<void> {
-    const args = ["start", processConfig.cmd, "--name", processConfig.name];
+  static async startProcess(
+    processConfig: Process,
+    projectName: string,
+  ): Promise<void> {
+    const prefixedName = `zap.${projectName}.${processConfig.name}`;
+    const args = ["start", processConfig.cmd, "--name", prefixedName];
 
     if (processConfig.cwd) {
       args.push("--cwd", processConfig.cwd);
@@ -19,16 +23,25 @@ export class Pm2Manager {
     await this.runPm2Command(args);
   }
 
-  static async stopProcess(name: string): Promise<void> {
-    await this.runPm2Command(["stop", name]);
+  static async stopProcess(name: string, projectName?: string): Promise<void> {
+    const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
+    await this.runPm2Command(["stop", prefixedName]);
   }
 
-  static async restartProcess(name: string): Promise<void> {
-    await this.runPm2Command(["restart", name]);
+  static async restartProcess(
+    name: string,
+    projectName?: string,
+  ): Promise<void> {
+    const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
+    await this.runPm2Command(["restart", prefixedName]);
   }
 
-  static async deleteProcess(name: string): Promise<void> {
-    await this.runPm2Command(["delete", name]);
+  static async deleteProcess(
+    name: string,
+    projectName?: string,
+  ): Promise<void> {
+    const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
+    await this.runPm2Command(["delete", prefixedName]);
   }
 
   static async getProcessInfo(name: string): Promise<ProcessInfo | null> {

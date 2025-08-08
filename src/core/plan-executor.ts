@@ -18,6 +18,7 @@ export class PlanExecutor {
   async executePlan(
     plan: ExecutionPlan,
     operation: "start" | "stop" | "restart",
+    projectName?: string,
   ): Promise<void> {
     if (!this.strategy.validatePlan(plan)) {
       throw new Error("Invalid execution plan");
@@ -34,7 +35,10 @@ export class PlanExecutor {
 
         switch (operation) {
           case "start":
-            await this.executor.startProcess(step.process);
+            if (!projectName) {
+              throw new Error("Project name is required for start operations");
+            }
+            await this.executor.startProcess(step.process, projectName);
             break;
           case "stop":
             await this.executor.stopProcess(step.process.name);
