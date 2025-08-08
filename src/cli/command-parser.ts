@@ -90,28 +90,28 @@ export class CommandParser {
 Usage: zap <command> [options]
 
 Commands:
-  up       Start all services or a specific service
-  down     Stop all services or a specific service
-  restart  Restart all services or a specific service
-  status   Show status of all services or a specific service
-  logs     Show logs for all services or a specific service
-  stop     Stop a specific service
-  start    Start a specific service
+  up       Start all processes or a specific process
+  down     Stop all processes or a specific process
+  restart  Restart all processes or a specific process
+  status   Show status of all processes or a specific process
+  logs     Show logs for all processes or a specific process
+  stop     Stop a specific process
+  start    Start a specific process
 
 Options:
-  --service <name>  Target a specific service
-  --all            Apply to all services (default for some commands)
+  --service <name>  Target a specific process
+  --all            Apply to all processes (default for some commands)
   --force          Force the operation
   --follow         Follow logs (for logs command)
   --config <file>  Use a specific config file (default: zap.yaml)
 
 Examples:
-  zap up                    # Start all services
-  zap up --service api      # Start only the api service
-  zap down --all            # Stop all services
-  zap status                # Show status of all services
-  zap logs --service api    # Show logs for api service
-  zap logs --follow         # Follow logs for all services
+  zap up                    # Start all processes
+  zap up --service test     # Start only the test process
+  zap down --all            # Stop all processes
+  zap status                # Show status of all processes
+  zap logs --service test   # Show logs for test process
+  zap logs --follow         # Follow logs for all processes
 `;
   }
 }

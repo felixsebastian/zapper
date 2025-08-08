@@ -1,10 +1,27 @@
 import { spawn } from "child_process";
-import { ContainerConfig, ContainerInfo } from "../types";
+
+interface DockerConfig {
+  image: string;
+  ports?: string[];
+  volumes?: string[];
+  networks?: string[];
+  environment?: Record<string, string>;
+  command?: string;
+}
+
+interface DockerContainer {
+  id: string;
+  name: string;
+  status: string;
+  ports: string[];
+  networks: string[];
+  created: string;
+}
 
 export class DockerManager {
   static async startContainer(
     name: string,
-    config: ContainerConfig,
+    config: DockerConfig,
   ): Promise<void> {
     const args = ["run", "-d", "--name", name];
 
@@ -53,7 +70,7 @@ export class DockerManager {
     await this.runDockerCommand(["rm", "-f", name]);
   }
 
-  static async getContainerInfo(name: string): Promise<ContainerInfo | null> {
+  static async getContainerInfo(name: string): Promise<DockerContainer | null> {
     try {
       const result = await this.runDockerCommand([
         "inspect",
@@ -62,7 +79,7 @@ export class DockerManager {
         name,
       ]);
 
-      const container = JSON.parse(result) as ContainerInfo;
+      const container = JSON.parse(result) as DockerContainer;
 
       return {
         id: container.id || "",
@@ -77,7 +94,7 @@ export class DockerManager {
     }
   }
 
-  static async listContainers(): Promise<ContainerInfo[]> {
+  static async listContainers(): Promise<DockerContainer[]> {
     try {
       const result = await this.runDockerCommand([
         "ps",
@@ -89,7 +106,7 @@ export class DockerManager {
       const containers = result
         .trim()
         .split("\n")
-        .map((line) => JSON.parse(line) as ContainerInfo);
+        .map((line) => JSON.parse(line) as DockerContainer);
 
       return containers.map((container) => ({
         id: container.id || "",

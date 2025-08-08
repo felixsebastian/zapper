@@ -1,14 +1,20 @@
 import { YamlParser } from "../config/yaml-parser";
 import { ConfigValidator } from "../config/config-validator";
 import { EnvResolver } from "../config/env-resolver";
-import { ZapperConfig, ServiceStatus } from "../types";
-
-declare const console: {
-  log: (...args: unknown[]) => void;
-};
+import { SequentialStrategy } from "./strategies/sequential-strategy";
+import { PlanExecutor } from "./plan-executor";
+import { Pm2Executor } from "../process/pm2-executor";
+import { ZapperConfig, Process } from "../types";
 
 export class Zapper {
   private config: ZapperConfig | null = null;
+  private planExecutor: PlanExecutor;
+
+  constructor() {
+    const strategy = new SequentialStrategy();
+    const executor = new Pm2Executor();
+    this.planExecutor = new PlanExecutor(strategy, executor);
+  }
 
   async loadConfig(configPath: string = "zap.yaml"): Promise<void> {
     try {
@@ -20,47 +26,54 @@ export class Zapper {
     }
   }
 
-  async startServices(): Promise<void> {
+  async startProcesses(processNames?: string[]): Promise<void> {
     if (!this.config) {
       throw new Error("Config not loaded");
     }
-    console.log("Starting services...");
+
+    const processesToStart = processNames
+      ? this.config.processes.filter((p) => processNames.includes(p.name))
+      : this.config.processes;
+
+    const plan = this.planExecutor.createPlan(processesToStart);
+    await this.planExecutor.executePlan(plan, "start");
   }
 
-  async stopServices(): Promise<void> {
+  async stopProcesses(processNames?: string[]): Promise<void> {
     if (!this.config) {
       throw new Error("Config not loaded");
     }
-    console.log("Stopping services...");
+
+    const processesToStop = processNames
+      ? this.config.processes.filter((p) => processNames.includes(p.name))
+      : this.config.processes;
+
+    const plan = this.planExecutor.createPlan(processesToStop);
+    await this.planExecutor.executePlan(plan, "stop");
   }
 
-  async restartServices(): Promise<void> {
+  async restartProcesses(processNames?: string[]): Promise<void> {
     if (!this.config) {
       throw new Error("Config not loaded");
     }
-    console.log("Restarting services...");
+
+    const processesToRestart = processNames
+      ? this.config.processes.filter((p) => processNames.includes(p.name))
+      : this.config.processes;
+
+    const plan = this.planExecutor.createPlan(processesToRestart);
+    await this.planExecutor.executePlan(plan, "restart");
   }
 
-  async getServiceStatus(serviceName?: string): Promise<ServiceStatus[]> {
+  async getProcessStatus(processName?: string): Promise<Process[]> {
     if (!this.config) {
       throw new Error("Config not loaded");
     }
 
-    const servicesToCheck = serviceName
-      ? [serviceName]
-      : Object.keys(this.config.services);
-    const statuses: ServiceStatus[] = [];
+    const processesToCheck = processName
+      ? this.config.processes.filter((p) => p.name === processName)
+      : this.config.processes;
 
-    for (const name of servicesToCheck) {
-      const service = this.config.services[name];
-      if (!service) continue;
-
-      statuses.push({
-        name,
-        status: "stopped",
-      });
-    }
-
-    return statuses;
+    return processesToCheck;
   }
 }

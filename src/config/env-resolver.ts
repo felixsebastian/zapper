@@ -4,23 +4,10 @@ export class EnvResolver {
   static resolve(config: ZapperConfig): ZapperConfig {
     const resolvedConfig = { ...config };
 
-    // Resolve global environment variables
-    if (resolvedConfig.environment) {
-      resolvedConfig.environment = this.interpolateEnvVars(
-        resolvedConfig.environment,
-      );
-    }
-
-    // Resolve service-specific environment variables
-    for (const [, service] of Object.entries(resolvedConfig.services)) {
-      if (service.env) {
-        service.env = this.interpolateEnvVars(service.env);
-      }
-
-      if ("environment" in service && service.environment) {
-        service.environment = this.interpolateEnvVars(
-          service.environment as Record<string, string>,
-        );
+    // Resolve process-specific environment variables
+    for (const process of resolvedConfig.processes) {
+      if (process.env) {
+        process.env = this.interpolateEnvVars(process.env);
       }
     }
 
@@ -49,32 +36,15 @@ export class EnvResolver {
     });
   }
 
-  static getServiceEnv(
-    serviceName: string,
+  static getProcessEnv(
+    processName: string,
     config: ZapperConfig,
   ): Record<string, string> {
-    const service = config.services[serviceName];
-    if (!service) {
-      throw new Error(`Service ${serviceName} not found`);
+    const process = config.processes.find((p) => p.name === processName);
+    if (!process) {
+      throw new Error(`Process ${processName} not found`);
     }
 
-    const env: Record<string, string> = {} as Record<string, string>;
-
-    // Add global environment variables
-    if (config.environment) {
-      Object.assign(env, config.environment);
-    }
-
-    // Add service-specific environment variables
-    if (service.env) {
-      Object.assign(env, service.env);
-    }
-
-    // Add container-specific environment variables
-    if ("environment" in service && service.environment) {
-      Object.assign(env, service.environment as Record<string, string>);
-    }
-
-    return env;
+    return process.env || {};
   }
 }

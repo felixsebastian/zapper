@@ -1,44 +1,19 @@
 import { spawn } from "child_process";
-import { ProcessConfig, ProcessInfo } from "../types";
+import { Process, ProcessInfo } from "../types";
 
 export class Pm2Manager {
-  static async startProcess(
-    name: string,
-    config: ProcessConfig,
-    env: Record<string, string>,
-  ): Promise<void> {
-    const args = [
-      "start",
-      config.script,
-      "--name",
-      name,
-      "--cwd",
-      config.cwd || globalThis.process?.cwd() || ".",
-    ];
+  static async startProcess(processConfig: Process): Promise<void> {
+    const args = ["start", processConfig.cmd, "--name", processConfig.name];
 
-    if (config.instances) {
-      args.push("--instances", config.instances.toString());
-    }
-
-    if (config.max_memory) {
-      args.push("--max-memory-restart", config.max_memory);
-    }
-
-    if (config.min_uptime) {
-      args.push("--min-uptime", config.min_uptime);
-    }
-
-    if (config.max_restarts) {
-      args.push("--max-restarts", config.max_restarts.toString());
-    }
-
-    if (config.node_args) {
-      args.push("--node-args", config.node_args.join(" "));
+    if (processConfig.cwd) {
+      args.push("--cwd", processConfig.cwd);
     }
 
     // Add environment variables
-    for (const [key, value] of Object.entries(env)) {
-      args.push("--env", `${key}=${value}`);
+    if (processConfig.env) {
+      for (const [key, value] of Object.entries(processConfig.env)) {
+        args.push("--env", `${key}=${value}`);
+      }
     }
 
     await this.runPm2Command(args);

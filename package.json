@@ -21,7 +21,6 @@
     "test:run": "vitest run",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
     "release": "changeset publish",
     "version": "changeset version",
     "prepublishOnly": "npm run build"

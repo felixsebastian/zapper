@@ -24,7 +24,7 @@ export default [
       ...prettierConfig.rules,
       "prettier/prettier": "error",
       "@typescript-eslint/no-unused-vars": "error",
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "error",
     },
   },
   {
