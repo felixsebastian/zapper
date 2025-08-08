@@ -2,7 +2,7 @@
   "name": "zapper-cli",
   "version": "1.0.0",
   "description": "A minimal TypeScript CLI project",
-  "type": "module",
+  "type": "commonjs",
   "main": "dist/index.js",
   "bin": {
     "zap": "dist/index.js"
