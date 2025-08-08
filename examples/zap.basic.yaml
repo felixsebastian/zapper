@@ -1,6 +1,9 @@
 project: myproj
+env_files: [env.yaml]
 processes:
   - name: test
-    cmd: echo "hello world"
+    cmd: echo "$MYENV"
+    envs:
+      - MYENV
   - name: server
     cmd: node -e "console.log('Server started on port 3000'); setInterval(() => console.log('Server running...'), 5000);" 

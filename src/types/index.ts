@@ -2,11 +2,13 @@ export interface Process {
   name: string;
   cmd: string;
   cwd?: string;
+  envs?: string[];
   env?: Record<string, string>;
 }
 
 export interface ZapperConfig {
   project: string;
+  env_files?: string[];
   processes: Process[];
 }
 

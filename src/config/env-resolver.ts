@@ -1,17 +1,60 @@
+import { readFileSync } from "fs";
+import { parse } from "yaml";
 import { ZapperConfig } from "../types";
+
+interface RawEnvFile {
+  envs?: Array<Record<string, string>>;
+}
 
 export class EnvResolver {
   static resolve(config: ZapperConfig): ZapperConfig {
     const resolvedConfig = { ...config };
 
-    // Resolve process-specific environment variables
-    for (const process of resolvedConfig.processes) {
-      if (process.env) {
-        process.env = this.interpolateEnvVars(process.env);
+    const mergedEnvFromFiles = this.loadAndMergeEnvFiles(
+      resolvedConfig.env_files,
+    );
+
+    for (const proc of resolvedConfig.processes) {
+      if (proc.envs && proc.envs.length > 0) {
+        const envSubset: Record<string, string> = {};
+        for (const key of proc.envs) {
+          const value = mergedEnvFromFiles[key];
+          if (value !== undefined) envSubset[key] = value;
+        }
+        proc.env = this.interpolateEnvVars(envSubset);
+      } else if (proc.env) {
+        proc.env = this.interpolateEnvVars(proc.env);
       }
     }
 
     return resolvedConfig;
+  }
+
+  static getMergedEnvFromFiles(config: ZapperConfig): Record<string, string> {
+    return this.loadAndMergeEnvFiles(config.env_files);
+  }
+
+  private static loadAndMergeEnvFiles(
+    envFiles?: string[],
+  ): Record<string, string> {
+    const merged: Record<string, string> = {};
+    if (!envFiles || envFiles.length === 0) return merged;
+
+    for (const filePath of envFiles) {
+      try {
+        const content = readFileSync(filePath, "utf8");
+        const parsed = parse(content) as RawEnvFile | undefined;
+        if (!parsed || !parsed.envs) continue;
+        for (const entry of parsed.envs) {
+          for (const [k, v] of Object.entries(entry)) {
+            merged[k] = String(v);
+          }
+        }
+      } catch (error) {
+        throw new Error(`Failed to load env file ${filePath}: ${error}`);
+      }
+    }
+    return merged;
   }
 
   private static interpolateEnvVars(

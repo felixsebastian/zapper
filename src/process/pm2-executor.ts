@@ -4,13 +4,19 @@ import { Pm2Manager } from "./pm2-manager";
 
 export class Pm2Executor implements ProcessExecutor {
   private projectName?: string;
+  private configDir?: string;
 
-  constructor(projectName?: string) {
+  constructor(projectName?: string, configDir?: string) {
     this.projectName = projectName;
+    this.configDir = configDir;
   }
 
   async startProcess(process: Process, projectName: string): Promise<void> {
-    await Pm2Manager.startProcess(process, projectName);
+    await Pm2Manager.startProcessWithTempEcosystem(
+      projectName,
+      process,
+      this.configDir,
+    );
   }
 
   async stopProcess(processName: string): Promise<void> {
