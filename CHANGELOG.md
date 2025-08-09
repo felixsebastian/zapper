@@ -1,4 +1,4 @@
-# zaper-cli
+# zapper-cli
 
 ## 0.0.2
 
