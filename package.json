@@ -1,6 +1,6 @@
 {
   "name": "zaper-cli",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A minimal TypeScript CLI project",
   "type": "commonjs",
   "main": "dist/index.js",
