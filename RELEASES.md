@@ -1,9 +1,5 @@
 ## Releases
 
-### Prerequisites (one-time)
-- **NPM token**: Create an npm Granular Access Token with Publish (and Read) for the package/org. Add to repo secrets as `NPM_TOKEN`.
-- **CI**: GitHub Actions is configured in `.github/workflows/release.yml`.
-
 ### Normal release (CI, recommended)
 1. **Create changeset**: `pnpm changeset` → pick bump → write summary.
 2. **Open PR** with the changeset and merge to `main`.
