@@ -6,10 +6,7 @@ import { PlanExecutor } from "./plan-executor";
 import { Pm2Executor } from "../process/pm2-executor";
 import { ZapperConfig, Process } from "../types";
 import path from "path";
-
-declare const console: {
-  log: (...args: unknown[]) => void;
-};
+import { logger } from "../utils/logger";
 
 export class Zapper {
   private config: ZapperConfig | null = null;
@@ -22,6 +19,14 @@ export class Zapper {
     try {
       this.configDir = path.dirname(path.resolve(configPath));
       this.config = YamlParser.parse(configPath);
+
+      // Normalize env_files to absolute paths relative to the config file directory
+      if (this.config.env_files && this.config.env_files.length > 0) {
+        this.config.env_files = this.config.env_files.map((p) =>
+          path.isAbsolute(p) ? p : path.join(this.configDir as string, p),
+        );
+      }
+
       ConfigValidator.validate(this.config);
       this.config = EnvResolver.resolve(this.config);
 
@@ -33,24 +38,56 @@ export class Zapper {
     }
   }
 
+  private getProcesses(): Process[] {
+    if (!this.config) {
+      throw new Error("Config not loaded");
+    }
+
+    // Prefer bare_metal over legacy processes
+    if (
+      this.config.bare_metal &&
+      Object.keys(this.config.bare_metal).length > 0
+    ) {
+      return Object.entries(this.config.bare_metal).map(([name, process]) => ({
+        ...process,
+        name: process.name || name, // Ensure name is set
+      }));
+    }
+
+    if (this.config.processes && this.config.processes.length > 0) {
+      return this.config.processes;
+    }
+
+    return [];
+  }
+
   async startProcesses(processNames?: string[]): Promise<void> {
     if (!this.config) {
       throw new Error("Config not loaded");
     }
 
+    const allProcesses = this.getProcesses();
+    if (allProcesses.length === 0) {
+      throw new Error("No processes defined in config");
+    }
+
     const processesToStart = processNames
-      ? this.config.processes.filter((p) => processNames.includes(p.name))
-      : this.config.processes;
+      ? allProcesses.filter((p) => processNames.includes(p.name))
+      : allProcesses;
 
     const mergedYamlEnvs = EnvResolver.getMergedEnvFromFiles(this.config);
-    console.log("[zapper] merged yaml envs:", mergedYamlEnvs);
+    logger.debug("merged yaml envs:", mergedYamlEnvs);
 
     for (const p of processesToStart) {
-      console.log(
-        `[zapper] process ${p.name} whitelist:`,
-        Array.isArray(p.envs) ? p.envs : [],
+      const whitelist = Array.isArray(p.env) ? p.env : [];
+      const whitelistWithValues = Object.fromEntries(
+        whitelist.map((k) => [k, mergedYamlEnvs[k] ?? "(missing)"]),
       );
-      console.log(`[zapper] process ${p.name} resolved env:`, p.env || {});
+      logger.debug(
+        `process ${p.name} whitelist (with values):`,
+        whitelistWithValues,
+      );
+      logger.debug(`process ${p.name} resolved env:`, p.resolvedEnv || {});
     }
 
     const plan = this.planExecutor!.createPlan(processesToStart);
@@ -62,9 +99,10 @@ export class Zapper {
       throw new Error("Config not loaded");
     }
 
+    const allProcesses = this.getProcesses();
     const processesToStop = processNames
-      ? this.config.processes.filter((p) => processNames.includes(p.name))
-      : this.config.processes;
+      ? allProcesses.filter((p) => processNames.includes(p.name))
+      : allProcesses;
 
     const plan = this.planExecutor!.createPlan(processesToStop);
     await this.planExecutor!.executePlan(plan, "stop");
@@ -75,9 +113,10 @@ export class Zapper {
       throw new Error("Config not loaded");
     }
 
+    const allProcesses = this.getProcesses();
     const processesToRestart = processNames
-      ? this.config.processes.filter((p) => processNames.includes(p.name))
-      : this.config.processes;
+      ? allProcesses.filter((p) => processNames.includes(p.name))
+      : allProcesses;
 
     const plan = this.planExecutor!.createPlan(processesToRestart);
     await this.planExecutor!.executePlan(plan, "restart");
@@ -88,10 +127,21 @@ export class Zapper {
       throw new Error("Config not loaded");
     }
 
+    const allProcesses = this.getProcesses();
     const processesToCheck = processName
-      ? this.config.processes.filter((p) => p.name === processName)
-      : this.config.processes;
+      ? allProcesses.filter((p) => p.name === processName)
+      : allProcesses;
 
     return processesToCheck;
+  }
+
+  async showLogs(processName: string, follow: boolean = false): Promise<void> {
+    // For logs, we don't need to check the config - we can show logs for any PM2 process
+    // Use a default project name if config is not loaded
+    const projectName = this.config?.project || "default";
+    const configDir = this.configDir || ".";
+
+    const pm2Executor = new Pm2Executor(projectName, configDir);
+    await pm2Executor.showLogs(processName, follow);
   }
 }

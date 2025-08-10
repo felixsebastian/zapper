@@ -1,0 +1,4 @@
+project: myproj
+bare_metal:
+  hello:
+    cmd: echo "Hello world"

@@ -14,11 +14,27 @@ export class CommandParser {
     const command = cleanArgs[0] as Command;
     if (!this.isValidCommand(command)) {
       throw new Error(
-        `Invalid command: ${command}. Valid commands: up, down, restart, status, logs, stop, start`,
+        `Invalid command: ${command}. Valid commands: up/start/s, down/stop/delete, restart, status, logs`,
       );
     }
 
-    options.command = command;
+    // Map aliases to canonical commands
+    const commandAliases: Record<string, Command> = {
+      // Start commands
+      up: "up",
+      start: "start",
+      s: "start",
+      // Stop commands
+      down: "down",
+      stop: "stop",
+      delete: "stop",
+      // Other commands
+      restart: "restart",
+      status: "status",
+      logs: "logs",
+    };
+
+    options.command = commandAliases[command];
 
     // Parse remaining arguments
     for (let i = 1; i < cleanArgs.length; i++) {
@@ -43,6 +59,16 @@ export class CommandParser {
           case "config":
             options.config = value || cleanArgs[++i];
             break;
+          case "verbose":
+          case "v":
+            options.verbose = true;
+            break;
+          case "quiet":
+            options.quiet = true;
+            break;
+          case "debug":
+            options.debug = true;
+            break;
           default:
             throw new Error(`Unknown option: --${key}`);
         }
@@ -60,6 +86,15 @@ export class CommandParser {
             case "F":
               options.follow = true;
               break;
+            case "v":
+              options.verbose = true;
+              break;
+            case "q":
+              options.quiet = true;
+              break;
+            case "d":
+              options.debug = true;
+              break;
             default:
               throw new Error(`Unknown flag: -${flag}`);
           }
@@ -73,16 +108,23 @@ export class CommandParser {
   }
 
   private static isValidCommand(command: string): command is Command {
-    const validCommands: Command[] = [
-      "up",
-      "down",
-      "restart",
-      "status",
-      "logs",
-      "stop",
-      "start",
-    ];
-    return validCommands.includes(command as Command);
+    // Map aliases to their canonical commands
+    const commandAliases: Record<string, Command> = {
+      // Start commands
+      up: "up",
+      start: "start",
+      s: "start",
+      // Stop commands
+      down: "down",
+      stop: "stop",
+      delete: "stop",
+      // Other commands
+      restart: "restart",
+      status: "status",
+      logs: "logs",
+    };
+
+    return command in commandAliases;
   }
 
   static getHelp(): string {
@@ -90,13 +132,13 @@ export class CommandParser {
 Usage: zap <command> [options]
 
 Commands:
-  up       Start all processes or a specific process
-  down     Stop all processes or a specific process
+  up       Start all processes or a specific process (aliases: start, s)
+  down     Stop all processes or a specific process (aliases: stop, delete)
   restart  Restart all processes or a specific process
   status   Show status of all processes or a specific process
-  logs     Show logs for all processes or a specific process
-  stop     Stop a specific process
-  start    Start a specific process
+  logs     Show logs for a specific process (requires --service, supports --follow)
+  start    Start a specific process (aliases: up, s)
+  stop     Stop and delete a specific process (aliases: down, delete) - cleans up logs and wrapper scripts
 
 Options:
   --service <name>  Target a specific process
@@ -104,14 +146,23 @@ Options:
   --force          Force the operation
   --follow         Follow logs (for logs command)
   --config <file>  Use a specific config file (default: zap.yaml)
+  --verbose, -v    Increase logging verbosity
+  --quiet, -q      Reduce logging output
+  --debug, -d      Enable debug logging
 
 Examples:
   zap up                    # Start all processes
+  zap start                 # Same as zap up
+  zap s                     # Same as zap up
   zap up --service test     # Start only the test process
   zap down --all            # Stop all processes
+  zap stop                  # Same as zap down
+  zap delete                # Same as zap down
   zap status                # Show status of all processes
   zap logs --service test   # Show logs for test process
   zap logs --follow         # Follow logs for all processes
+  zap logs --service test   # Show logs for test process
+  zap logs --service test --follow  # Follow logs for test process
 `;
   }
 }

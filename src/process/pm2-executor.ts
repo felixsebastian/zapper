@@ -20,10 +20,23 @@ export class Pm2Executor implements ProcessExecutor {
   }
 
   async stopProcess(processName: string): Promise<void> {
-    await Pm2Manager.stopProcess(processName, this.projectName);
+    await Pm2Manager.deleteAllMatchingProcesses(
+      processName,
+      this.projectName,
+      this.configDir,
+    );
   }
 
   async restartProcess(processName: string): Promise<void> {
     await Pm2Manager.restartProcess(processName, this.projectName);
+  }
+
+  async showLogs(processName: string, follow: boolean = false): Promise<void> {
+    await Pm2Manager.showLogs(
+      processName,
+      this.projectName,
+      follow,
+      this.configDir,
+    );
   }
 }

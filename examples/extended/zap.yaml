@@ -1,0 +1,25 @@
+project: myproj
+env_files: [.env]
+bare_metal:
+  frontend:
+    cmd: npm run dev
+    cwd: ./frontend
+    env: [PORT, API_URL]
+  api:
+    cmd: npm run dev
+    cwd: ./api
+    env: [PORT, DATABASE_URL]
+containers:
+  database:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    env: [POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD]
+    volumes:
+      - name: postgres_data
+        internal_dir: /var/lib/postgresql/data
+  redis:
+    name: redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

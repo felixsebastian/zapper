@@ -4,10 +4,7 @@ import {
   ExecutionStrategy,
   ProcessExecutor,
 } from "./strategies";
-
-declare const console: {
-  log: (...args: unknown[]) => void;
-};
+import { logger } from "../utils/logger";
 
 export class PlanExecutor {
   constructor(
@@ -24,13 +21,13 @@ export class PlanExecutor {
       throw new Error("Invalid execution plan");
     }
 
-    console.log(`Executing ${operation} plan with ${plan.totalSteps} steps...`);
+    logger.debug(`Executing ${operation} plan with ${plan.totalSteps} steps`);
 
     for (const step of plan.steps) {
       try {
         step.status = "running";
-        console.log(
-          `[${step.order}/${plan.totalSteps}] ${operation}ing ${step.process.name}...`,
+        logger.debug(
+          `[${step.order}/${plan.totalSteps}] ${operation}ing ${step.process.name}`,
         );
 
         switch (operation) {
@@ -49,15 +46,15 @@ export class PlanExecutor {
         }
 
         step.status = "completed";
-        console.log(`✅ ${step.process.name} ${operation}ed successfully`);
+        logger.success(`${step.process.name} ${operation}ed successfully`);
       } catch (error) {
         step.status = "failed";
-        console.log(`❌ Failed to ${operation} ${step.process.name}: ${error}`);
+        logger.error(`Failed to ${operation} ${step.process.name}:`, error);
         throw error;
       }
     }
 
-    console.log(`🎉 All processes ${operation}ed successfully!`);
+    logger.success(`All processes ${operation}ed successfully!`);
   }
 
   createPlan(processes: Process[]): ExecutionPlan {

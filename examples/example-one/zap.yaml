@@ -1,0 +1,7 @@
+project: example-one
+env_files: [.env.base]
+bare_metal:
+  myservice:
+    cmd: echo $APP_ENV
+    cwd: ./node-monorepo/packages/lolli
+    env: [APP_ENV, LOLLI_PORT, REDIS_URL, MONGO_CONNECTION_STRING]

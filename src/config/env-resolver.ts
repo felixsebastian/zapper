@@ -1,6 +1,9 @@
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
+import path from "path";
 import { parse } from "yaml";
-import { ZapperConfig } from "../types";
+import { config as dotenvConfig } from "dotenv";
+import { ZapperConfig, Process } from "../types";
+import { logger } from "../utils/logger";
 
 interface RawEnvFile {
   envs?: Array<Record<string, string>>;
@@ -14,20 +17,56 @@ export class EnvResolver {
       resolvedConfig.env_files,
     );
 
-    for (const proc of resolvedConfig.processes) {
-      if (proc.envs && proc.envs.length > 0) {
-        const envSubset: Record<string, string> = {};
-        for (const key of proc.envs) {
-          const value = mergedEnvFromFiles[key];
-          if (value !== undefined) envSubset[key] = value;
+    logger.debug("Merged env files:", mergedEnvFromFiles);
+
+    // Process bare_metal processes (preferred)
+    if (resolvedConfig.bare_metal) {
+      for (const [name, proc] of Object.entries(resolvedConfig.bare_metal)) {
+        // Ensure the process has a name field
+        if (!proc.name) {
+          proc.name = name;
         }
-        proc.env = this.interpolateEnvVars(envSubset);
-      } else if (proc.env) {
-        proc.env = this.interpolateEnvVars(proc.env);
+        this.resolveProcessEnv(proc, mergedEnvFromFiles);
+      }
+    }
+
+    // Process legacy processes (backward compatibility)
+    if (resolvedConfig.processes) {
+      for (const proc of resolvedConfig.processes) {
+        this.resolveProcessEnv(proc, mergedEnvFromFiles);
       }
     }
 
     return resolvedConfig;
+  }
+
+  private static resolveProcessEnv(
+    proc: Process,
+    mergedEnvFromFiles: Record<string, string>,
+  ): void {
+    logger.debug(`Processing process: ${proc.name}`);
+
+    // Normalize: prefer 'env' (whitelist). If missing, fallback to legacy 'envs'.
+    const whitelist = Array.isArray(proc.env)
+      ? proc.env
+      : Array.isArray(proc.envs)
+        ? proc.envs
+        : [];
+
+    logger.debug(`Process env whitelist:`, whitelist);
+
+    const envSubset: Record<string, string> = {};
+    for (const key of whitelist) {
+      const value = mergedEnvFromFiles[key];
+      logger.debug(`Looking for env var ${key}, found:`, value);
+      if (value !== undefined) envSubset[key] = value;
+    }
+
+    proc.resolvedEnv = envSubset;
+    // Ensure env remains the whitelist for downstream usage/logging
+    proc.env = whitelist;
+
+    logger.debug(`Final resolved env for ${proc.name}:`, proc.resolvedEnv);
   }
 
   static getMergedEnvFromFiles(config: ZapperConfig): Record<string, string> {
@@ -40,54 +79,74 @@ export class EnvResolver {
     const merged: Record<string, string> = {};
     if (!envFiles || envFiles.length === 0) return merged;
 
+    logger.debug("Loading env files:", envFiles);
+
     for (const filePath of envFiles) {
       try {
-        const content = readFileSync(filePath, "utf8");
-        const parsed = parse(content) as RawEnvFile | undefined;
-        if (!parsed || !parsed.envs) continue;
-        for (const entry of parsed.envs) {
-          for (const [k, v] of Object.entries(entry)) {
-            merged[k] = String(v);
+        if (!existsSync(filePath)) {
+          logger.warn(`Env file does not exist: ${filePath}`);
+          continue;
+        }
+
+        logger.debug(`Reading env file: ${filePath}`);
+
+        const baseName = path.basename(filePath);
+        if (baseName.startsWith(".env")) {
+          const result = dotenvConfig({ path: filePath, override: true });
+          if (result.error) {
+            throw new Error(
+              `Failed to load .env file: ${result.error.message}`,
+            );
+          }
+
+          const envVars = result.parsed || {};
+          logger.debug(`Loaded .env vars:`, envVars);
+
+          for (const [key, value] of Object.entries(envVars)) {
+            if (value !== undefined) {
+              merged[key] = String(value);
+              logger.debug(`Added env var: ${key} = ${value}`);
+            }
+          }
+        } else {
+          const content = readFileSync(filePath, "utf8");
+          logger.debug(`File content:`, content);
+
+          const parsed = parse(content) as RawEnvFile | undefined;
+          logger.debug(`Parsed content:`, parsed);
+
+          if (!parsed || !parsed.envs) {
+            logger.debug(`No envs found in ${filePath}`);
+            continue;
+          }
+
+          for (const entry of parsed.envs) {
+            logger.debug(`Processing env entry:`, entry);
+            for (const [k, v] of Object.entries(entry)) {
+              merged[k] = String(v);
+              logger.debug(`Added env var: ${k} = ${v}`);
+            }
           }
         }
       } catch (error) {
         throw new Error(`Failed to load env file ${filePath}: ${error}`);
       }
     }
+
+    logger.debug("Final merged env vars:", merged);
     return merged;
-  }
-
-  private static interpolateEnvVars(
-    env: Record<string, string>,
-  ): Record<string, string> {
-    const resolved: Record<string, string> = {} as Record<string, string>;
-
-    for (const [key, value] of Object.entries(env)) {
-      resolved[key] = this.interpolateString(value);
-    }
-
-    return resolved;
-  }
-
-  private static interpolateString(str: string): string {
-    return str.replace(/\$\{([^}]+)\}/g, (match, varName) => {
-      const envValue = globalThis.process?.env?.[varName];
-      if (envValue === undefined) {
-        throw new Error(`Environment variable ${varName} is not defined`);
-      }
-      return envValue;
-    });
   }
 
   static getProcessEnv(
     processName: string,
     config: ZapperConfig,
   ): Record<string, string> {
-    const process = config.processes.find((p) => p.name === processName);
+    // Check bare_metal first, then fallback to legacy processes
+    let process = config.bare_metal?.[processName];
     if (!process) {
-      throw new Error(`Process ${processName} not found`);
+      process = config.processes?.find((p) => p.name === processName);
     }
-
-    return process.env || {};
+    if (!process) throw new Error(`Process ${processName} not found`);
+    return process.resolvedEnv || {};
   }
 }
