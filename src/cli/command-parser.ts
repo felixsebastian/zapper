@@ -94,14 +94,11 @@ export class CommandParser {
   }
 
   private static readonly canonicalToAliases = {
-    // Start
-    up: ["start", "s"],
-    // Stop
+    up: ["start", "s", "u"],
     down: ["stop", "delete"],
-    // Other
     restart: [],
-    status: [],
-    logs: [],
+    status: ["ps"],
+    logs: ["l"],
     reset: [],
   } as const;
 
