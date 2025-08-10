@@ -97,6 +97,33 @@ describe("ConfigValidator", () => {
     }).toThrow("Config must have a project field");
   });
 
+  it("should reject invalid project name", () => {
+    const config: ZapperConfig = {
+      project: "invalid_name_123",
+      bare_metal: {
+        test: { name: "test", cmd: "echo ok" },
+      },
+    };
+
+    expect(() => ConfigValidator.validate(config)).toThrow(
+      "Project name 'invalid_name_123' is invalid. Only letters and hyphens are allowed",
+    );
+  });
+
+  it("should reject unknown top-level keys", () => {
+    const config = {
+      project: "myproj",
+      bare_metal: {
+        test: { name: "test", cmd: "echo ok" },
+      },
+      unknown_key: true,
+    } as unknown as ZapperConfig;
+
+    expect(() => ConfigValidator.validate(config)).toThrow(
+      "Unknown top-level key: unknown_key",
+    );
+  });
+
   it("should reject config without bare_metal or processes", () => {
     const config: ZapperConfig = {
       project: "myproj",
@@ -147,19 +174,77 @@ describe("ConfigValidator", () => {
     }).toThrow("Process test must have a cmd field");
   });
 
-  it("should reject container without image", () => {
+  it("should reject invalid service names and mismatched names", () => {
+    const configBadName: ZapperConfig = {
+      project: "myproj",
+      bare_metal: {
+        front_end: { name: "front_end", cmd: "run" },
+      },
+    };
+    expect(() => ConfigValidator.validate(configBadName)).toThrow(
+      "Service name 'front_end' is invalid. Only letters and hyphens are allowed",
+    );
+
+    const configMismatch: ZapperConfig = {
+      project: "myproj",
+      bare_metal: {
+        frontend: { name: "fe", cmd: "run" },
+      },
+    };
+    expect(() => ConfigValidator.validate(configMismatch)).toThrow(
+      "Process name 'fe' must match its key 'frontend'",
+    );
+  });
+
+  it("should reject duplicate names across bare_metal and containers", () => {
     const config: ZapperConfig = {
       project: "myproj",
+      bare_metal: {
+        api: { name: "api", cmd: "run" },
+      },
       containers: {
-        database: {
-          ports: ["5432:5432"],
-        } as unknown as NonNullable<ZapperConfig["containers"]>[string],
+        api: { image: "redis:7" },
       },
     };
 
-    expect(() => {
-      ConfigValidator.validate(config);
-    }).toThrow("Container database must have an image field");
+    expect(() => ConfigValidator.validate(config)).toThrow(
+      "Duplicate service name 'api' across bare_metal and containers",
+    );
+  });
+
+  it("should reject unknown keys in process and container entries", () => {
+    const config1 = {
+      project: "myproj",
+      bare_metal: {
+        api: { name: "api", cmd: "run", foo: true },
+      },
+    } as unknown as ZapperConfig;
+    expect(() => ConfigValidator.validate(config1)).toThrow(
+      "Unknown key in bare_metal['api']: foo",
+    );
+
+    const config2 = {
+      project: "myproj",
+      containers: {
+        db: { image: "postgres:15", bar: 1 },
+      },
+    } as unknown as ZapperConfig;
+    expect(() => ConfigValidator.validate(config2)).toThrow(
+      "Unknown key in containers['db']: bar",
+    );
+  });
+
+  it("should reject container name mismatch when name field present", () => {
+    const config = {
+      project: "myproj",
+      containers: {
+        db: { name: "postgres", image: "postgres:15" },
+      },
+    } as unknown as ZapperConfig;
+
+    expect(() => ConfigValidator.validate(config)).toThrow(
+      "Container name 'postgres' must match its key 'db'",
+    );
   });
 
   it("should reject container with invalid ports", () => {

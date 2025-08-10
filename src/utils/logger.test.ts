@@ -31,7 +31,9 @@ describe("Logger", () => {
 
   it("should log info messages by default", () => {
     logger.info("test message");
-    expect(consoleSpy.log).toHaveBeenCalledWith("test message");
+    const call = consoleSpy.log.mock.calls[0][0] as string;
+    expect(call).toContain("test message");
+    expect(call).toContain("ℹ️");
   });
 
   it("should not log debug messages by default", () => {
@@ -42,7 +44,9 @@ describe("Logger", () => {
   it("should log debug messages when level is set to DEBUG", () => {
     logger.setLevel(LogLevel.DEBUG);
     logger.debug("debug message");
-    expect(consoleSpy.log).toHaveBeenCalledWith("[DEBUG] debug message");
+    const call = consoleSpy.log.mock.calls[0][0] as string;
+    expect(call).toContain("debug message");
+    expect(call).toContain("🐞");
   });
 
   it("should not log when silent is true", () => {
@@ -54,15 +58,17 @@ describe("Logger", () => {
   it("should include timestamp when enabled", () => {
     logger.setTimestamp(true);
     logger.info("test message");
-    const call = consoleSpy.log.mock.calls[0][0];
+    const call = consoleSpy.log.mock.calls[0][0] as string;
     expect(call).toContain("test message");
-    expect(call).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/);
+    expect(call).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\./);
   });
 
   it("should format data correctly", () => {
     const testData = { key: "value" };
     logger.info("test message", testData);
-    expect(consoleSpy.log).toHaveBeenCalledWith('test message {"key":"value"}');
+    const call = consoleSpy.log.mock.calls[0][0] as string;
+    expect(call).toContain("test message");
+    expect(call).toContain('{"key":"value"}');
   });
 
   it("should respect log level hierarchy", () => {
@@ -73,17 +79,16 @@ describe("Logger", () => {
     logger.warn("warn message");
     logger.error("error message");
 
+    const warnCall = consoleSpy.warn.mock.calls[0][0] as string;
+    const errorCall = consoleSpy.error.mock.calls[0][0] as string;
+
     expect(consoleSpy.log).not.toHaveBeenCalledWith(
-      expect.stringContaining("DEBUG"),
+      expect.stringContaining("debug message"),
     );
     expect(consoleSpy.log).not.toHaveBeenCalledWith(
-      expect.stringContaining("INFO"),
+      expect.stringContaining("info message"),
     );
-    expect(consoleSpy.warn).toHaveBeenCalledWith(
-      expect.stringContaining("[WARN]"),
-    );
-    expect(consoleSpy.error).toHaveBeenCalledWith(
-      expect.stringContaining("[ERROR]"),
-    );
+    expect(warnCall).toContain("⚠️");
+    expect(errorCall).toContain("❌");
   });
 });

@@ -7,3 +7,5 @@ For running the program for testing purposes, create example projects like:
 ./examples/myproj/zap.yaml
 
 Remember to `pnpm build` and link (its ususally already linked). Then cd into the example project and zap away.
+
+Make sure to clean up after, stopping processes and deleting the relevant .zap folders.

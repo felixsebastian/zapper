@@ -11,30 +11,16 @@ export class CommandParser {
       throw new Error("No command specified. Use: zap <command> [options]");
     }
 
-    const command = cleanArgs[0] as Command;
+    const command = cleanArgs[0] as string;
     if (!this.isValidCommand(command)) {
       throw new Error(
-        `Invalid command: ${command}. Valid commands: up/start/s, down/stop/delete, restart, status, logs`,
+        `Invalid command: ${command}. Valid commands: up/start/s, down/stop/delete, restart, status, logs, reset`,
       );
     }
 
-    // Map aliases to canonical commands
-    const commandAliases: Record<string, Command> = {
-      // Start commands
-      up: "up",
-      start: "start",
-      s: "start",
-      // Stop commands
-      down: "down",
-      stop: "stop",
-      delete: "stop",
-      // Other commands
-      restart: "restart",
-      status: "status",
-      logs: "logs",
-    };
-
-    options.command = commandAliases[command];
+    // Preserve invoked string and resolve canonical
+    options.invoked = command;
+    options.command = this.aliasToCanonical[command] as Command;
 
     // Parse remaining arguments
     for (let i = 1; i < cleanArgs.length; i++) {
@@ -107,24 +93,31 @@ export class CommandParser {
     return options as CliOptions;
   }
 
-  private static isValidCommand(command: string): command is Command {
-    // Map aliases to their canonical commands
-    const commandAliases: Record<string, Command> = {
-      // Start commands
-      up: "up",
-      start: "start",
-      s: "start",
-      // Stop commands
-      down: "down",
-      stop: "stop",
-      delete: "stop",
-      // Other commands
-      restart: "restart",
-      status: "status",
-      logs: "logs",
-    };
+  private static readonly canonicalToAliases = {
+    // Start
+    up: ["start", "s"],
+    // Stop
+    down: ["stop", "delete"],
+    // Other
+    restart: [],
+    status: [],
+    logs: [],
+    reset: [],
+  } as const;
 
-    return command in commandAliases;
+  private static readonly aliasToCanonical: Record<string, Command> = (() => {
+    const map: Record<string, Command> = {};
+    for (const [canonical, aliases] of Object.entries(
+      this.canonicalToAliases,
+    )) {
+      map[canonical] = canonical as Command;
+      for (const alias of aliases) map[alias] = canonical as Command;
+    }
+    return map;
+  })();
+
+  private static isValidCommand(command: string): command is Command {
+    return command in this.aliasToCanonical;
   }
 
   static getHelp(): string {
@@ -135,14 +128,13 @@ Commands:
   up       Start all processes or a specific process (aliases: start, s)
   down     Stop all processes or a specific process (aliases: stop, delete)
   restart  Restart all processes or a specific process
-  status   Show status of all processes or a specific process
+  status   Show status from PM2 (filters to current project by default)
   logs     Show logs for a specific process (requires --service, supports --follow)
-  start    Start a specific process (aliases: up, s)
-  stop     Stop and delete a specific process (aliases: down, delete) - cleans up logs and wrapper scripts
+  reset    Stop all processes and delete the .zap directory
 
 Options:
   --service <name>  Target a specific process
-  --all            Apply to all processes (default for some commands)
+  --all            Include processes from all projects (for status)
   --force          Force the operation
   --follow         Follow logs (for logs command)
   --config <file>  Use a specific config file (default: zap.yaml)
@@ -158,11 +150,11 @@ Examples:
   zap down --all            # Stop all processes
   zap stop                  # Same as zap down
   zap delete                # Same as zap down
-  zap status                # Show status of all processes
-  zap logs --service test   # Show logs for test process
-  zap logs --follow         # Follow logs for all processes
+  zap status                # Show status for current project processes
+  zap status --all          # Show status for all PM2 processes
   zap logs --service test   # Show logs for test process
   zap logs --service test --follow  # Follow logs for test process
+  zap reset --force         # Stop all processes and remove .zap without prompt
 `;
   }
 }

@@ -45,17 +45,11 @@ export interface ProcessInfo {
   restarts: number;
 }
 
-export type Command =
-  | "up"
-  | "down"
-  | "restart"
-  | "status"
-  | "logs"
-  | "stop"
-  | "start";
+export type Command = "up" | "down" | "restart" | "status" | "logs" | "reset";
 
 export interface CliOptions {
   command: Command;
+  invoked?: string;
   service?: string;
   all?: boolean;
   force?: boolean;

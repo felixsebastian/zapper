@@ -1,8 +1,10 @@
 import { existsSync } from "fs";
 import { ZapperConfig, Process, Container, Volume } from "../types";
+import { assertValidName } from "../utils/validators";
 
 export class ConfigValidator {
   static validate(config: ZapperConfig): void {
+    this.validateTopLevelKeys(config);
     this.validateProject(config);
     this.validateEnvFiles(config);
     this.validateBareMetal(config);
@@ -10,7 +12,17 @@ export class ConfigValidator {
     // Backward compatibility
     this.validateProcesses(config);
 
-    // Require at least one process definition (bare_metal or legacy processes)
+    // Global uniqueness across bare_metal and containers (by keys)
+    const bare = new Set(Object.keys(config.bare_metal || {}));
+    const cont = new Set(Object.keys(config.containers || {}));
+    for (const name of cont) {
+      if (bare.has(name))
+        throw new Error(
+          `Duplicate service name '${name}' across bare_metal and containers`,
+        );
+    }
+
+    // Require at least one process definition (bare_metal, containers, or legacy processes)
     const hasBareMetal =
       typeof config.bare_metal === "object" &&
       config.bare_metal !== null &&
@@ -26,10 +38,26 @@ export class ConfigValidator {
     }
   }
 
+  private static validateTopLevelKeys(config: ZapperConfig): void {
+    const allowed = new Set([
+      "project",
+      "env_files",
+      "bare_metal",
+      "containers",
+      "processes",
+    ]);
+    for (const key of Object.keys(
+      config as unknown as Record<string, unknown>,
+    )) {
+      if (!allowed.has(key)) throw new Error(`Unknown top-level key: ${key}`);
+    }
+  }
+
   private static validateProject(config: ZapperConfig): void {
     if (!config.project) {
       throw new Error("Config must have a project field");
     }
+    assertValidName(config.project, "Project");
   }
 
   private static validateEnvFiles(config: ZapperConfig): void {
@@ -57,11 +85,15 @@ export class ConfigValidator {
         throw new Error("bare_metal must have at least one process defined");
       }
       for (const [name, process] of Object.entries(config.bare_metal)) {
+        assertValidName(name, "Service");
         // Ensure the process has a name field matching the key
-        if (!process.name) {
-          process.name = name;
-        }
+        if (!process.name) process.name = name;
+        if (process.name !== name)
+          throw new Error(
+            `Process name '${process.name}' must match its key '${name}'`,
+          );
         this.validateProcess(process);
+        this.validateProcessKeys(process, name);
       }
     }
   }
@@ -72,6 +104,14 @@ export class ConfigValidator {
         throw new Error("containers must be an object");
       }
       for (const [name, container] of Object.entries(config.containers)) {
+        assertValidName(name, "Service");
+        this.validateContainerKeys(container, name);
+        // If container.name is provided, enforce it matches key as a strictness rule
+        if (container.name && container.name !== name) {
+          throw new Error(
+            `Container name '${container.name}' must match its key '${name}'`,
+          );
+        }
         this.validateContainer(name, container);
       }
     }
@@ -134,6 +174,17 @@ export class ConfigValidator {
   }
 
   private static validateVolume(containerName: string, volume: Volume): void {
+    // Unknown keys in volume
+    const allowed = new Set(["name", "internal_dir"]);
+    for (const key of Object.keys(
+      volume as unknown as Record<string, unknown>,
+    )) {
+      if (!allowed.has(key))
+        throw new Error(
+          `Unknown key in volume for containers['${containerName}']: ${key}`,
+        );
+    }
+
     if (!volume.name) {
       throw new Error(
         `Container ${containerName} volume must have a name field`,
@@ -155,8 +206,15 @@ export class ConfigValidator {
       if (config.processes.length === 0) {
         throw new Error("Config must have at least one process defined");
       }
-      for (const process of config.processes) {
+      const seen = new Set<string>();
+      for (const [index, process] of config.processes.entries()) {
         this.validateProcess(process);
+        this.validateProcessKeys(process, `processes[${index}]`);
+        if (seen.has(process.name))
+          throw new Error(
+            `Duplicate process name '${process.name}' in processes`,
+          );
+        seen.add(process.name);
       }
     }
   }
@@ -165,6 +223,7 @@ export class ConfigValidator {
     if (!process.name) {
       throw new Error("Process must have a name field");
     }
+    assertValidName(process.name, "Service");
 
     if (!process.cmd) {
       throw new Error(`Process ${process.name} must have a cmd field`);
@@ -190,6 +249,45 @@ export class ConfigValidator {
           );
         }
       }
+    }
+  }
+
+  private static validateProcessKeys(process: Process, name: string): void {
+    const allowed = new Set([
+      "name",
+      "cmd",
+      "cwd",
+      "env",
+      "envs",
+      "resolvedEnv",
+      "source",
+    ]);
+    for (const key of Object.keys(
+      process as unknown as Record<string, unknown>,
+    )) {
+      if (!allowed.has(key))
+        throw new Error(`Unknown key in bare_metal['${name}']: ${key}`);
+    }
+  }
+
+  private static validateContainerKeys(
+    container: Container,
+    name: string,
+  ): void {
+    const allowed = new Set([
+      "name",
+      "image",
+      "ports",
+      "env",
+      "volumes",
+      "networks",
+      "command",
+    ]);
+    for (const key of Object.keys(
+      container as unknown as Record<string, unknown>,
+    )) {
+      if (!allowed.has(key))
+        throw new Error(`Unknown key in containers['${name}']: ${key}`);
     }
   }
 }

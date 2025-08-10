@@ -11,6 +11,22 @@ export interface LoggerOptions {
   timestamp?: boolean;
 }
 
+const colors = {
+  reset: "\u001B[0m",
+  red: "\u001B[31m",
+  green: "\u001B[32m",
+  yellow: "\u001B[33m",
+  white: "\u001B[37m",
+};
+
+const emoji = {
+  error: "❌",
+  warn: "⚠️",
+  info: "ℹ️",
+  debug: "🐞",
+  success: "⚡️",
+};
+
 export class Logger {
   private level: LogLevel;
   private silent: boolean;
@@ -22,15 +38,8 @@ export class Logger {
     this.timestamp = options.timestamp ?? false;
   }
 
-  private formatMessage(
-    level: string,
-    message: string,
-    data?: unknown,
-  ): string {
-    const timestamp = this.timestamp ? `[${new Date().toISOString()}] ` : "";
-    const levelStr = `[${level.toUpperCase()}] `;
-    const dataStr = this.formatData(data);
-    return `${timestamp}${levelStr}${message}${dataStr}`;
+  private prefix(): string {
+    return this.timestamp ? `[${new Date().toISOString()}] ` : "";
   }
 
   private shouldLog(level: LogLevel): boolean {
@@ -51,45 +60,43 @@ export class Logger {
   }
 
   error(message: string, data?: unknown): void {
-    if (this.shouldLog(LogLevel.ERROR)) {
-      (
-        globalThis as { console?: { error: (msg: string) => void } }
-      ).console?.error(this.formatMessage("ERROR", message, data));
-    }
+    if (!this.shouldLog(LogLevel.ERROR)) return;
+    const msg = `${this.prefix()}${emoji.error} ${message}${this.formatData(data)}`;
+    (
+      globalThis as { console?: { error: (msg: string) => void } }
+    ).console?.error(`${colors.red}${msg}${colors.reset}`);
   }
 
   warn(message: string, data?: unknown): void {
-    if (this.shouldLog(LogLevel.WARN)) {
-      (
-        globalThis as { console?: { warn: (msg: string) => void } }
-      ).console?.warn(this.formatMessage("WARN", message, data));
-    }
+    if (!this.shouldLog(LogLevel.WARN)) return;
+    const msg = `${this.prefix()}${emoji.warn} ${message}${this.formatData(data)}`;
+    (globalThis as { console?: { warn: (msg: string) => void } }).console?.warn(
+      `${colors.yellow}${msg}${colors.reset}`,
+    );
   }
 
   info(message: string, data?: unknown): void {
-    if (this.shouldLog(LogLevel.INFO)) {
-      const timestamp = this.timestamp ? `[${new Date().toISOString()}] ` : "";
-      const dataStr = this.formatData(data);
-      (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
-        `${timestamp}${message}${dataStr}`,
-      );
-    }
+    if (!this.shouldLog(LogLevel.INFO)) return;
+    const msg = `${this.prefix()}${emoji.info} ${message}${this.formatData(data)}`;
+    (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
+      `${colors.white}${msg}${colors.reset}`,
+    );
   }
 
   debug(message: string, data?: unknown): void {
-    if (this.shouldLog(LogLevel.DEBUG)) {
-      (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
-        this.formatMessage("DEBUG", message, data),
-      );
-    }
+    if (!this.shouldLog(LogLevel.DEBUG)) return;
+    const msg = `${this.prefix()}${emoji.debug} ${message}${this.formatData(data)}`;
+    (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
+      msg,
+    );
   }
 
   success(message: string, data?: unknown): void {
-    if (this.shouldLog(LogLevel.INFO)) {
-      (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
-        `✅ ${this.formatMessage("SUCCESS", message, data)}`,
-      );
-    }
+    if (!this.shouldLog(LogLevel.INFO)) return;
+    const msg = `${this.prefix()}${emoji.success} ${message}${this.formatData(data)}`;
+    (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
+      `${colors.green}${msg}${colors.reset}`,
+    );
   }
 
   setLevel(level: LogLevel): void {

@@ -21,6 +21,17 @@ export class PlanExecutor {
       throw new Error("Invalid execution plan");
     }
 
+    const opVerb = operation;
+    const opPast =
+      opVerb === "stop"
+        ? "stopped"
+        : opVerb === "start"
+          ? "started"
+          : "restarted";
+
+    logger.info(
+      `${opVerb === "start" ? "Starting" : opVerb === "stop" ? "Stopping" : "Restarting"} ${plan.totalSteps} process${plan.totalSteps === 1 ? "" : "es"}...`,
+    );
     logger.debug(`Executing ${operation} plan with ${plan.totalSteps} steps`);
 
     for (const step of plan.steps) {
@@ -32,9 +43,8 @@ export class PlanExecutor {
 
         switch (operation) {
           case "start":
-            if (!projectName) {
+            if (!projectName)
               throw new Error("Project name is required for start operations");
-            }
             await this.executor.startProcess(step.process, projectName);
             break;
           case "stop":
@@ -46,7 +56,8 @@ export class PlanExecutor {
         }
 
         step.status = "completed";
-        logger.success(`${step.process.name} ${operation}ed successfully`);
+        // per-service success moved to debug
+        logger.debug(`${step.process.name} ${opPast}`);
       } catch (error) {
         step.status = "failed";
         logger.error(`Failed to ${operation} ${step.process.name}:`, error);
@@ -54,7 +65,7 @@ export class PlanExecutor {
       }
     }
 
-    logger.success(`All processes ${operation}ed successfully!`);
+    logger.success(`All processes ${opPast}.`);
   }
 
   createPlan(processes: Process[]): ExecutionPlan {

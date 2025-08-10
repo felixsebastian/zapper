@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "fs";
 import path from "path";
 import { parse } from "yaml";
-import { config as dotenvConfig } from "dotenv";
+import { parse as dotenvParse } from "dotenv";
 import { ZapperConfig, Process } from "../types";
 import { logger } from "../utils/logger";
 
@@ -91,15 +91,11 @@ export class EnvResolver {
         logger.debug(`Reading env file: ${filePath}`);
 
         const baseName = path.basename(filePath);
-        if (baseName.startsWith(".env")) {
-          const result = dotenvConfig({ path: filePath, override: true });
-          if (result.error) {
-            throw new Error(
-              `Failed to load .env file: ${result.error.message}`,
-            );
-          }
-
-          const envVars = result.parsed || {};
+        const isDotenvFile =
+          baseName.startsWith(".env") || baseName.endsWith(".env");
+        if (isDotenvFile) {
+          const content = readFileSync(filePath, "utf8");
+          const envVars = dotenvParse(content) || {};
           logger.debug(`Loaded .env vars:`, envVars);
 
           for (const [key, value] of Object.entries(envVars)) {

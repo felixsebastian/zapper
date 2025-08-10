@@ -38,6 +38,10 @@ export class Zapper {
     }
   }
 
+  getProject(): string | null {
+    return this.config?.project ?? null;
+  }
+
   private getProcesses(): Process[] {
     if (!this.config) {
       throw new Error("Config not loaded");
@@ -113,13 +117,9 @@ export class Zapper {
       throw new Error("Config not loaded");
     }
 
-    const allProcesses = this.getProcesses();
-    const processesToRestart = processNames
-      ? allProcesses.filter((p) => processNames.includes(p.name))
-      : allProcesses;
-
-    const plan = this.planExecutor!.createPlan(processesToRestart);
-    await this.planExecutor!.executePlan(plan, "restart");
+    // Perform a true restart by deleting then starting so updates apply
+    await this.stopProcesses(processNames);
+    await this.startProcesses(processNames);
   }
 
   async getProcessStatus(processName?: string): Promise<Process[]> {
@@ -143,5 +143,27 @@ export class Zapper {
 
     const pm2Executor = new Pm2Executor(projectName, configDir);
     await pm2Executor.showLogs(processName, follow);
+  }
+
+  async reset(): Promise<void> {
+    if (!this.configDir) throw new Error("Config not loaded");
+
+    // Stop all processes defined in config (best-effort)
+    try {
+      await this.stopProcesses();
+    } catch (e) {
+      logger.warn(`Failed to stop processes: ${e}`);
+    }
+
+    // Remove .zap directory
+    const fs = await import("fs");
+    const zapDir = path.join(this.configDir, ".zap");
+    try {
+      if (fs.existsSync(zapDir))
+        fs.rmSync(zapDir, { recursive: true, force: true });
+      logger.info(`Removed ${zapDir}`);
+    } catch (e) {
+      logger.warn(`Failed to remove ${zapDir}: ${e}`);
+    }
   }
 }
