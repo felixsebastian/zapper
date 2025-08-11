@@ -2,15 +2,18 @@ project: myproj
 env_files: [.env]
 bare_metal:
   frontend:
+    aliases: [f]
     cmd: npm run dev
     cwd: ./frontend
     env: [PORT, API_URL]
   api:
+    aliases: [a]
     cmd: npm run dev
     cwd: ./api
     env: [PORT, DATABASE_URL]
 containers:
   database:
+    aliases: [db]
     image: postgres:15
     ports:
       - "5432:5432"

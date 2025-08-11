@@ -29,15 +29,19 @@ async function main() {
     // Load config
     await zapper.loadConfig(options.config);
 
+    const resolvedService = options.service
+      ? zapper.resolveServiceName(options.service)
+      : undefined;
+
     switch (options.command) {
       case "up":
-        if (options.service) await zapper.startProcesses([options.service]);
+        if (resolvedService) await zapper.startProcesses([resolvedService]);
         else await zapper.startProcesses();
         break;
 
       case "down":
-        if (options.service) {
-          await zapper.stopProcesses([options.service]);
+        if (resolvedService) {
+          await zapper.stopProcesses([resolvedService]);
         } else {
           const proceed = await confirm(
             "This will stop all bare metal processes. Continue?",
@@ -52,7 +56,7 @@ async function main() {
         break;
 
       case "restart":
-        if (options.service) await zapper.restartProcesses([options.service]);
+        if (resolvedService) await zapper.restartProcesses([resolvedService]);
         else await zapper.restartProcesses();
         break;
 
@@ -77,7 +81,7 @@ async function main() {
             restarts: p.restarts,
           }))
           .filter((p) =>
-            !options.service ? true : p.service === options.service,
+            !resolvedService ? true : p.service === resolvedService,
           );
 
         const emojiFor = (status: string) => {
@@ -105,15 +109,15 @@ async function main() {
       }
 
       case "logs":
-        if (!options.service) {
+        if (!resolvedService) {
           throw new Error(
             "Service name required for logs command. Use: zap logs --service <name>",
           );
         }
         logger.info(
-          `Showing logs for ${options.service}${options.follow ? " (following)" : ""}`,
+          `Showing logs for ${resolvedService}${options.follow ? " (following)" : ""}`,
         );
-        await zapper.showLogs(options.service, options.follow);
+        await zapper.showLogs(resolvedService, options.follow);
         break;
 
       case "reset": {

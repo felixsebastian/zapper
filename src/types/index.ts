@@ -6,6 +6,8 @@ export interface Process {
   envs?: string[];
   // Whitelist of environment variable keys
   env?: string[];
+  // Optional shorthand aliases for this service
+  aliases?: string[];
   // Computed resolved env map used internally for execution
   resolvedEnv?: Record<string, string>;
   source?: string;
@@ -24,6 +26,8 @@ export interface Container {
   volumes?: Volume[];
   networks?: string[];
   command?: string;
+  // Optional shorthand aliases for this container service
+  aliases?: string[];
 }
 
 export interface ZapperConfig {

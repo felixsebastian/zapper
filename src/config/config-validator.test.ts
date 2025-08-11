@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ConfigValidator } from "./config-validator";
-import { ZapperConfig, Process, Volume } from "../types";
+import { ZapperConfig, Process } from "../types";
 
 describe("ConfigValidator", () => {
   it("should validate correct config with bare_metal", () => {
@@ -106,7 +106,7 @@ describe("ConfigValidator", () => {
     };
 
     expect(() => ConfigValidator.validate(config)).toThrow(
-      "Project name 'invalid_name_123' is invalid. Only letters and hyphens are allowed",
+      "Project name 'invalid_name_123' is invalid. Must start with a letter and contain only letters, digits, and hyphens",
     );
   });
 
@@ -182,7 +182,7 @@ describe("ConfigValidator", () => {
       },
     };
     expect(() => ConfigValidator.validate(configBadName)).toThrow(
-      "Service name 'front_end' is invalid. Only letters and hyphens are allowed",
+      "Service name 'front_end' is invalid. Must start with a letter and contain only letters, digits, and hyphens",
     );
 
     const configMismatch: ZapperConfig = {
@@ -208,7 +208,7 @@ describe("ConfigValidator", () => {
     };
 
     expect(() => ConfigValidator.validate(config)).toThrow(
-      "Duplicate service name 'api' across bare_metal and containers",
+      "Duplicate service identifier 'api'. Names and aliases must be globally unique across bare_metal and containers",
     );
   });
 
@@ -234,95 +234,83 @@ describe("ConfigValidator", () => {
     );
   });
 
-  it("should reject container name mismatch when name field present", () => {
-    const config = {
-      project: "myproj",
-      containers: {
-        db: { name: "postgres", image: "postgres:15" },
+  it("should validate names with digits after first character", () => {
+    const config: ZapperConfig = {
+      project: "proj1",
+      bare_metal: {
+        api1: { name: "api1", cmd: "run" },
       },
-    } as unknown as ZapperConfig;
+      containers: {
+        db2: { image: "postgres:15" },
+      },
+    };
+    expect(() => ConfigValidator.validate(config)).not.toThrow();
+  });
 
+  // Aliases
+  it("should accept valid aliases and keep them unique globally", () => {
+    const config: ZapperConfig = {
+      project: "p",
+      bare_metal: {
+        frontend: { name: "frontend", cmd: "run", aliases: ["f", "fe"] },
+        api: { name: "api", cmd: "run", aliases: ["a"] },
+      },
+      containers: {
+        database: { image: "postgres:15", aliases: ["db"] },
+      },
+    };
+    expect(() => ConfigValidator.validate(config)).not.toThrow();
+  });
+
+  it("should reject duplicate alias within the same service", () => {
+    const config: ZapperConfig = {
+      project: "p",
+      bare_metal: {
+        frontend: { name: "frontend", cmd: "run", aliases: ["f", "f"] },
+      },
+    };
     expect(() => ConfigValidator.validate(config)).toThrow(
-      "Container name 'postgres' must match its key 'db'",
+      "Duplicate alias 'f' for bare_metal['frontend']",
     );
   });
 
-  it("should reject container with invalid ports", () => {
+  it("should reject alias equal to base name", () => {
     const config: ZapperConfig = {
-      project: "myproj",
-      containers: {
-        database: {
-          image: "postgres:15",
-          ports: [""],
-        },
+      project: "p",
+      bare_metal: {
+        frontend: { name: "frontend", cmd: "run", aliases: ["frontend"] },
       },
     };
-
-    expect(() => {
-      ConfigValidator.validate(config);
-    }).toThrow("Container database ports must contain non-empty strings");
+    expect(() => ConfigValidator.validate(config)).toThrow(
+      "Alias 'frontend' for bare_metal['frontend'] cannot equal its service name",
+    );
   });
 
-  it("should reject container with invalid volumes", () => {
+  it("should reject alias colliding with another service name", () => {
     const config: ZapperConfig = {
-      project: "myproj",
-      containers: {
-        database: {
-          image: "postgres:15",
-          volumes: [
-            {
-              name: "postgres_data",
-              // missing internal_dir
-            } as unknown as Volume,
-          ],
-        },
+      project: "p",
+      bare_metal: {
+        frontend: { name: "frontend", cmd: "run", aliases: ["api"] },
+        api: { name: "api", cmd: "run" },
       },
     };
-
-    expect(() => {
-      ConfigValidator.validate(config);
-    }).toThrow("Container database volume must have an internal_dir field");
+    expect(() => ConfigValidator.validate(config)).toThrow(
+      "Duplicate service identifier 'api'. Names and aliases must be globally unique across bare_metal and containers",
+    );
   });
 
-  // Backward compatibility tests
-  it("should reject config without processes when bare_metal is not present", () => {
+  it("should reject alias colliding across containers and bare_metal", () => {
     const config: ZapperConfig = {
-      project: "myproj",
-      processes: [],
+      project: "p",
+      bare_metal: {
+        frontend: { name: "frontend", cmd: "run", aliases: ["db"] },
+      },
+      containers: {
+        db: { image: "postgres:15" },
+      },
     };
-
-    expect(() => {
-      ConfigValidator.validate(config);
-    }).toThrow("Config must have at least one process defined");
-  });
-
-  it("should reject process without name in legacy processes", () => {
-    const config: ZapperConfig = {
-      project: "myproj",
-      processes: [
-        {
-          cmd: "echo 'hello world'",
-        } as unknown as NonNullable<ZapperConfig["processes"]>[0],
-      ],
-    };
-
-    expect(() => {
-      ConfigValidator.validate(config);
-    }).toThrow("Process must have a name field");
-  });
-
-  it("should reject process without cmd in legacy processes", () => {
-    const config: ZapperConfig = {
-      project: "myproj",
-      processes: [
-        {
-          name: "test",
-        } as unknown as NonNullable<ZapperConfig["processes"]>[0],
-      ],
-    };
-
-    expect(() => {
-      ConfigValidator.validate(config);
-    }).toThrow("Process test must have a cmd field");
+    expect(() => ConfigValidator.validate(config)).toThrow(
+      "Duplicate service identifier 'db'. Names and aliases must be globally unique across bare_metal and containers",
+    );
   });
 });

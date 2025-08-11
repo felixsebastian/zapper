@@ -65,6 +65,24 @@ export class Zapper {
     return [];
   }
 
+  private resolveAliasesToCanonical(names?: string[]): string[] | undefined {
+    if (!names || !this.config) return names;
+    const aliasToName = new Map<string, string>();
+    const processes = this.getProcesses();
+    for (const p of processes) {
+      aliasToName.set(p.name, p.name);
+      if (Array.isArray(p.aliases)) {
+        for (const a of p.aliases) aliasToName.set(a, p.name);
+      }
+    }
+    return names.map((n) => aliasToName.get(n) || n);
+  }
+
+  resolveServiceName(name: string): string {
+    const resolved = this.resolveAliasesToCanonical([name]);
+    return resolved && resolved.length > 0 ? resolved[0] : name;
+  }
+
   async startProcesses(processNames?: string[]): Promise<void> {
     if (!this.config) {
       throw new Error("Config not loaded");
@@ -75,9 +93,17 @@ export class Zapper {
       throw new Error("No processes defined in config");
     }
 
-    const processesToStart = processNames
-      ? allProcesses.filter((p) => processNames.includes(p.name))
+    const canonical = this.resolveAliasesToCanonical(processNames);
+
+    const processesToStart = canonical
+      ? allProcesses.filter((p) => canonical.includes(p.name))
       : allProcesses;
+
+    if (canonical && processesToStart.length === 0) {
+      throw new Error(
+        `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
+      );
+    }
 
     const mergedYamlEnvs = EnvResolver.getMergedEnvFromFiles(this.config);
     logger.debug("merged yaml envs:", mergedYamlEnvs);
@@ -104,9 +130,16 @@ export class Zapper {
     }
 
     const allProcesses = this.getProcesses();
-    const processesToStop = processNames
-      ? allProcesses.filter((p) => processNames.includes(p.name))
+    const canonical = this.resolveAliasesToCanonical(processNames);
+    const processesToStop = canonical
+      ? allProcesses.filter((p) => canonical.includes(p.name))
       : allProcesses;
+
+    if (canonical && processesToStop.length === 0) {
+      throw new Error(
+        `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
+      );
+    }
 
     const plan = this.planExecutor!.createPlan(processesToStop);
     await this.planExecutor!.executePlan(plan, "stop");
@@ -117,9 +150,9 @@ export class Zapper {
       throw new Error("Config not loaded");
     }
 
-    // Perform a true restart by deleting then starting so updates apply
-    await this.stopProcesses(processNames);
-    await this.startProcesses(processNames);
+    const canonical = this.resolveAliasesToCanonical(processNames);
+    await this.stopProcesses(canonical);
+    await this.startProcesses(canonical);
   }
 
   async getProcessStatus(processName?: string): Promise<Process[]> {
@@ -128,8 +161,11 @@ export class Zapper {
     }
 
     const allProcesses = this.getProcesses();
-    const processesToCheck = processName
-      ? allProcesses.filter((p) => p.name === processName)
+    const target = processName
+      ? this.resolveServiceName(processName)
+      : undefined;
+    const processesToCheck = target
+      ? allProcesses.filter((p) => p.name === target)
       : allProcesses;
 
     return processesToCheck;
@@ -142,7 +178,12 @@ export class Zapper {
     const configDir = this.configDir || ".";
 
     const pm2Executor = new Pm2Executor(projectName, configDir);
-    await pm2Executor.showLogs(processName, follow);
+
+    // Try to resolve alias if config is available; otherwise pass-through
+    const name = this.config
+      ? this.resolveServiceName(processName)
+      : processName;
+    await pm2Executor.showLogs(name, follow);
   }
 
   async reset(): Promise<void> {

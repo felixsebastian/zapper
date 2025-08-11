@@ -12,14 +12,30 @@ export class ConfigValidator {
     // Backward compatibility
     this.validateProcesses(config);
 
-    // Global uniqueness across bare_metal and containers (by keys)
-    const bare = new Set(Object.keys(config.bare_metal || {}));
-    const cont = new Set(Object.keys(config.containers || {}));
-    for (const name of cont) {
-      if (bare.has(name))
+    // Global uniqueness across bare_metal and containers for names and aliases
+    const seen = new Map<string, string>();
+    const add = (id: string, where: string) => {
+      if (seen.has(id)) {
         throw new Error(
-          `Duplicate service name '${name}' across bare_metal and containers`,
+          `Duplicate service identifier '${id}'. Names and aliases must be globally unique across bare_metal and containers`,
         );
+      }
+      seen.set(id, where);
+    };
+
+    if (config.bare_metal) {
+      for (const [name, proc] of Object.entries(config.bare_metal)) {
+        add(name, `bare_metal['${name}']`);
+        if (Array.isArray(proc.aliases))
+          for (const a of proc.aliases) add(a, `bare_metal['${name}'].aliases`);
+      }
+    }
+    if (config.containers) {
+      for (const [name, c] of Object.entries(config.containers)) {
+        add(name, `containers['${name}']`);
+        if (Array.isArray(c.aliases))
+          for (const a of c.aliases) add(a, `containers['${name}'].aliases`);
+      }
     }
 
     // Require at least one process definition (bare_metal, containers, or legacy processes)
@@ -94,6 +110,7 @@ export class ConfigValidator {
           );
         this.validateProcess(process);
         this.validateProcessKeys(process, name);
+        this.validateAliases(process.aliases, name, "bare_metal");
       }
     }
   }
@@ -113,6 +130,7 @@ export class ConfigValidator {
           );
         }
         this.validateContainer(name, container);
+        this.validateAliases(container.aliases, name, "containers");
       }
     }
   }
@@ -259,6 +277,7 @@ export class ConfigValidator {
       "cwd",
       "env",
       "envs",
+      "aliases",
       "resolvedEnv",
       "source",
     ]);
@@ -282,12 +301,41 @@ export class ConfigValidator {
       "volumes",
       "networks",
       "command",
+      "aliases",
     ]);
     for (const key of Object.keys(
       container as unknown as Record<string, unknown>,
     )) {
       if (!allowed.has(key))
         throw new Error(`Unknown key in containers['${name}']: ${key}`);
+    }
+  }
+
+  private static validateAliases(
+    aliases: unknown,
+    baseName: string,
+    section: "bare_metal" | "containers",
+  ): void {
+    if (aliases === undefined) return;
+    if (!Array.isArray(aliases))
+      throw new Error(
+        `Aliases for ${section}['${baseName}'] must be an array of strings`,
+      );
+
+    const local = new Set<string>();
+    for (const a of aliases) {
+      if (typeof a !== "string" || a.trim() === "")
+        throw new Error(
+          `Aliases for ${section}['${baseName}'] must contain non-empty strings`,
+        );
+      assertValidName(a, "Service alias");
+      if (a === baseName)
+        throw new Error(
+          `Alias '${a}' for ${section}['${baseName}'] cannot equal its service name`,
+        );
+      if (local.has(a))
+        throw new Error(`Duplicate alias '${a}' for ${section}['${baseName}']`);
+      local.add(a);
     }
   }
 }
