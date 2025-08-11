@@ -11,6 +11,8 @@ export interface Process {
   // Computed resolved env map used internally for execution
   resolvedEnv?: Record<string, string>;
   source?: string;
+  // Optional GitHub repository in the form "owner/repo" or a full URL
+  repo?: string;
 }
 
 export interface Volume {
@@ -33,6 +35,8 @@ export interface Container {
 export interface ZapperConfig {
   project: string;
   env_files?: string[];
+  // Preferred Git clone method (default: ssh)
+  git_method?: "http" | "ssh" | "cli";
   bare_metal?: Record<string, Process>;
   containers?: Record<string, Container>;
   // Backward compatibility
@@ -49,7 +53,14 @@ export interface ProcessInfo {
   restarts: number;
 }
 
-export type Command = "up" | "down" | "restart" | "status" | "logs" | "reset";
+export type Command =
+  | "up"
+  | "down"
+  | "restart"
+  | "status"
+  | "logs"
+  | "reset"
+  | "clone";
 
 export interface CliOptions {
   command: Command;

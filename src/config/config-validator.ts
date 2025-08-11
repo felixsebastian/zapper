@@ -7,6 +7,7 @@ export class ConfigValidator {
     this.validateTopLevelKeys(config);
     this.validateProject(config);
     this.validateEnvFiles(config);
+    this.validateGitMethod(config);
     this.validateBareMetal(config);
     this.validateContainers(config);
     // Backward compatibility
@@ -58,6 +59,7 @@ export class ConfigValidator {
     const allowed = new Set([
       "project",
       "env_files",
+      "git_method",
       "bare_metal",
       "containers",
       "processes",
@@ -90,6 +92,15 @@ export class ConfigValidator {
         }
       }
     }
+  }
+
+  private static validateGitMethod(config: ZapperConfig): void {
+    if (config.git_method === undefined) return;
+    const allowed = new Set(["http", "ssh", "cli"]);
+    if (!allowed.has(config.git_method))
+      throw new Error(
+        `git_method must be one of http | ssh | cli (got: ${config.git_method})`,
+      );
   }
 
   private static validateBareMetal(config: ZapperConfig): void {
@@ -280,6 +291,7 @@ export class ConfigValidator {
       "aliases",
       "resolvedEnv",
       "source",
+      "repo",
     ]);
     for (const key of Object.keys(
       process as unknown as Record<string, unknown>,

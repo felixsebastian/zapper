@@ -7,6 +7,8 @@ import { Pm2Executor } from "../process/pm2-executor";
 import { ZapperConfig, Process } from "../types";
 import path from "path";
 import { logger } from "../utils/logger";
+import * as fs from "fs";
+import { execSync } from "child_process";
 
 export class Zapper {
   private config: ZapperConfig | null = null;
@@ -205,6 +207,121 @@ export class Zapper {
       logger.info(`Removed ${zapDir}`);
     } catch (e) {
       logger.warn(`Failed to remove ${zapDir}: ${e}`);
+    }
+  }
+
+  async cloneRepos(processNames?: string[]): Promise<void> {
+    if (!this.config || !this.configDir) throw new Error("Config not loaded");
+
+    const method = this.config.git_method || "ssh";
+
+    const allBareMetal = this.config.bare_metal
+      ? Object.entries(this.config.bare_metal).map(([name, p]) => ({
+          ...p,
+          name: p.name || name,
+        }))
+      : [];
+
+    const canonical = this.resolveAliasesToCanonical(processNames);
+    const targets = canonical
+      ? allBareMetal.filter((p) => canonical.includes(p.name))
+      : allBareMetal;
+
+    if (targets.length === 0) {
+      logger.info("No bare_metal services to clone");
+      return;
+    }
+
+    for (const svc of targets) {
+      if (!svc.repo) {
+        logger.debug(`Skipping ${svc.name}: no repo field`);
+        continue;
+      }
+
+      const destDir = (() => {
+        const cwd = svc.cwd && svc.cwd.trim().length > 0 ? svc.cwd : svc.name;
+        return path.isAbsolute(cwd)
+          ? cwd
+          : path.join(this.configDir as string, cwd);
+      })();
+
+      const repoSpec = svc.repo;
+
+      const ensureDir = (dir: string) => {
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      };
+
+      const isGitRepo = (dir: string) => fs.existsSync(path.join(dir, ".git"));
+      const isEmptyDir = (dir: string) => {
+        try {
+          const files = fs.readdirSync(dir);
+          return files.length === 0;
+        } catch {
+          return true;
+        }
+      };
+
+      const toSshUrl = (spec: string) => {
+        if (spec.startsWith("git@") || spec.startsWith("ssh://")) return spec;
+        if (spec.startsWith("http://") || spec.startsWith("https://"))
+          return spec; // assume provided URL desired as-is
+        return `git@github.com:${spec}.git`;
+      };
+
+      const toHttpUrl = (spec: string) => {
+        if (spec.startsWith("http://") || spec.startsWith("https://"))
+          return spec;
+        if (spec.startsWith("git@"))
+          return `https://github.com/${spec.split(":")[1]?.replace(/\.git$/, "")}.git`;
+        return `https://github.com/${spec}.git`;
+      };
+
+      const cloneWithGit = (url: string, dir: string) => {
+        const parent = path.dirname(dir);
+        ensureDir(parent);
+        const folderName = path.basename(dir);
+        const parentIsRepo = isGitRepo(dir);
+
+        if (!fs.existsSync(dir) || isEmptyDir(dir)) {
+          logger.info(`Cloning ${svc.name} -> ${dir}`);
+          execSync(`git clone ${url} ${folderName}`, {
+            cwd: parent,
+            stdio: "inherit",
+          });
+        } else if (parentIsRepo || isGitRepo(dir)) {
+          logger.info(`Pulling ${svc.name} in ${dir}`);
+          execSync(`git -C ${dir} pull --ff-only`, { stdio: "inherit" });
+        } else {
+          logger.warn(
+            `Destination ${dir} exists and is not empty. Skipping ${svc.name}.`,
+          );
+        }
+      };
+
+      const cloneWithGh = (spec: string, dir: string) => {
+        const parent = path.dirname(dir);
+        ensureDir(parent);
+        const target = dir;
+        if (!fs.existsSync(dir) || isEmptyDir(dir)) {
+          logger.info(`Cloning (gh) ${svc.name} -> ${target}`);
+          execSync(`gh repo clone ${spec} ${target}`, { stdio: "inherit" });
+        } else if (isGitRepo(dir)) {
+          logger.info(`Pulling ${svc.name} in ${dir}`);
+          execSync(`git -C ${dir} pull --ff-only`, { stdio: "inherit" });
+        } else {
+          logger.warn(
+            `Destination ${dir} exists and is not empty. Skipping ${svc.name}.`,
+          );
+        }
+      };
+
+      try {
+        if (method === "cli") cloneWithGh(repoSpec, destDir);
+        else if (method === "http") cloneWithGit(toHttpUrl(repoSpec), destDir);
+        else cloneWithGit(toSshUrl(repoSpec), destDir);
+      } catch (e) {
+        logger.warn(`Failed to clone ${svc.name}: ${e}`);
+      }
     }
   }
 }

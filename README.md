@@ -151,6 +151,27 @@ frontend:
     - database
 ```
 
+### Git cloning
+
+- Top-level `git_method` controls how repos are cloned: `ssh` (default), `http`, or `cli` (GitHub CLI `gh`).
+- Each bare metal service can specify `repo` as `owner/repo` or a full URL. The destination is the service `cwd` if set, otherwise a folder named after the service.
+
+Example:
+
+```yaml
+project: myproj
+git_method: ssh
+bare_metal:
+  api:
+    cmd: pnpm dev
+    cwd: ./api
+    repo: myorg/api
+  web:
+    cmd: pnpm dev
+    cwd: ./web
+    repo: myorg/web
+```
+
 ## CLI Commands
 
 ```bash
@@ -161,6 +182,8 @@ zap restart               # Restart all services
 zap status                # Show service status
 zap logs --service api    # Show service logs
 zap logs --follow         # Follow logs
+zap reset                 # Stop all processes and delete .zap
+zap clone                 # Clone all repos (or pass --service to clone one)
 ```
 
 ## Development
@@ -171,6 +194,7 @@ zap logs --follow         # Follow logs
 - PM2 (`npm install -g pm2`)
 - Docker (for container services)
 - asdf (optional, for runtime versioning)
+- GitHub CLI (`brew install gh`) if using `git_method: cli`
 
 ### Setup
 
@@ -201,7 +225,6 @@ src/
 ├── cli/              # Command line interface
 ├── core/             # Main orchestrator
 ├── types/            # TypeScript type definitions
-└── utils/            # Utility functions
 ```
 
 ## Testing

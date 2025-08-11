@@ -133,6 +133,13 @@ async function main() {
         break;
       }
 
+      case "clone": {
+        await zapper.cloneRepos(
+          resolvedService ? [resolvedService] : undefined,
+        );
+        break;
+      }
+
       default:
         throw new Error(`Unknown command: ${options.command}`);
     }

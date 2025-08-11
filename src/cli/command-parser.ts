@@ -14,7 +14,7 @@ export class CommandParser {
     const command = cleanArgs[0] as string;
     if (!this.isValidCommand(command)) {
       throw new Error(
-        `Invalid command: ${command}. Valid commands: up/start/s, down/stop/delete, restart, status, logs, reset`,
+        `Invalid command: ${command}. Valid commands: up/start/s, down/stop/delete, restart, status, logs, reset, clone`,
       );
     }
 
@@ -100,6 +100,7 @@ export class CommandParser {
     status: ["ps"],
     logs: ["l"],
     reset: [],
+    clone: [],
   } as const;
 
   private static readonly aliasToCanonical: Record<string, Command> = (() => {
@@ -128,6 +129,7 @@ Commands:
   status   Show status from PM2 (filters to current project by default)
   logs     Show logs for a specific process (requires --service, supports --follow)
   reset    Stop all processes and delete the .zap directory
+  clone    Clone all repos defined in bare_metal services (respects git_method)
 
 Options:
   --service <name>  Target a specific process
@@ -152,6 +154,8 @@ Examples:
   zap logs --service test   # Show logs for test process
   zap logs --service test --follow  # Follow logs for test process
   zap reset --force         # Stop all processes and remove .zap without prompt
+  zap clone                 # Clone all repos to their cwd folders
+  zap clone --service api   # Clone only the api service repo
 `;
   }
 }
