@@ -14,7 +14,7 @@ export class CommandParser {
     const command = cleanArgs[0] as string;
     if (!this.isValidCommand(command)) {
       throw new Error(
-        `Invalid command: ${command}. Valid commands: up/start/s, down/stop/delete, restart, status, logs, reset, clone`,
+        `Invalid command: ${command}. Valid commands: up/start/s, down/stop/delete, restart, status, logs, reset, clone, task`,
       );
     }
 
@@ -107,6 +107,7 @@ export class CommandParser {
     logs: ["l"],
     reset: [],
     clone: [],
+    task: ["t"],
   } as const;
 
   private static readonly aliasToCanonical: Record<string, Command> = (() => {
@@ -136,9 +137,10 @@ Commands:
   logs     Show logs for a specific process (requires --service, follows by default)
   reset    Stop all processes and delete the .zap directory
   clone    Clone all repos defined in bare_metal services (respects git_method)
+  task     Run a one-off task by name (alias: t)
 
 Options:
-  --service <name>  Target a specific process
+  --service <name>  Target a specific process or task
   --all            Include processes from all projects (for status)
   --force, -y      Force the operation
   --follow, -f     Follow logs (default)
@@ -150,20 +152,15 @@ Options:
 
 Examples:
   zap up                    # Start all processes
-  zap start                 # Same as zap up
-  zap s                     # Same as zap up
   zap up --service test     # Start only the test process
   zap down --all            # Stop all processes
-  zap stop                  # Same as zap down
-  zap delete                # Same as zap down
   zap status                # Show status for current project processes
-  zap status --all          # Show status for all PM2 processes
   zap logs --service test   # Show logs for test process
-  zap logs --service test --no-follow  # Print last logs and exit
-  zap logs --service test -f # Follow logs
   zap reset --force         # Stop all processes and remove .zap without prompt
   zap clone                 # Clone all repos to their cwd folders
   zap clone --service api   # Clone only the api service repo
+  zap task build            # Run the 'build' task
+  zap t test                # Alias for running 'test' task
 `;
   }
 }

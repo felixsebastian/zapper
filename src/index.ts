@@ -142,6 +142,17 @@ async function main() {
         break;
       }
 
+      case "task": {
+        const taskName = options.service;
+        if (!taskName) {
+          throw new Error(
+            "Task name required. Use: zap task <name> or zap task --service <name>",
+          );
+        }
+        await zapper.runTask(taskName);
+        break;
+      }
+
       default:
         throw new Error(`Unknown command: ${options.command}`);
     }

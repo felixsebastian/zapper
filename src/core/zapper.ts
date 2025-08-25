@@ -326,4 +326,41 @@ export class Zapper {
       }
     }
   }
+
+  async runTask(taskName: string): Promise<void> {
+    if (!this.config) throw new Error("Config not loaded");
+    if (!this.config.tasks || Object.keys(this.config.tasks).length === 0)
+      throw new Error("No tasks defined in config");
+
+    const tasks = this.config.tasks;
+    const cwd = this.configDir || process.cwd();
+
+    const execTask = (name: string, stack: string[] = []) => {
+      if (!tasks[name]) throw new Error(`Task not found: ${name}`);
+      if (stack.includes(name))
+        throw new Error(
+          `Circular task reference detected: ${[...stack, name].join(" -> ")}`,
+        );
+
+      const t = tasks[name];
+      const env = {
+        ...process.env,
+        ...(t.resolvedEnv || {}),
+      } as NodeJS.ProcessEnv;
+
+      logger.info(`Running task: ${name}${t.desc ? ` — ${t.desc}` : ""}`);
+      for (const cmd of t.cmds) {
+        if (typeof cmd === "string") {
+          logger.debug(`$ ${cmd}`);
+          execSync(cmd, { stdio: "inherit", cwd: cwd, env });
+        } else if (cmd && typeof cmd === "object" && "task" in cmd) {
+          execTask(cmd.task, [...stack, name]);
+        } else {
+          throw new Error(`Invalid command in task ${name}`);
+        }
+      }
+    };
+
+    execTask(taskName);
+  }
 }

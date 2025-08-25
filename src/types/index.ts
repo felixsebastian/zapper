@@ -41,6 +41,8 @@ export interface ZapperConfig {
   containers?: Record<string, Container>;
   // Backward compatibility
   processes?: Process[];
+  // One-off tasks
+  tasks?: Record<string, Task>;
 }
 
 export interface ProcessInfo {
@@ -60,7 +62,8 @@ export type Command =
   | "status"
   | "logs"
   | "reset"
-  | "clone";
+  | "clone"
+  | "task";
 
 export interface CliOptions {
   command: Command;
@@ -73,4 +76,15 @@ export interface CliOptions {
   verbose?: boolean;
   quiet?: boolean;
   debug?: boolean;
+}
+
+// One-off Task support
+export type TaskCmd = string | { task: string };
+
+export interface Task {
+  name?: string;
+  desc?: string;
+  cmds: TaskCmd[];
+  env?: string[];
+  resolvedEnv?: Record<string, string>;
 }

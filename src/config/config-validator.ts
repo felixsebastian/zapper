@@ -1,5 +1,5 @@
 import { existsSync } from "fs";
-import { ZapperConfig, Process, Container, Volume } from "../types";
+import { ZapperConfig, Process, Container, Volume, TaskCmd } from "../types";
 import { assertValidName } from "../utils/validators";
 
 export class ConfigValidator {
@@ -12,6 +12,8 @@ export class ConfigValidator {
     this.validateContainers(config);
     // Backward compatibility
     this.validateProcesses(config);
+    // Tasks
+    this.validateTasks(config);
 
     // Global uniqueness across bare_metal and containers for names and aliases
     const seen = new Map<string, string>();
@@ -63,6 +65,7 @@ export class ConfigValidator {
       "bare_metal",
       "containers",
       "processes",
+      "tasks",
     ]);
     for (const key of Object.keys(
       config as unknown as Record<string, unknown>,
@@ -146,6 +149,28 @@ export class ConfigValidator {
     }
   }
 
+  private static validateContainerKeys(
+    container: Container,
+    name: string,
+  ): void {
+    const allowed = new Set([
+      "name",
+      "image",
+      "ports",
+      "env",
+      "volumes",
+      "networks",
+      "command",
+      "aliases",
+    ]);
+    for (const key of Object.keys(
+      container as unknown as Record<string, unknown>,
+    )) {
+      if (!allowed.has(key))
+        throw new Error(`Unknown key in containers['${name}']: ${key}`);
+    }
+  }
+
   private static validateContainer(name: string, container: Container): void {
     if (!container.image) {
       throw new Error(`Container ${name} must have an image field`);
@@ -202,46 +227,25 @@ export class ConfigValidator {
     }
   }
 
-  private static validateVolume(containerName: string, volume: Volume): void {
-    // Unknown keys in volume
-    const allowed = new Set(["name", "internal_dir"]);
-    for (const key of Object.keys(
-      volume as unknown as Record<string, unknown>,
-    )) {
-      if (!allowed.has(key))
-        throw new Error(
-          `Unknown key in volume for containers['${containerName}']: ${key}`,
-        );
-    }
-
-    if (!volume.name) {
-      throw new Error(
-        `Container ${containerName} volume must have a name field`,
-      );
-    }
-    if (!volume.internal_dir) {
-      throw new Error(
-        `Container ${containerName} volume must have an internal_dir field`,
-      );
-    }
+  private static validateVolume(name: string, volume: Volume): void {
+    if (!volume.name || typeof volume.name !== "string")
+      throw new Error(`Container ${name} volume must have a name`);
+    if (!volume.internal_dir || typeof volume.internal_dir !== "string")
+      throw new Error(`Container ${name} volume must have an internal_dir`);
   }
 
   private static validateProcesses(config: ZapperConfig): void {
-    // Backward compatibility - only validate if bare_metal is not present
-    if (config.bare_metal === undefined && config.processes !== undefined) {
+    if (config.processes !== undefined) {
       if (!Array.isArray(config.processes)) {
         throw new Error("processes must be an array");
       }
-      if (config.processes.length === 0) {
-        throw new Error("Config must have at least one process defined");
-      }
       const seen = new Set<string>();
-      for (const [index, process] of config.processes.entries()) {
+      for (const process of config.processes) {
         this.validateProcess(process);
-        this.validateProcessKeys(process, `processes[${index}]`);
+        this.validateProcessKeys(process, process.name);
         if (seen.has(process.name))
           throw new Error(
-            `Duplicate process name '${process.name}' in processes`,
+            `Duplicate process name '${process.name}' in processes array`,
           );
         seen.add(process.name);
       }
@@ -286,8 +290,8 @@ export class ConfigValidator {
       "name",
       "cmd",
       "cwd",
-      "env",
       "envs",
+      "env",
       "aliases",
       "resolvedEnv",
       "source",
@@ -301,53 +305,85 @@ export class ConfigValidator {
     }
   }
 
-  private static validateContainerKeys(
-    container: Container,
-    name: string,
-  ): void {
-    const allowed = new Set([
-      "name",
-      "image",
-      "ports",
-      "env",
-      "volumes",
-      "networks",
-      "command",
-      "aliases",
-    ]);
-    for (const key of Object.keys(
-      container as unknown as Record<string, unknown>,
-    )) {
-      if (!allowed.has(key))
-        throw new Error(`Unknown key in containers['${name}']: ${key}`);
-    }
-  }
-
   private static validateAliases(
-    aliases: unknown,
-    baseName: string,
-    section: "bare_metal" | "containers",
+    aliases: string[] | undefined,
+    name: string,
+    section: string,
   ): void {
     if (aliases === undefined) return;
     if (!Array.isArray(aliases))
       throw new Error(
-        `Aliases for ${section}['${baseName}'] must be an array of strings`,
+        `${section}['${name}'].aliases must be an array of strings`,
       );
-
-    const local = new Set<string>();
     for (const a of aliases) {
       if (typeof a !== "string" || a.trim() === "")
         throw new Error(
-          `Aliases for ${section}['${baseName}'] must contain non-empty strings`,
+          `${section}['${name}'].aliases must contain non-empty string values`,
         );
-      assertValidName(a, "Service alias");
-      if (a === baseName)
+    }
+  }
+
+  // Tasks validation
+  private static validateTasks(config: ZapperConfig): void {
+    if (config.tasks === undefined) return;
+    if (typeof config.tasks !== "object" || config.tasks === null)
+      throw new Error("tasks must be an object");
+
+    for (const [name, task] of Object.entries(config.tasks)) {
+      assertValidName(name, "Task");
+      if (!task || typeof task !== "object")
+        throw new Error(`Task '${name}' must be an object`);
+
+      // Normalize optional name
+      if (!task.name) task.name = name;
+      if (task.name !== name)
         throw new Error(
-          `Alias '${a}' for ${section}['${baseName}'] cannot equal its service name`,
+          `Task name '${task.name}' must match its key '${name}'`,
         );
-      if (local.has(a))
-        throw new Error(`Duplicate alias '${a}' for ${section}['${baseName}']`);
-      local.add(a);
+
+      // Validate keys
+      const allowed = new Set(["name", "desc", "cmds", "env", "resolvedEnv"]);
+      for (const key of Object.keys(
+        task as unknown as Record<string, unknown>,
+      )) {
+        if (!allowed.has(key))
+          throw new Error(`Unknown key in tasks['${name}']: ${key}`);
+      }
+
+      // Validate env whitelist
+      if (task.env !== undefined) {
+        if (!Array.isArray(task.env))
+          throw new Error(`Task ${name} env must be an array of strings`);
+        for (const k of task.env) {
+          if (typeof k !== "string" || k.trim() === "")
+            throw new Error(
+              `Task ${name} env must contain non-empty string keys`,
+            );
+        }
+      }
+
+      // Validate cmds
+      if (!Array.isArray(task.cmds) || task.cmds.length === 0)
+        throw new Error(`Task ${name} must have a non-empty cmds array`);
+      for (const c of task.cmds as TaskCmd[]) {
+        if (typeof c === "string") {
+          if (c.trim() === "")
+            throw new Error(`Task ${name} has an empty command string`);
+        } else if (typeof c === "object" && c !== null) {
+          if (!("task" in c))
+            throw new Error(
+              `Task ${name} contains an invalid object cmd. Use { task: "name" }`,
+            );
+          const ref = (c as { task: string }).task;
+          if (typeof ref !== "string" || ref.trim() === "")
+            throw new Error(`Task ${name} has an empty task reference`);
+          // Defer cycle/exists check to runtime executor to allow any order
+        } else {
+          throw new Error(
+            `Task ${name} cmds must be strings or { task: string } objects`,
+          );
+        }
+      }
     }
   }
 }

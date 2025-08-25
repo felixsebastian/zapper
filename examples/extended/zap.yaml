@@ -29,3 +29,18 @@ containers:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+tasks:
+  build:
+    desc: Build both services
+    env: [NODE_ENV]
+    cmds:
+      - npm ci --prefix ./frontend
+      - npm run build --prefix ./frontend
+      - npm ci --prefix ./api
+      - npm run build --prefix ./api
+  test:
+    desc: Run tests for both services
+    cmds:
+      - { task: build }
+      - npm test --prefix ./frontend -- --watch=false
+      - npm test --prefix ./api -- --watch=false

@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from "fs";
 import path from "path";
 import { parse } from "yaml";
 import { parse as dotenvParse } from "dotenv";
-import { ZapperConfig, Process } from "../types";
+import { ZapperConfig, Process, Task } from "../types";
 import { logger } from "../utils/logger";
 
 interface RawEnvFile {
@@ -37,6 +37,14 @@ export class EnvResolver {
       }
     }
 
+    // Resolve tasks env whitelist
+    if (resolvedConfig.tasks) {
+      for (const [name, task] of Object.entries(resolvedConfig.tasks)) {
+        if (!task.name) task.name = name;
+        this.resolveTaskEnv(task, mergedEnvFromFiles);
+      }
+    }
+
     return resolvedConfig;
   }
 
@@ -67,6 +75,21 @@ export class EnvResolver {
     proc.env = whitelist;
 
     logger.debug(`Final resolved env for ${proc.name}:`, proc.resolvedEnv);
+  }
+
+  private static resolveTaskEnv(
+    task: Task,
+    mergedEnvFromFiles: Record<string, string>,
+  ): void {
+    const whitelist = Array.isArray(task.env) ? task.env : [];
+    const envSubset: Record<string, string> = {};
+    for (const key of whitelist) {
+      const value = mergedEnvFromFiles[key];
+      if (value !== undefined) envSubset[key] = value;
+    }
+    task.resolvedEnv = envSubset;
+    task.env = whitelist;
+    logger.debug(`Final resolved env for task ${task.name}:`, task.resolvedEnv);
   }
 
   static getMergedEnvFromFiles(config: ZapperConfig): Record<string, string> {
