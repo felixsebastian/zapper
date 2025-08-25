@@ -333,7 +333,12 @@ export class Zapper {
       throw new Error("No tasks defined in config");
 
     const tasks = this.config.tasks;
-    const cwd = this.configDir || process.cwd();
+    const baseCwd = this.configDir || process.cwd();
+
+    const resolveCwd = (tCwd?: string) => {
+      if (!tCwd || tCwd.trim().length === 0) return baseCwd;
+      return path.isAbsolute(tCwd) ? tCwd : path.join(baseCwd, tCwd);
+    };
 
     const execTask = (name: string, stack: string[] = []) => {
       if (!tasks[name]) throw new Error(`Task not found: ${name}`);
@@ -347,12 +352,13 @@ export class Zapper {
         ...process.env,
         ...(t.resolvedEnv || {}),
       } as NodeJS.ProcessEnv;
+      const cwd = resolveCwd(t.cwd);
 
       logger.info(`Running task: ${name}${t.desc ? ` — ${t.desc}` : ""}`);
       for (const cmd of t.cmds) {
         if (typeof cmd === "string") {
           logger.debug(`$ ${cmd}`);
-          execSync(cmd, { stdio: "inherit", cwd: cwd, env });
+          execSync(cmd, { stdio: "inherit", cwd, env });
         } else if (cmd && typeof cmd === "object" && "task" in cmd) {
           execTask(cmd.task, [...stack, name]);
         } else {

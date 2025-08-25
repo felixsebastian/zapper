@@ -342,7 +342,14 @@ export class ConfigValidator {
         );
 
       // Validate keys
-      const allowed = new Set(["name", "desc", "cmds", "env", "resolvedEnv"]);
+      const allowed = new Set([
+        "name",
+        "desc",
+        "cmds",
+        "env",
+        "cwd",
+        "resolvedEnv",
+      ]);
       for (const key of Object.keys(
         task as unknown as Record<string, unknown>,
       )) {
@@ -360,6 +367,12 @@ export class ConfigValidator {
               `Task ${name} env must contain non-empty string keys`,
             );
         }
+      }
+
+      // Validate cwd
+      if (task.cwd !== undefined) {
+        if (typeof task.cwd !== "string" || task.cwd.trim() === "")
+          throw new Error(`Task ${name} cwd must be a non-empty string`);
       }
 
       // Validate cmds

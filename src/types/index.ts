@@ -86,5 +86,6 @@ export interface Task {
   desc?: string;
   cmds: TaskCmd[];
   env?: string[];
+  cwd?: string;
   resolvedEnv?: Record<string, string>;
 }
