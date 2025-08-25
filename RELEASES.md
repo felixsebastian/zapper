@@ -14,4 +14,4 @@
 
 Notes
 - Always release via a changeset. Do not run `npm publish` directly.
-- Use semantic bumps: patch for fixes, minor for features, major for breaking changes. 
+- Use semantic bumps: patch for fixes, minor for features, major for breaking changes.
