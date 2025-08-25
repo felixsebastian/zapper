@@ -33,7 +33,7 @@ describe("Logger", () => {
     logger.info("test message");
     const call = consoleSpy.log.mock.calls[0][0] as string;
     expect(call).toContain("test message");
-    expect(call).toContain("ℹ️");
+    expect(call).toContain("🔹");
   });
 
   it("should not log debug messages by default", () => {

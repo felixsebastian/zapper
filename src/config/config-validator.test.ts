@@ -124,14 +124,16 @@ describe("ConfigValidator", () => {
     );
   });
 
-  it("should reject config without bare_metal or processes", () => {
+  it("should reject config without any services", () => {
     const config: ZapperConfig = {
       project: "myproj",
     };
 
     expect(() => {
       ConfigValidator.validate(config);
-    }).toThrow("bare_metal must have at least one process defined");
+    }).toThrow(
+      "No processes defined. Define at least one in bare_metal, containers, or processes",
+    );
   });
 
   it("should reject empty bare_metal object", () => {
@@ -270,7 +272,7 @@ describe("ConfigValidator", () => {
       },
     };
     expect(() => ConfigValidator.validate(config)).toThrow(
-      "Duplicate alias 'f' for bare_metal['frontend']",
+      "Duplicate service identifier 'f'. Names and aliases must be globally unique across bare_metal and containers",
     );
   });
 
@@ -282,7 +284,7 @@ describe("ConfigValidator", () => {
       },
     };
     expect(() => ConfigValidator.validate(config)).toThrow(
-      "Alias 'frontend' for bare_metal['frontend'] cannot equal its service name",
+      "Duplicate service identifier 'frontend'. Names and aliases must be globally unique across bare_metal and containers",
     );
   });
 

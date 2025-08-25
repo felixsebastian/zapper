@@ -137,6 +137,14 @@ export class DockerManager {
     }
   }
 
+  static async createVolume(name: string): Promise<void> {
+    try {
+      await this.runDockerCommand(["volume", "create", name]);
+    } catch (error) {
+      // Volume may already exist; ignore to keep idempotent
+    }
+  }
+
   private static runDockerCommand(args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn("docker", args, {

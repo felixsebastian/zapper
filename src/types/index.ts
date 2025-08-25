@@ -13,6 +13,8 @@ export interface Process {
   source?: string;
   // Optional GitHub repository in the form "owner/repo" or a full URL
   repo?: string;
+  // Optional per-process env files (take precedence over global)
+  env_files?: string[];
 }
 
 export interface Volume {
@@ -20,16 +22,21 @@ export interface Volume {
   internal_dir: string;
 }
 
+// Accept either structured volume objects or docker -v style "name:/path" strings
+export type ContainerVolume = Volume | string;
+
 export interface Container {
   name?: string;
   image: string;
   ports?: string[];
   env?: string[];
-  volumes?: Volume[];
+  volumes?: ContainerVolume[];
   networks?: string[];
   command?: string;
   // Optional shorthand aliases for this container service
   aliases?: string[];
+  // Computed resolved env map used internally for execution
+  resolvedEnv?: Record<string, string>;
 }
 
 export interface ZapperConfig {
@@ -88,4 +95,6 @@ export interface Task {
   env?: string[];
   cwd?: string;
   resolvedEnv?: Record<string, string>;
+  // Optional per-task env files (take precedence over global)
+  env_files?: string[];
 }

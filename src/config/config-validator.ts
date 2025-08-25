@@ -52,8 +52,11 @@ export class ConfigValidator {
       typeof config.containers === "object" &&
       config.containers !== null &&
       Object.keys(config.containers).length > 0;
+
     if (!hasBareMetal && !hasLegacyProcesses && !hasContainers) {
-      throw new Error("bare_metal must have at least one process defined");
+      throw new Error(
+        "No processes defined. Define at least one in bare_metal, containers, or processes",
+      );
     }
   }
 
@@ -162,6 +165,8 @@ export class ConfigValidator {
       "networks",
       "command",
       "aliases",
+      // internal
+      "resolvedEnv",
     ]);
     for (const key of Object.keys(
       container as unknown as Record<string, unknown>,
@@ -193,13 +198,7 @@ export class ConfigValidator {
       if (!Array.isArray(container.env)) {
         throw new Error(`Container ${name} env must be an array of strings`);
       }
-      for (const key of container.env) {
-        if (typeof key !== "string" || key.trim() === "") {
-          throw new Error(
-            `Container ${name} env must contain non-empty string keys`,
-          );
-        }
-      }
+      this.validateInlineEnvArray(container.env, `Container ${name} env`);
     }
 
     if (container.volumes !== undefined) {
@@ -207,7 +206,26 @@ export class ConfigValidator {
         throw new Error(`Container ${name} volumes must be an array`);
       }
       for (const volume of container.volumes) {
-        this.validateVolume(name, volume);
+        if (typeof volume === "string") {
+          // simplified docker-compose style: "name:/container/path"
+          const parts = volume.split(":");
+          if (
+            parts.length !== 2 ||
+            parts[0].trim() === "" ||
+            parts[1].trim() === ""
+          ) {
+            throw new Error(
+              `Container ${name} volume string must be in 'name:/container/path' form`,
+            );
+          }
+          if (!parts[1].startsWith("/")) {
+            throw new Error(
+              `Container ${name} volume internal path must be absolute: ${parts[1]}`,
+            );
+          }
+        } else {
+          this.validateVolume(name, volume);
+        }
       }
     }
 
@@ -232,6 +250,10 @@ export class ConfigValidator {
       throw new Error(`Container ${name} volume must have a name`);
     if (!volume.internal_dir || typeof volume.internal_dir !== "string")
       throw new Error(`Container ${name} volume must have an internal_dir`);
+    if (!volume.internal_dir.startsWith("/"))
+      throw new Error(
+        `Container ${name} volume.internal_dir must be an absolute path`,
+      );
   }
 
   private static validateProcesses(config: ZapperConfig): void {
@@ -263,24 +285,46 @@ export class ConfigValidator {
     }
 
     // Prefer 'env' whitelist; allow legacy 'envs'
-    const whitelist = Array.isArray(process.env)
-      ? process.env
-      : Array.isArray(process.envs)
-        ? process.envs
-        : undefined;
+    const envEntries = Array.isArray(process.env) ? process.env : undefined;
+    const legacyWhitelist = Array.isArray(process.envs)
+      ? process.envs
+      : undefined;
 
-    if (whitelist !== undefined) {
-      if (!Array.isArray(whitelist)) {
+    if (envEntries !== undefined) {
+      if (!Array.isArray(envEntries)) {
         throw new Error(
           `Process ${process.name} env must be an array of strings`,
         );
       }
-      for (const key of whitelist) {
+      this.validateInlineEnvArray(envEntries, `Process ${process.name} env`);
+    } else if (legacyWhitelist !== undefined) {
+      if (!Array.isArray(legacyWhitelist)) {
+        throw new Error(
+          `Process ${process.name} envs must be an array of strings`,
+        );
+      }
+      for (const key of legacyWhitelist) {
         if (typeof key !== "string" || key.trim() === "") {
           throw new Error(
-            `Process ${process.name} env must contain non-empty string keys`,
+            `Process ${process.name} envs must contain non-empty string keys`,
           );
         }
+      }
+    }
+
+    // Validate local env_files if provided
+    if (process.env_files !== undefined) {
+      if (!Array.isArray(process.env_files))
+        throw new Error(
+          `Process ${process.name} env_files must be an array of file paths`,
+        );
+      for (const filePath of process.env_files) {
+        if (typeof filePath !== "string" || filePath.trim() === "")
+          throw new Error(
+            `Process ${process.name} env_files must contain non-empty string paths`,
+          );
+        if (!existsSync(filePath))
+          throw new Error(`Env file does not exist: ${filePath}`);
       }
     }
   }
@@ -296,6 +340,7 @@ export class ConfigValidator {
       "resolvedEnv",
       "source",
       "repo",
+      "env_files",
     ]);
     for (const key of Object.keys(
       process as unknown as Record<string, unknown>,
@@ -349,6 +394,7 @@ export class ConfigValidator {
         "env",
         "cwd",
         "resolvedEnv",
+        "env_files",
       ]);
       for (const key of Object.keys(
         task as unknown as Record<string, unknown>,
@@ -357,15 +403,26 @@ export class ConfigValidator {
           throw new Error(`Unknown key in tasks['${name}']: ${key}`);
       }
 
-      // Validate env whitelist
+      // Validate env array (keys or key=value)
       if (task.env !== undefined) {
         if (!Array.isArray(task.env))
           throw new Error(`Task ${name} env must be an array of strings`);
-        for (const k of task.env) {
-          if (typeof k !== "string" || k.trim() === "")
+        this.validateInlineEnvArray(task.env, `Task ${name} env`);
+      }
+
+      // Validate local env_files if provided
+      if (task.env_files !== undefined) {
+        if (!Array.isArray(task.env_files))
+          throw new Error(
+            `Task ${name} env_files must be an array of file paths`,
+          );
+        for (const filePath of task.env_files) {
+          if (typeof filePath !== "string" || filePath.trim() === "")
             throw new Error(
-              `Task ${name} env must contain non-empty string keys`,
+              `Task ${name} env_files must contain non-empty string paths`,
             );
+          if (!existsSync(filePath))
+            throw new Error(`Env file does not exist: ${filePath}`);
         }
       }
 
@@ -397,6 +454,43 @@ export class ConfigValidator {
           );
         }
       }
+    }
+  }
+
+  // Strict validation for env arrays supporting KEY and KEY=VALUE
+  private static validateInlineEnvArray(
+    entries: string[],
+    where: string,
+  ): void {
+    const keyRegex = /^[A-Z][A-Z0-9_]*$/;
+    const seen = new Set<string>();
+    for (const raw of entries) {
+      if (typeof raw !== "string" || raw.trim() === "")
+        throw new Error(`${where} must contain non-empty string values`);
+
+      const eqIdx = raw.indexOf("=");
+      const key = eqIdx === -1 ? raw : raw.slice(0, eqIdx);
+      const value = eqIdx === -1 ? undefined : raw.slice(eqIdx + 1);
+
+      if (!keyRegex.test(key))
+        throw new Error(
+          `${where} key '${key}' must match /^[A-Z][A-Z0-9_]*$/ and contain no spaces`,
+        );
+
+      // Disallow spaces around '=' for strictness
+      if (eqIdx !== -1) {
+        if (raw.includes(" "))
+          throw new Error(
+            `${where} entry '${raw}' must not contain spaces. Use KEY=VALUE without spaces`,
+          );
+        // Value can be empty string; no further validation required
+        if (value === undefined)
+          throw new Error(`${where} entry '${raw}' is invalid`);
+      }
+
+      if (seen.has(key))
+        throw new Error(`${where} contains duplicate key '${key}'`);
+      seen.add(key);
     }
   }
 }

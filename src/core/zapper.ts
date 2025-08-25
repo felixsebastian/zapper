@@ -2,14 +2,15 @@ import { YamlParser } from "../config/yaml-parser";
 import { ConfigValidator } from "../config/config-validator";
 import { EnvResolver } from "../config/env-resolver";
 import { SequentialStrategy } from "./strategies/sequential-strategy";
-import { PlanExecutor } from "./plan-executor";
+import { PlanExecutor } from "../core/plan-executor";
 import { Pm2Executor } from "../process/pm2-executor";
-import { ZapperConfig, Process } from "../types";
+import { ZapperConfig, Process, Container, ContainerVolume } from "../types";
 import path from "path";
 import { logger } from "../utils/logger";
 import * as fs from "fs";
 import { execSync } from "child_process";
 import { resolveConfigPath } from "../utils/find-up";
+import { DockerManager } from "../containers";
 
 export class Zapper {
   private config: ZapperConfig | null = null;
@@ -29,6 +30,39 @@ export class Zapper {
         this.config.env_files = this.config.env_files.map((p) =>
           path.isAbsolute(p) ? p : path.join(this.configDir as string, p),
         );
+      }
+
+      // Normalize per-process env_files
+      if (this.config.bare_metal) {
+        for (const [name, proc] of Object.entries(this.config.bare_metal)) {
+          if (!proc.name) proc.name = name;
+          if (proc.env_files && proc.env_files.length > 0) {
+            proc.env_files = proc.env_files.map((p) =>
+              path.isAbsolute(p) ? p : path.join(this.configDir as string, p),
+            );
+          }
+        }
+      }
+      if (this.config.processes && this.config.processes.length > 0) {
+        for (const proc of this.config.processes) {
+          if (proc.env_files && proc.env_files.length > 0) {
+            proc.env_files = proc.env_files.map((p) =>
+              path.isAbsolute(p) ? p : path.join(this.configDir as string, p),
+            );
+          }
+        }
+      }
+
+      // Normalize per-task env_files
+      if (this.config.tasks) {
+        for (const [name, task] of Object.entries(this.config.tasks)) {
+          if (!task.name) task.name = name;
+          if (task.env_files && task.env_files.length > 0) {
+            task.env_files = task.env_files.map((p) =>
+              path.isAbsolute(p) ? p : path.join(this.configDir as string, p),
+            );
+          }
+        }
       }
 
       ConfigValidator.validate(this.config);
@@ -69,6 +103,12 @@ export class Zapper {
     return [];
   }
 
+  private getContainers(): Array<[string, Container]> {
+    if (!this.config) throw new Error("Config not loaded");
+    if (!this.config.containers) return [];
+    return Object.entries(this.config.containers).map(([name, c]) => [name, c]);
+  }
+
   private resolveAliasesToCanonical(names?: string[]): string[] | undefined {
     if (!names || !this.config) return names;
     const aliasToName = new Map<string, string>();
@@ -78,6 +118,12 @@ export class Zapper {
       if (Array.isArray(p.aliases)) {
         for (const a of p.aliases) aliasToName.set(a, p.name);
       }
+    }
+    const containers = this.getContainers();
+    for (const [name, c] of containers) {
+      aliasToName.set(name, name);
+      if (Array.isArray(c.aliases))
+        for (const a of c.aliases) aliasToName.set(a, name);
     }
     return names.map((n) => aliasToName.get(n) || n);
   }
@@ -93,7 +139,8 @@ export class Zapper {
     }
 
     const allProcesses = this.getProcesses();
-    if (allProcesses.length === 0) {
+    const allContainers = this.getContainers();
+    if (allProcesses.length === 0 && allContainers.length === 0) {
       throw new Error("No processes defined in config");
     }
 
@@ -102,30 +149,46 @@ export class Zapper {
     const processesToStart = canonical
       ? allProcesses.filter((p) => canonical.includes(p.name))
       : allProcesses;
+    const containersToStart = canonical
+      ? allContainers.filter(([name]) => canonical.includes(name))
+      : allContainers;
 
-    if (canonical && processesToStart.length === 0) {
+    if (
+      canonical &&
+      processesToStart.length === 0 &&
+      containersToStart.length === 0
+    ) {
       throw new Error(
         `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
       );
     }
 
-    const mergedYamlEnvs = EnvResolver.getMergedEnvFromFiles(this.config);
-    logger.debug("merged yaml envs:", mergedYamlEnvs);
-
-    for (const p of processesToStart) {
-      const whitelist = Array.isArray(p.env) ? p.env : [];
-      const whitelistWithValues = Object.fromEntries(
-        whitelist.map((k) => [k, mergedYamlEnvs[k] ?? "(missing)"]),
-      );
-      logger.debug(
-        `process ${p.name} whitelist (with values):`,
-        whitelistWithValues,
-      );
-      logger.debug(`process ${p.name} resolved env:`, p.resolvedEnv || {});
+    if (processesToStart.length > 0) {
+      const plan = this.planExecutor!.createPlan(processesToStart);
+      await this.planExecutor!.executePlan(plan, "start", this.config.project);
     }
 
-    const plan = this.planExecutor!.createPlan(processesToStart);
-    await this.planExecutor!.executePlan(plan, "start", this.config.project);
+    // Start containers
+    for (const [name, c] of containersToStart) {
+      const containerName = `${this.config.project}-${name}`;
+
+      const toVolumeBinding = (v: ContainerVolume): string =>
+        typeof v === "string" ? v : `${v.name}:${v.internal_dir}`;
+
+      const envMap = c.resolvedEnv || {};
+
+      await DockerManager.startContainer(containerName, {
+        image: c.image,
+        ports: c.ports,
+        volumes: Array.isArray(c.volumes)
+          ? (c.volumes as ContainerVolume[]).map(toVolumeBinding)
+          : undefined,
+        networks: c.networks,
+        environment: envMap,
+        command: c.command,
+      });
+      logger.info(`Started container ${containerName}`);
+    }
   }
 
   async stopProcesses(processNames?: string[]): Promise<void> {
@@ -134,82 +197,116 @@ export class Zapper {
     }
 
     const allProcesses = this.getProcesses();
+    const allContainers = this.getContainers();
+
     const canonical = this.resolveAliasesToCanonical(processNames);
+
     const processesToStop = canonical
       ? allProcesses.filter((p) => canonical.includes(p.name))
       : allProcesses;
+    const containersToStop = canonical
+      ? allContainers.filter(([name]) => canonical.includes(name))
+      : allContainers;
 
-    if (canonical && processesToStop.length === 0) {
-      throw new Error(
-        `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
-      );
+    if (processesToStop.length > 0) {
+      const plan = this.planExecutor!.createPlan(processesToStop);
+      await this.planExecutor!.executePlan(plan, "stop");
     }
 
-    const plan = this.planExecutor!.createPlan(processesToStop);
-    await this.planExecutor!.executePlan(plan, "stop");
+    for (const [name] of containersToStop) {
+      const containerName = `${this.config!.project}-${name}`;
+      try {
+        await DockerManager.stopContainer(containerName);
+        logger.info(`Stopped container ${containerName}`);
+      } catch (e) {
+        logger.warn(`Failed to stop container ${containerName}: ${e}`);
+      }
+    }
   }
 
   async restartProcesses(processNames?: string[]): Promise<void> {
-    if (!this.config) {
-      throw new Error("Config not loaded");
-    }
+    if (!this.config) throw new Error("Config not loaded");
 
     const canonical = this.resolveAliasesToCanonical(processNames);
-    await this.stopProcesses(canonical);
-    await this.startProcesses(canonical);
-  }
+    const allProcesses = this.getProcesses();
 
-  async getProcessStatus(processName?: string): Promise<Process[]> {
-    if (!this.config) {
-      throw new Error("Config not loaded");
+    const processesToRestart = canonical
+      ? allProcesses.filter((p) => canonical.includes(p.name))
+      : allProcesses;
+    if (processesToRestart.length === 0) {
+      throw new Error("No processes to restart");
     }
 
-    const allProcesses = this.getProcesses();
-    const target = processName
-      ? this.resolveServiceName(processName)
-      : undefined;
-    const processesToCheck = target
-      ? allProcesses.filter((p) => p.name === target)
-      : allProcesses;
-
-    return processesToCheck;
+    const plan = this.planExecutor!.createPlan(processesToRestart);
+    await this.planExecutor!.executePlan(plan, "restart");
   }
 
-  async showLogs(processName: string, follow: boolean = false): Promise<void> {
-    // For logs, we don't need to check the config - we can show logs for any PM2 process
-    // Use a default project name if config is not loaded
-    const projectName = this.config?.project || "default";
-    const configDir = this.configDir || ".";
+  async showLogs(processName?: string, follow: boolean = false): Promise<void> {
+    if (!this.config) throw new Error("Config not loaded");
 
-    const pm2Executor = new Pm2Executor(projectName, configDir);
+    const allProcesses = this.getProcesses();
+    const allContainers = this.getContainers();
 
-    // Try to resolve alias if config is available; otherwise pass-through
-    const name = this.config
+    if (!processName && allProcesses.length + allContainers.length > 1) {
+      throw new Error(
+        "Multiple services defined. Please specify a service name to show logs for",
+      );
+    }
+
+    const target = processName
       ? this.resolveServiceName(processName)
       : processName;
-    await pm2Executor.showLogs(name, follow);
+
+    if (target) {
+      // Try processes first
+      const p = allProcesses.find((x) => x.name === target);
+      if (p) {
+        const pm2 = new Pm2Executor(this.config.project, this.configDir || ".");
+        await pm2.showLogs(p.name, follow);
+        return;
+      }
+      // Containers: not supported via PM2; fall back to docker logs by name
+      const c = allContainers.find(([name]) => name === target);
+      if (c) {
+        logger.info(
+          "Log streaming for containers is not implemented yet. Use docker logs",
+        );
+        return;
+      }
+
+      throw new Error(`Service not found: ${target}`);
+    }
+
+    // Single process scenario
+    if (allProcesses.length === 1) {
+      const pm2 = new Pm2Executor(this.config.project, this.configDir || ".");
+      await pm2.showLogs(allProcesses[0].name, follow);
+      return;
+    }
+
+    throw new Error("No services defined");
   }
 
   async reset(): Promise<void> {
-    if (!this.configDir) throw new Error("Config not loaded");
+    if (!this.config) throw new Error("Config not loaded");
 
-    // Stop all processes defined in config (best-effort)
+    // Stop all processes and containers best-effort
     try {
       await this.stopProcesses();
     } catch (e) {
-      logger.warn(`Failed to stop processes: ${e}`);
+      logger.warn(`Failed to stop some services: ${e}`);
     }
 
-    // Remove .zap directory
-    const fs = await import("fs");
-    const zapDir = path.join(this.configDir, ".zap");
+    // Remove PM2 logs folder
+    const logsDir = path.join(this.configDir as string, ".zap", "logs");
     try {
-      if (fs.existsSync(zapDir))
-        fs.rmSync(zapDir, { recursive: true, force: true });
-      logger.info(`Removed ${zapDir}`);
+      if (fs.existsSync(logsDir))
+        fs.rmSync(logsDir, { recursive: true, force: true });
     } catch (e) {
-      logger.warn(`Failed to remove ${zapDir}: ${e}`);
+      logger.warn(`Failed to remove logs dir: ${e}`);
     }
+
+    logger.info("Reset complete");
   }
 
   async cloneRepos(processNames?: string[]): Promise<void> {

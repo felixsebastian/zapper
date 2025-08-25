@@ -2,12 +2,14 @@ import { readFileSync, existsSync } from "fs";
 import path from "path";
 import { parse } from "yaml";
 import { parse as dotenvParse } from "dotenv";
-import { ZapperConfig, Process, Task } from "../types";
+import { ZapperConfig, Process, Task, Container } from "../types";
 import { logger } from "../utils/logger";
 
 interface RawEnvFile {
   envs?: Array<Record<string, string>>;
 }
+
+type InlineEnv = { keys: string[]; pairs: Record<string, string> };
 
 export class EnvResolver {
   static resolve(config: ZapperConfig): ZapperConfig {
@@ -37,6 +39,16 @@ export class EnvResolver {
       }
     }
 
+    // Process containers env whitelist
+    if (resolvedConfig.containers) {
+      for (const [name, container] of Object.entries(
+        resolvedConfig.containers,
+      )) {
+        if (!container.name) container.name = name;
+        this.resolveContainerEnv(container, mergedEnvFromFiles);
+      }
+    }
+
     // Resolve tasks env whitelist
     if (resolvedConfig.tasks) {
       for (const [name, task] of Object.entries(resolvedConfig.tasks)) {
@@ -48,47 +60,107 @@ export class EnvResolver {
     return resolvedConfig;
   }
 
+  private static splitInlineEnv(entries?: string[]): InlineEnv {
+    const result: InlineEnv = { keys: [], pairs: {} };
+    if (!Array.isArray(entries)) return result;
+    for (const raw of entries) {
+      const idx = raw.indexOf("=");
+      if (idx === -1) result.keys.push(raw);
+      else result.pairs[raw.slice(0, idx)] = raw.slice(idx + 1);
+    }
+    return result;
+  }
+
   private static resolveProcessEnv(
     proc: Process,
     mergedEnvFromFiles: Record<string, string>,
   ): void {
     logger.debug(`Processing process: ${proc.name}`);
 
-    // Normalize: prefer 'env' (whitelist). If missing, fallback to legacy 'envs'.
-    const whitelist = Array.isArray(proc.env)
-      ? proc.env
-      : Array.isArray(proc.envs)
-        ? proc.envs
-        : [];
+    // Local env_files: if present, use them and bypass whitelist
+    const local = this.loadAndMergeEnvFiles(proc.env_files);
+    const useLocalOnly = Object.keys(local).length > 0;
 
-    logger.debug(`Process env whitelist:`, whitelist);
+    if (useLocalOnly) {
+      // Overlay inline key=value on top of local
+      const inline = this.splitInlineEnv(proc.env);
+      proc.resolvedEnv = { ...local, ...inline.pairs };
+      logger.debug(
+        `Final resolved env for ${proc.name} (local env_files + inline pairs):`,
+        proc.resolvedEnv,
+      );
+      return;
+    }
+
+    // Parse inline env into keys (whitelist) and pairs (overrides)
+    const inline = this.splitInlineEnv(proc.env);
+
+    const whitelist =
+      inline.keys.length > 0
+        ? inline.keys
+        : Array.isArray(proc.envs)
+          ? proc.envs
+          : [];
 
     const envSubset: Record<string, string> = {};
     for (const key of whitelist) {
       const value = mergedEnvFromFiles[key];
-      logger.debug(`Looking for env var ${key}, found:`, value);
       if (value !== undefined) envSubset[key] = value;
     }
 
-    proc.resolvedEnv = envSubset;
-    // Ensure env remains the whitelist for downstream usage/logging
-    proc.env = whitelist;
+    // Overlay inline pairs last
+    proc.resolvedEnv = { ...envSubset, ...inline.pairs };
+    // Keep env as originally provided (including inline strings) when present
+    if (!Array.isArray(proc.env)) proc.env = whitelist;
 
     logger.debug(`Final resolved env for ${proc.name}:`, proc.resolvedEnv);
+  }
+
+  private static resolveContainerEnv(
+    container: Container,
+    mergedEnvFromFiles: Record<string, string>,
+  ): void {
+    const inline = this.splitInlineEnv(container.env);
+    const whitelist = inline.keys;
+    const envSubset: Record<string, string> = {};
+    for (const key of whitelist) {
+      const value = mergedEnvFromFiles[key];
+      if (value !== undefined) envSubset[key] = value;
+    }
+    container.resolvedEnv = { ...envSubset, ...inline.pairs };
+    container.env = Array.isArray(container.env) ? container.env : whitelist;
+    logger.debug(
+      `Final resolved env for container ${container.name}:`,
+      container.resolvedEnv,
+    );
   }
 
   private static resolveTaskEnv(
     task: Task,
     mergedEnvFromFiles: Record<string, string>,
   ): void {
-    const whitelist = Array.isArray(task.env) ? task.env : [];
+    // Local env_files: if present, use them and bypass whitelist
+    const local = this.loadAndMergeEnvFiles(task.env_files);
+    const inline = this.splitInlineEnv(task.env);
+    const useLocalOnly = Object.keys(local).length > 0;
+
+    if (useLocalOnly) {
+      task.resolvedEnv = { ...local, ...inline.pairs };
+      logger.debug(
+        `Final resolved env for task ${task.name} (local env_files + inline pairs):`,
+        task.resolvedEnv,
+      );
+      return;
+    }
+
+    const whitelist = inline.keys;
     const envSubset: Record<string, string> = {};
     for (const key of whitelist) {
       const value = mergedEnvFromFiles[key];
       if (value !== undefined) envSubset[key] = value;
     }
-    task.resolvedEnv = envSubset;
-    task.env = whitelist;
+    task.resolvedEnv = { ...envSubset, ...inline.pairs };
+    task.env = Array.isArray(task.env) ? task.env : whitelist;
     logger.debug(`Final resolved env for task ${task.name}:`, task.resolvedEnv);
   }
 
