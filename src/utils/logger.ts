@@ -59,9 +59,17 @@ export class Logger {
     }
   }
 
+  private withEmojiPrefix(
+    kind: "error" | "warn" | "info" | "debug" | "success",
+    message: string,
+  ): string {
+    // Ensure single space between emoji and message
+    return `${this.prefix()}${emoji[kind]} ${message}`;
+  }
+
   error(message: string, data?: unknown): void {
     if (!this.shouldLog(LogLevel.ERROR)) return;
-    const msg = `${this.prefix()}${emoji.error} ${message}${this.formatData(data)}`;
+    const msg = `${this.withEmojiPrefix("error", message)}${this.formatData(data)}`;
     (
       globalThis as { console?: { error: (msg: string) => void } }
     ).console?.error(`${colors.red}${msg}${colors.reset}`);
@@ -69,7 +77,7 @@ export class Logger {
 
   warn(message: string, data?: unknown): void {
     if (!this.shouldLog(LogLevel.WARN)) return;
-    const msg = `${this.prefix()}${emoji.warn} ${message}${this.formatData(data)}`;
+    const msg = `${this.withEmojiPrefix("warn", message)}${this.formatData(data)}`;
     (globalThis as { console?: { warn: (msg: string) => void } }).console?.warn(
       `${colors.yellow}${msg}${colors.reset}`,
     );
@@ -77,7 +85,7 @@ export class Logger {
 
   info(message: string, data?: unknown): void {
     if (!this.shouldLog(LogLevel.INFO)) return;
-    const msg = `${this.prefix()}${emoji.info} ${message}${this.formatData(data)}`;
+    const msg = `${this.withEmojiPrefix("info", message)}${this.formatData(data)}`;
     (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
       `${colors.white}${msg}${colors.reset}`,
     );
@@ -85,7 +93,7 @@ export class Logger {
 
   debug(message: string, data?: unknown): void {
     if (!this.shouldLog(LogLevel.DEBUG)) return;
-    const msg = `${this.prefix()}${emoji.debug} ${message}${this.formatData(data)}`;
+    const msg = `${this.withEmojiPrefix("debug", message)}${this.formatData(data)}`;
     (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
       msg,
     );
@@ -93,7 +101,7 @@ export class Logger {
 
   success(message: string, data?: unknown): void {
     if (!this.shouldLog(LogLevel.INFO)) return;
-    const msg = `${this.prefix()}${emoji.success} ${message}${this.formatData(data)}`;
+    const msg = `${this.withEmojiPrefix("success", message)}${this.formatData(data)}`;
     (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
       `${colors.green}${msg}${colors.reset}`,
     );
