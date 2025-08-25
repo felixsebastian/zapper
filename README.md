@@ -180,8 +180,8 @@ zap up --service api      # Start specific service
 zap down                  # Stop all services
 zap restart               # Restart all services
 zap status                # Show service status
-zap logs --service api    # Show service logs
-zap logs --follow         # Follow logs
+zap logs --service api    # Show and follow service logs (default)
+zap logs --service api --no-follow  # Print last logs and exit
 zap reset                 # Stop all processes and delete .zap
 zap clone                 # Clone all repos (or pass --service to clone one)
 ```

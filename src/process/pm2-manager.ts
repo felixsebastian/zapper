@@ -508,24 +508,60 @@ export class Pm2Manager {
       }
 
       if (follow) {
-        // Live tailing - combine both files with tail -f
-        const args = ["-f"];
-        if (existsSync(logFiles.stdout)) args.push(logFiles.stdout);
-        if (existsSync(logFiles.stderr)) args.push(logFiles.stderr);
+        const tails: Array<ReturnType<typeof spawn>> = [];
+        const RED = "\x1b[31m";
+        const RESET = "\x1b[0m";
 
-        const child = spawn("tail", args, { stdio: "inherit" });
-
-        // Handle SIGINT to stop tailing
-        globalThis.process?.on("SIGINT", () => {
-          child.kill("SIGINT");
-        });
-
-        await new Promise<void>((resolve, reject) => {
-          child.on("close", (code) => {
-            if (code === 0 || code === null) resolve();
-            else reject(new Error(`tail command failed with code ${code}`));
+        const startTail = (
+          filePath: string,
+          isError: boolean,
+        ): ReturnType<typeof spawn> => {
+          const child = spawn("tail", ["-n", "10", "-f", filePath], {
+            stdio: ["ignore", "pipe", "inherit"],
           });
-          child.on("error", reject);
+
+          let buffer = "";
+          child.stdout.on("data", (data) => {
+            buffer += data.toString();
+            const parts = buffer.split(/\r?\n/);
+            buffer = parts.pop() || "";
+            for (const line of parts) {
+              if (!line) continue;
+              if (isError)
+                globalThis.process?.stdout?.write(`${RED}${line}${RESET}\n`);
+              else globalThis.process?.stdout?.write(line + "\n");
+            }
+          });
+
+          child.on("error", (err) => {
+            logger.warn(`tail error for ${filePath}: ${err}`);
+          });
+
+          return child;
+        };
+
+        if (existsSync(logFiles.stdout))
+          tails.push(startTail(logFiles.stdout, false));
+        if (existsSync(logFiles.stderr))
+          tails.push(startTail(logFiles.stderr, true));
+
+        await new Promise<void>((resolve) => {
+          let exiting = false;
+          const cleanup = () => {
+            if (exiting) return;
+            exiting = true;
+            for (const t of tails) {
+              try {
+                t.kill("SIGINT");
+              } catch (e) {
+                void e;
+              }
+            }
+            resolve();
+          };
+
+          for (const t of tails) t.on("close", cleanup);
+          globalThis.process?.on("SIGINT", cleanup);
         });
       } else {
         // Static logs - show last few lines from each file

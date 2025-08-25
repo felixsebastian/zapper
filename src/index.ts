@@ -108,17 +108,19 @@ async function main() {
         break;
       }
 
-      case "logs":
+      case "logs": {
         if (!resolvedService) {
           throw new Error(
             "Service name required for logs command. Use: zap logs --service <name>",
           );
         }
+        const follow = options.follow ?? true;
         logger.info(
-          `Showing logs for ${resolvedService}${options.follow ? " (following)" : ""}`,
+          `Showing logs for ${resolvedService}${follow ? " (following)" : ""}`,
         );
-        await zapper.showLogs(resolvedService, options.follow);
+        await zapper.showLogs(resolvedService, follow);
         break;
+      }
 
       case "reset": {
         const proceed = await confirm(

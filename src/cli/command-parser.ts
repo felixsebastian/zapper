@@ -42,6 +42,9 @@ export class CommandParser {
           case "follow":
             options.follow = true;
             break;
+          case "no-follow":
+            options.follow = false;
+            break;
           case "config":
             options.config = value || cleanArgs[++i];
             break;
@@ -66,8 +69,11 @@ export class CommandParser {
             case "a":
               options.all = true;
               break;
-            case "f":
+            case "y":
               options.force = true;
+              break;
+            case "f":
+              options.follow = true;
               break;
             case "F":
               options.follow = true;
@@ -127,15 +133,16 @@ Commands:
   down     Stop all processes or a specific process (aliases: stop, delete)
   restart  Restart all processes or a specific process
   status   Show status from PM2 (filters to current project by default)
-  logs     Show logs for a specific process (requires --service, supports --follow)
+  logs     Show logs for a specific process (requires --service, follows by default)
   reset    Stop all processes and delete the .zap directory
   clone    Clone all repos defined in bare_metal services (respects git_method)
 
 Options:
   --service <name>  Target a specific process
   --all            Include processes from all projects (for status)
-  --force          Force the operation
-  --follow         Follow logs (for logs command)
+  --force, -y      Force the operation
+  --follow, -f     Follow logs (default)
+  --no-follow      Do not follow logs (print and exit)
   --config <file>  Use a specific config file (default: zap.yaml)
   --verbose, -v    Increase logging verbosity
   --quiet, -q      Reduce logging output
@@ -152,7 +159,8 @@ Examples:
   zap status                # Show status for current project processes
   zap status --all          # Show status for all PM2 processes
   zap logs --service test   # Show logs for test process
-  zap logs --service test --follow  # Follow logs for test process
+  zap logs --service test --no-follow  # Print last logs and exit
+  zap logs --service test -f # Follow logs
   zap reset --force         # Stop all processes and remove .zap without prompt
   zap clone                 # Clone all repos to their cwd folders
   zap clone --service api   # Clone only the api service repo
