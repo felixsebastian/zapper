@@ -7,6 +7,7 @@ interface DockerConfig {
   networks?: string[];
   environment?: Record<string, string>;
   command?: string;
+  labels?: Record<string, string>;
 }
 
 interface DockerContainer {
@@ -24,6 +25,12 @@ export class DockerManager {
     config: DockerConfig,
   ): Promise<void> {
     const args = ["run", "-d", "--name", name];
+
+    if (config.labels) {
+      for (const [key, value] of Object.entries(config.labels)) {
+        args.push("--label", `${key}=${value}`);
+      }
+    }
 
     if (config.ports) {
       for (const port of config.ports) {
