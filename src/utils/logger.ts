@@ -22,7 +22,7 @@ const colors = {
 const emoji = {
   error: "❌",
   warn: "⚠️",
-  info: "ℹ️",
+  info: "🔹",
   debug: "🐞",
   success: "⚡️",
 };
