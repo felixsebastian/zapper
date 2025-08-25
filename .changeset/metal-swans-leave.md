@@ -1,5 +1,0 @@
----
-"zapper-cli": minor
----
-
-Improvements
