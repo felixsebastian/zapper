@@ -69,7 +69,7 @@ export class Pm2Manager {
           name: `zap.${projectName}.${processConfig.name}`,
           script: wrapperScript,
           cwd: (() => {
-            if (!processConfig.cwd) return undefined;
+            if (!processConfig.cwd) return configDir;
             const resolved = path.isAbsolute(processConfig.cwd)
               ? processConfig.cwd
               : path.join(configDir, processConfig.cwd);
@@ -77,7 +77,7 @@ export class Pm2Manager {
               logger.warn(
                 `cwd path does not exist for ${processConfig.name}: ${resolved} (skipping)`,
               );
-              return undefined;
+              return configDir;
             }
             return resolved;
           })(),

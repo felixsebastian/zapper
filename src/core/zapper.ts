@@ -9,6 +9,7 @@ import path from "path";
 import { logger } from "../utils/logger";
 import * as fs from "fs";
 import { execSync } from "child_process";
+import { resolveConfigPath } from "../utils/find-up";
 
 export class Zapper {
   private config: ZapperConfig | null = null;
@@ -19,8 +20,9 @@ export class Zapper {
 
   async loadConfig(configPath: string = "zap.yaml"): Promise<void> {
     try {
-      this.configDir = path.dirname(path.resolve(configPath));
-      this.config = YamlParser.parse(configPath);
+      const resolvedPath = resolveConfigPath(configPath) ?? configPath;
+      this.configDir = path.dirname(path.resolve(resolvedPath));
+      this.config = YamlParser.parse(resolvedPath);
 
       // Normalize env_files to absolute paths relative to the config file directory
       if (this.config.env_files && this.config.env_files.length > 0) {

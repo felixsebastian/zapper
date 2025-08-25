@@ -4,16 +4,16 @@ git_method: ssh
 bare_metal:
   frontend:
     aliases: [f]
+    repo: myorg/frontend
     cmd: npm run dev
     cwd: ./frontend
     env: [PORT, API_URL]
-    repo: myorg/frontend
   api:
     aliases: [a]
+    repo: myorg/api
     cmd: npm run dev
     cwd: ./api
     env: [PORT, DATABASE_URL]
-    repo: myorg/api
 containers:
   database:
     aliases: [db]
