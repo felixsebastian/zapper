@@ -9,6 +9,7 @@ export interface Process {
   source?: string;
   repo?: string;
   env_files?: string[];
+  profiles?: string[];
 }
 
 export interface Volume {
@@ -28,6 +29,7 @@ export interface Container {
   command?: string;
   aliases?: string[];
   resolvedEnv?: Record<string, string>;
+  profiles?: string[];
 }
 
 export interface ZapperConfig {

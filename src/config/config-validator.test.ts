@@ -315,4 +315,40 @@ describe("ConfigValidator", () => {
       "Duplicate service identifier 'db'. Names and aliases must be globally unique across bare_metal and docker",
     );
   });
+
+  // Profiles
+  it("should accept profiles arrays for bare_metal and docker services", () => {
+    const config: ZapperConfig = {
+      project: "p",
+      bare_metal: {
+        api: { name: "api", cmd: "run", profiles: ["dev", "api"] },
+      },
+      docker: {
+        db: { image: "postgres:15", profiles: ["dev", "db"] },
+      },
+    };
+    expect(() => ConfigValidator.validate(config)).not.toThrow();
+  });
+
+  it("should reject invalid profiles type", () => {
+    const config1 = {
+      project: "p",
+      bare_metal: {
+        api: { name: "api", cmd: "run", profiles: "dev" },
+      },
+    } as unknown as ZapperConfig;
+    expect(() => ConfigValidator.validate(config1)).toThrow(
+      "bare_metal['api'] profiles must be an array of strings",
+    );
+
+    const config2 = {
+      project: "p",
+      docker: {
+        db: { image: "postgres:15", profiles: ["dev", ""] },
+      },
+    } as unknown as ZapperConfig;
+    expect(() => ConfigValidator.validate(config2)).toThrow(
+      "docker['db'] profiles must contain non-empty strings",
+    );
+  });
 });

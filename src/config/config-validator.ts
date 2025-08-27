@@ -1,5 +1,5 @@
 import { existsSync } from "fs";
-import { ZapperConfig, Process, Container, Volume, TaskCmd } from "../types";
+import { ZapperConfig, Process, Container, Volume, Task } from "../types";
 import { assertValidName } from "../utils/validators";
 
 export class ConfigValidator {
@@ -130,6 +130,10 @@ export class ConfigValidator {
         this.validateProcess(process);
         this.validateProcessKeys(process, name);
         this.validateAliases(process.aliases, name, "bare_metal");
+        this.validateProfiles(
+          process.profiles,
+          `bare_metal['${name}'] profiles`,
+        );
       }
     }
   }
@@ -151,6 +155,7 @@ export class ConfigValidator {
         }
         this.validateContainer(name, container);
         this.validateAliases(container.aliases, name, "docker");
+        this.validateProfiles(container.profiles, `docker['${name}'] profiles`);
       }
     }
   }
@@ -168,6 +173,7 @@ export class ConfigValidator {
       "networks",
       "command",
       "aliases",
+      "profiles",
       // internal
       "resolvedEnv",
     ]);
@@ -292,6 +298,7 @@ export class ConfigValidator {
       "aliases",
       "repo",
       "env_files",
+      "profiles",
       // internal
       "resolvedEnv",
     ]);
@@ -329,14 +336,16 @@ export class ConfigValidator {
       if (typeof config.tasks !== "object" || config.tasks === null) {
         throw new Error("tasks must be an object");
       }
-      for (const [name, task] of Object.entries(config.tasks)) {
+      for (const [name, task] of Object.entries(
+        config.tasks as Record<string, Task>,
+      )) {
         assertValidName(name, "Task");
-        this.validateTask(task as any, name);
+        this.validateTask(task, name);
       }
     }
   }
 
-  private static validateTask(task: any, name: string): void {
+  private static validateTask(task: Task, name: string): void {
     const allowed = new Set([
       "name",
       "desc",
@@ -347,16 +356,16 @@ export class ConfigValidator {
       // internal
       "resolvedEnv",
     ]);
-    for (const key of Object.keys(task)) {
+    for (const key of Object.keys(task as unknown as Record<string, unknown>)) {
       if (!allowed.has(key))
         throw new Error(`Unknown key in tasks['${name}']: ${key}`);
     }
 
-    if (!Array.isArray((task as { cmds?: TaskCmd[] }).cmds)) {
+    if (!Array.isArray(task.cmds)) {
       throw new Error(`Task ${name} must have a cmds array`);
     }
 
-    const cmds = (task as { cmds: TaskCmd[] }).cmds;
+    const cmds = task.cmds;
     for (const cmd of cmds) {
       if (
         typeof cmd !== "string" &&
@@ -399,6 +408,19 @@ export class ConfigValidator {
           `Duplicate service identifier '${a}'. Names and aliases must be globally unique across bare_metal and ${scope}`,
         );
       seen.add(a);
+    }
+  }
+
+  private static validateProfiles(
+    profiles: string[] | undefined,
+    context: string,
+  ): void {
+    if (profiles === undefined) return;
+    if (!Array.isArray(profiles))
+      throw new Error(`${context} must be an array of strings`);
+    for (const p of profiles) {
+      if (typeof p !== "string" || p.trim() === "")
+        throw new Error(`${context} must contain non-empty strings`);
     }
   }
 }

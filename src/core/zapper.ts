@@ -120,10 +120,14 @@ export class Zapper {
 
     const processesToStart = canonical
       ? allProcesses.filter((p) => canonical.includes(p.name))
-      : allProcesses;
+      : allProcesses.filter(
+          (p) => !Array.isArray(p.profiles) || p.profiles.length === 0,
+        );
     const containersToStart = canonical
       ? allContainers.filter(([name]) => canonical.includes(name))
-      : allContainers;
+      : allContainers.filter(
+          ([, c]) => !Array.isArray(c.profiles) || c.profiles.length === 0,
+        );
 
     if (
       canonical &&
@@ -242,13 +246,15 @@ export class Zapper {
       );
     }
 
+    // Stop bare metal via PM2
     if (processesToStop.length > 0) {
       const plan = this.planExecutor!.createPlan(processesToStop);
       await this.planExecutor!.executePlan(plan, "stop");
     }
 
+    // Stop docker via Docker
     for (const [name] of containersToStop) {
-      const dockerName = `zap.${this.config.project}.${name}`;
+      const dockerName = `zap.${this.config!.project}.${name}`;
       await DockerManager.stopContainer(dockerName);
       logger.info(`Stopped docker ${dockerName}`);
     }
@@ -259,25 +265,38 @@ export class Zapper {
       throw new Error("Config not loaded");
     }
 
+    const allProcesses = this.getProcesses();
+    const allContainers = this.getContainers();
     const canonical = this.resolveAliasesToCanonical(processNames);
-    await this.stopProcesses(canonical);
-    await this.startProcesses(canonical);
-  }
+    const processesToRestart = canonical
+      ? allProcesses.filter((p) => canonical.includes(p.name))
+      : allProcesses;
+    const containersToRestart = canonical
+      ? allContainers.filter(([name]) => canonical.includes(name))
+      : allContainers;
 
-  async getProcessStatus(processName?: string): Promise<Process[]> {
-    if (!this.config) {
-      throw new Error("Config not loaded");
+    if (
+      canonical &&
+      processesToRestart.length === 0 &&
+      containersToRestart.length === 0
+    ) {
+      throw new Error(
+        `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
+      );
     }
 
-    const allProcesses = this.getProcesses();
-    const target = processName
-      ? this.resolveServiceName(processName)
-      : undefined;
-    const processesToCheck = target
-      ? allProcesses.filter((p) => p.name === target)
-      : allProcesses;
+    // Restart bare metal via PM2
+    if (processesToRestart.length > 0) {
+      const plan = this.planExecutor!.createPlan(processesToRestart);
+      await this.planExecutor!.executePlan(plan, "restart");
+    }
 
-    return processesToCheck;
+    // Restart docker via Docker
+    for (const [name] of containersToRestart) {
+      const dockerName = `zap.${this.config!.project}.${name}`;
+      await DockerManager.restartContainer(dockerName);
+      logger.info(`Restarted docker ${dockerName}`);
+    }
   }
 
   async showLogs(processName: string, follow: boolean = false): Promise<void> {
@@ -295,25 +314,40 @@ export class Zapper {
     await pm2Executor.showLogs(name, follow);
   }
 
-  async reset(): Promise<void> {
-    if (!this.configDir) throw new Error("Config not loaded");
-
-    // Stop all processes defined in config (best-effort)
-    try {
-      await this.stopProcesses();
-    } catch (e) {
-      logger.warn(`Failed to stop processes: ${e}`);
+  async reset(force = false): Promise<void> {
+    if (!this.config) {
+      throw new Error("Config not loaded");
     }
 
-    // Remove .zap directory
-    const fs = await import("fs");
-    const zapDir = path.join(this.configDir, ".zap");
-    try {
-      if (fs.existsSync(zapDir))
-        fs.rmSync(zapDir, { recursive: true, force: true });
-      logger.info(`Removed ${zapDir}`);
-    } catch (e) {
-      logger.warn(`Failed to remove ${zapDir}: ${e}`);
+    const proceed = force
+      ? true
+      : await new Promise<boolean>((resolve) => {
+          process.stdout.write(
+            "This will stop all processes and remove the .zap directory. Continue? (y/N) ",
+          );
+          process.stdin.resume();
+          process.stdin.setEncoding("utf8");
+          process.stdin.once("data", (data: string) => {
+            const answer = data.trim().toLowerCase();
+            resolve(answer === "y" || answer === "yes");
+          });
+        });
+
+    if (!proceed) {
+      logger.info("Aborted.");
+      return;
+    }
+
+    // Stop all processes and containers
+    await this.stopProcesses();
+
+    // Remove the .zap directory
+    const zapDir = path.join(this.configDir!, ".zap");
+    if (fs.existsSync(zapDir)) {
+      fs.rmSync(zapDir, { recursive: true, force: true });
+      logger.info("Removed .zap directory.");
+    } else {
+      logger.info(".zap directory does not exist.");
     }
   }
 
