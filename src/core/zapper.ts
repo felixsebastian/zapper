@@ -47,6 +47,10 @@ export class Zapper {
     return this.config?.project ?? null;
   }
 
+  getConfigDir(): string | null {
+    return this.configDir;
+  }
+
   private getProcesses(): Process[] {
     if (!this.config) {
       throw new Error("Config not loaded");

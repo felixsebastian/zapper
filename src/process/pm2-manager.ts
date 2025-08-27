@@ -356,6 +356,17 @@ export class Pm2Manager {
     }
   }
 
+  private static sanitizeJsonOutput(output: string): string {
+    // PM2 occasionally prepends warnings to stdout; strip until first JSON token
+    const firstArray = output.indexOf("[");
+    const firstObject = output.indexOf("{");
+    let idx = -1;
+    if (firstArray !== -1 && firstObject !== -1)
+      idx = Math.min(firstArray, firstObject);
+    else idx = Math.max(firstArray, firstObject);
+    return idx > 0 ? output.slice(idx) : output;
+  }
+
   static async showLogs(
     name: string,
     projectName?: string,
@@ -408,8 +419,9 @@ export class Pm2Manager {
 
   static async getProcessInfo(name: string): Promise<ProcessInfo | null> {
     try {
-      const output = await this.runPm2Command(["jlist"]);
-      const processes = JSON.parse(output) as ProcessInfo[];
+      const output = await this.runPm2Command(["jlist", "--silent"]);
+      const sanitized = this.sanitizeJsonOutput(output);
+      const processes = JSON.parse(sanitized) as ProcessInfo[];
 
       const process = processes.find((p) => p.name === name);
 
@@ -421,9 +433,11 @@ export class Pm2Manager {
 
   static async listProcesses(): Promise<ProcessInfo[]> {
     try {
-      const output = await this.runPm2Command(["jlist"]);
+      const output = await this.runPm2Command(["jlist", "--silent"]);
 
-      const rawList = JSON.parse(output) as Array<Record<string, unknown>>;
+      const rawList = JSON.parse(this.sanitizeJsonOutput(output)) as Array<
+        Record<string, unknown>
+      >;
       const processes: ProcessInfo[] = rawList.map((proc) => ({
         name: String(proc["name"]),
         pid: Number(proc["pid"]),
@@ -435,6 +449,9 @@ export class Pm2Manager {
         cpu: Number((proc["monit"] as Record<string, unknown>)["cpu"]),
         restarts: Number(
           (proc["pm2_env"] as Record<string, unknown>)["restart_time"],
+        ),
+        cwd: String(
+          (proc["pm2_env"] as Record<string, unknown>)["pm_cwd"] || "",
         ),
       }));
 
@@ -467,8 +484,10 @@ export class Pm2Manager {
       }
 
       // For non-Zapper processes, fall back to PM2's default paths
-      const output = await this.runPm2Command(["jlist"]);
-      const processes = JSON.parse(output) as Array<Record<string, unknown>>;
+      const output = await this.runPm2Command(["jlist", "--silent"]);
+      const processes = JSON.parse(this.sanitizeJsonOutput(output)) as Array<
+        Record<string, unknown>
+      >;
 
       const process = processes.find((p) => p.name === processName);
 

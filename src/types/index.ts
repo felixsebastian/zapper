@@ -60,6 +60,7 @@ export interface ProcessInfo {
   memory: number;
   cpu: number;
   restarts: number;
+  cwd?: string;
 }
 
 export type Command =
