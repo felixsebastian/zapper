@@ -86,15 +86,19 @@ export class DockerManager {
         name,
       ]);
 
-      const container = JSON.parse(result) as DockerContainer;
+      const raw = JSON.parse(result) as Record<string, unknown>;
+      const state = raw["State"] as Record<string, unknown> | undefined;
+      const net = raw["NetworkSettings"] as Record<string, unknown> | undefined;
+      const networks =
+        (net?.["Networks"] as Record<string, unknown> | undefined) || {};
 
       return {
-        id: container.id || "",
-        name: container.name || "",
-        status: container.status || "",
-        ports: container.ports || [],
-        networks: container.networks || [],
-        created: container.created || "",
+        id: (raw["Id"] as string) || "",
+        name: ((raw["Name"] as string) || "").replace(/^\//, ""),
+        status: (state?.["Status"] as string) || "",
+        ports: [],
+        networks: Object.keys(networks),
+        created: (raw["Created"] as string) || "",
       };
     } catch (error) {
       return null;
@@ -110,18 +114,30 @@ export class DockerManager {
         "{{json .}}",
       ]);
 
-      const containers = result
+      const lines = result
         .trim()
         .split("\n")
-        .map((line) => JSON.parse(line) as DockerContainer);
+        .filter((l) => l.trim().length > 0);
+      const containers = lines.map(
+        (line) => JSON.parse(line) as Record<string, unknown>,
+      );
 
-      return containers.map((container) => ({
-        id: container.id || "",
-        name: container.name || "",
-        status: container.status || "",
-        ports: container.ports || [],
-        networks: container.networks || [],
-        created: container.created || "",
+      return containers.map((raw) => ({
+        id: (raw["ID"] as string) || (raw["Id"] as string) || "",
+        name: (raw["Names"] as string) || (raw["Name"] as string) || "",
+        status: (raw["Status"] as string) || "",
+        ports: raw["Ports"]
+          ? Array.isArray(raw["Ports"])
+            ? (raw["Ports"] as string[])
+            : [String(raw["Ports"])]
+          : [],
+        networks: raw["Networks"]
+          ? Array.isArray(raw["Networks"])
+            ? (raw["Networks"] as string[])
+            : [String(raw["Networks"])]
+          : [],
+        created:
+          (raw["CreatedAt"] as string) || (raw["Created"] as string) || "",
       }));
     } catch (error) {
       return [];

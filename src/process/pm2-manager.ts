@@ -68,6 +68,7 @@ export class Pm2Manager {
         {
           name: `zap.${projectName}.${processConfig.name}`,
           script: wrapperScript,
+          interpreter: "/bin/bash",
           cwd: (() => {
             if (!processConfig.cwd) return configDir;
             const resolved = path.isAbsolute(processConfig.cwd)
@@ -81,7 +82,7 @@ export class Pm2Manager {
             }
             return resolved;
           })(),
-          env: processConfig.resolvedEnv ?? {},
+          env: { ...(process.env || {}), ...(processConfig.resolvedEnv || {}) },
           error_file: path.join(
             logsDir,
             `${projectName}.${processConfig.name}-error.log`,
@@ -778,9 +779,9 @@ export class Pm2Manager {
     const fileName = `${projectName}.${processConfig.name}.${timestamp}.sh`;
     const filePath = path.join(zapDir, fileName);
 
-    let content = "";
+    let content = "#!/bin/bash\n";
     if (processConfig.source) {
-      content = `#!/bin/bash\nsource ${processConfig.source}\n`;
+      content += `source ${processConfig.source}\n`;
     }
 
     content += `${processConfig.cmd}\n`;

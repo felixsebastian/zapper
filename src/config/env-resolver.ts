@@ -162,9 +162,11 @@ export class EnvResolver {
     for (const file of files) {
       if (!existsSync(file)) continue;
       const ext = path.extname(file).toLowerCase();
+      const base = path.basename(file);
       try {
         const content = readFileSync(file, "utf8");
-        if (ext === ".env") {
+        const isDotenv = base.startsWith(".env") || base.endsWith(".env");
+        if (isDotenv) {
           const parsed = dotenvParse(content);
           Object.assign(merged, parsed);
         } else if (ext === ".yaml" || ext === ".yml") {

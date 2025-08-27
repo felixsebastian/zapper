@@ -272,7 +272,7 @@ describe("ConfigValidator", () => {
       },
     };
     expect(() => ConfigValidator.validate(config)).toThrow(
-      "Duplicate service identifier 'f'. Names and aliases must be globally unique across bare_metal and docker",
+      "Duplicate service identifier 'f'. Names and aliases must be globally unique across bare_metal and bare_metal",
     );
   });
 
