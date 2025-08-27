@@ -133,7 +133,7 @@ Commands:
   up       Start all processes or a specific process (aliases: start, s)
   down     Stop all processes or a specific process (aliases: stop, delete)
   restart  Restart all processes or a specific process
-  status   Show status from PM2 (filters to current project by default)
+  status   Show status (PM2 + Docker) filtered to current project by default
   logs     Show logs for a specific process (requires --service, follows by default)
   reset    Stop all processes and delete the .zap directory
   clone    Clone all repos defined in bare_metal services (respects git_method)
@@ -154,7 +154,7 @@ Examples:
   zap up                    # Start all processes
   zap up --service test     # Start only the test process
   zap down --all            # Stop all processes
-  zap status                # Show status for current project processes
+  zap status                # Show status for current project processes and docker
   zap logs --service test   # Show logs for test process
   zap reset --force         # Stop all processes and remove .zap without prompt
   zap clone                 # Clone all repos to their cwd folders

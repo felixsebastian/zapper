@@ -19,10 +19,10 @@ describe("ConfigValidator", () => {
     }).not.toThrow();
   });
 
-  it("should validate correct config with containers", () => {
+  it("should validate correct config with docker", () => {
     const config: ZapperConfig = {
       project: "myproj",
-      containers: {
+      docker: {
         database: {
           image: "postgres:15",
           ports: ["5432:5432"],
@@ -42,7 +42,7 @@ describe("ConfigValidator", () => {
     }).not.toThrow();
   });
 
-  it("should validate correct config with both bare_metal and containers", () => {
+  it("should validate correct config with both bare_metal and docker", () => {
     const config: ZapperConfig = {
       project: "myproj",
       bare_metal: {
@@ -53,7 +53,7 @@ describe("ConfigValidator", () => {
           env: ["PORT", "API_URL"],
         },
       },
-      containers: {
+      docker: {
         database: {
           image: "postgres:15",
           ports: ["5432:5432"],
@@ -132,7 +132,7 @@ describe("ConfigValidator", () => {
     expect(() => {
       ConfigValidator.validate(config);
     }).toThrow(
-      "No processes defined. Define at least one in bare_metal, containers, or processes",
+      "No processes defined. Define at least one in bare_metal, docker, or processes",
     );
   });
 
@@ -198,23 +198,23 @@ describe("ConfigValidator", () => {
     );
   });
 
-  it("should reject duplicate names across bare_metal and containers", () => {
+  it("should reject duplicate names across bare_metal and docker", () => {
     const config: ZapperConfig = {
       project: "myproj",
       bare_metal: {
         api: { name: "api", cmd: "run" },
       },
-      containers: {
+      docker: {
         api: { image: "redis:7" },
       },
     };
 
     expect(() => ConfigValidator.validate(config)).toThrow(
-      "Duplicate service identifier 'api'. Names and aliases must be globally unique across bare_metal and containers",
+      "Duplicate service identifier 'api'. Names and aliases must be globally unique across bare_metal and docker",
     );
   });
 
-  it("should reject unknown keys in process and container entries", () => {
+  it("should reject unknown keys in process and docker entries", () => {
     const config1 = {
       project: "myproj",
       bare_metal: {
@@ -227,12 +227,12 @@ describe("ConfigValidator", () => {
 
     const config2 = {
       project: "myproj",
-      containers: {
+      docker: {
         db: { image: "postgres:15", bar: 1 },
       },
     } as unknown as ZapperConfig;
     expect(() => ConfigValidator.validate(config2)).toThrow(
-      "Unknown key in containers['db']: bar",
+      "Unknown key in docker['db']: bar",
     );
   });
 
@@ -242,7 +242,7 @@ describe("ConfigValidator", () => {
       bare_metal: {
         api1: { name: "api1", cmd: "run" },
       },
-      containers: {
+      docker: {
         db2: { image: "postgres:15" },
       },
     };
@@ -257,7 +257,7 @@ describe("ConfigValidator", () => {
         frontend: { name: "frontend", cmd: "run", aliases: ["f", "fe"] },
         api: { name: "api", cmd: "run", aliases: ["a"] },
       },
-      containers: {
+      docker: {
         database: { image: "postgres:15", aliases: ["db"] },
       },
     };
@@ -272,7 +272,7 @@ describe("ConfigValidator", () => {
       },
     };
     expect(() => ConfigValidator.validate(config)).toThrow(
-      "Duplicate service identifier 'f'. Names and aliases must be globally unique across bare_metal and containers",
+      "Duplicate service identifier 'f'. Names and aliases must be globally unique across bare_metal and docker",
     );
   });
 
@@ -284,7 +284,7 @@ describe("ConfigValidator", () => {
       },
     };
     expect(() => ConfigValidator.validate(config)).toThrow(
-      "Duplicate service identifier 'frontend'. Names and aliases must be globally unique across bare_metal and containers",
+      "Duplicate service identifier 'frontend'. Names and aliases must be globally unique across bare_metal and docker",
     );
   });
 
@@ -297,22 +297,22 @@ describe("ConfigValidator", () => {
       },
     };
     expect(() => ConfigValidator.validate(config)).toThrow(
-      "Duplicate service identifier 'api'. Names and aliases must be globally unique across bare_metal and containers",
+      "Duplicate service identifier 'api'. Names and aliases must be globally unique across bare_metal and docker",
     );
   });
 
-  it("should reject alias colliding across containers and bare_metal", () => {
+  it("should reject alias colliding across docker and bare_metal", () => {
     const config: ZapperConfig = {
       project: "p",
       bare_metal: {
         frontend: { name: "frontend", cmd: "run", aliases: ["db"] },
       },
-      containers: {
+      docker: {
         db: { image: "postgres:15" },
       },
     };
     expect(() => ConfigValidator.validate(config)).toThrow(
-      "Duplicate service identifier 'db'. Names and aliases must be globally unique across bare_metal and containers",
+      "Duplicate service identifier 'db'. Names and aliases must be globally unique across bare_metal and docker",
     );
   });
 });

@@ -5,6 +5,7 @@ import { Zapper } from "./core/zapper";
 import { logger, LogLevel } from "./utils/logger";
 import { confirm } from "./utils/prompt";
 import { Pm2Manager } from "./process/pm2-manager";
+import { DockerManager } from "./containers";
 
 declare const process: {
   argv: string[];
@@ -71,20 +72,43 @@ async function main() {
           return p.name.startsWith(`zap.${project}.`);
         });
 
-        const byService = filtered
+        const bareMetal = filtered
           .map((p) => ({
             rawName: p.name,
             service: p.name.split(".").pop() || p.name,
             status: p.status,
-            cpu: p.cpu,
-            mem: p.memory,
-            restarts: p.restarts,
           }))
           .filter((p) =>
             !resolvedService ? true : p.service === resolvedService,
           );
 
-        const emojiFor = (status: string) => {
+        const allDocker = await DockerManager.listContainers();
+        const docker = allDocker
+          .map((c) => {
+            const name =
+              (c as unknown as Record<string, string>)["name"] ||
+              (c as unknown as Record<string, string>)["Names"] ||
+              "";
+            const status =
+              (c as unknown as Record<string, string>)["status"] ||
+              (c as unknown as Record<string, string>)["Status"] ||
+              "";
+            return {
+              rawName: name,
+              service: name.split(".").pop() || name,
+              status,
+            };
+          })
+          .filter((c) => {
+            if (!c.rawName) return false;
+            if (!all && project) return c.rawName.startsWith(`zap.${project}.`);
+            return true;
+          })
+          .filter((c) =>
+            !resolvedService ? true : c.service === resolvedService,
+          );
+
+        const emojiForPm2 = (status: string) => {
           const s = status.toLowerCase();
           if (s === "online") return "🟢";
           if (s === "stopped" || s === "stopping") return "🛑";
@@ -94,17 +118,37 @@ async function main() {
           return "⚪️";
         };
 
-        if (byService.length === 0) {
-          logger.info("No processes found");
-          break;
-        }
+        const emojiForDocker = (status: string) => {
+          const s = status.toLowerCase();
+          if (s.includes("up")) return "🟢";
+          if (s.includes("exited") || s.includes("dead")) return "🔴";
+          if (s.includes("restarting")) return "🟡";
+          if (s.includes("created")) return "⚪️";
+          return "⚪️";
+        };
 
-        logger.info(
-          "Status:\n" +
-            byService
-              .map((p) => `${emojiFor(p.status)}  ${p.service}  ${p.status}`)
-              .join("\n"),
-        );
+        const bareMetalSection = ["⛓️ Bare metal"]
+          .concat(
+            bareMetal.length > 0
+              ? bareMetal.map(
+                  (p) => `${emojiForPm2(p.status)}  ${p.service}  ${p.status}`,
+                )
+              : ["(none)"],
+          )
+          .join("\n");
+
+        const dockerSection = ["🐳 Docker"]
+          .concat(
+            docker.length > 0
+              ? docker.map(
+                  (c) =>
+                    `${emojiForDocker(c.status)}  ${c.service}  ${c.status}`,
+                )
+              : ["(none)"],
+          )
+          .join("\n");
+
+        logger.info(`Status:\n${bareMetalSection}\n\n${dockerSection}`);
         break;
       }
 
@@ -142,30 +186,14 @@ async function main() {
         break;
       }
 
-      case "task": {
-        const taskName = options.service;
-        if (!taskName) {
-          throw new Error(
-            "Task name required. Use: zap task <name> or zap task --service <name>",
-          );
-        }
-        await zapper.runTask(taskName);
-        break;
-      }
-
       default:
-        throw new Error(`Unknown command: ${options.command}`);
+        logger.info(CommandParser.getHelp());
+        break;
     }
   } catch (error) {
-    logger.error("Error:", error);
+    logger.error(String(error));
     process.exit(1);
   }
-}
-
-// Handle help command
-if (process.argv.includes("--help") || process.argv.includes("-h")) {
-  logger.info(CommandParser.getHelp());
-  process.exit(0);
 }
 
 main();

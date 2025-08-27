@@ -1,12 +1,12 @@
 # Zapper
 
-A lightweight dev environment runner that uses a single YAML file to define and launch your local development setup. Zapper manages app processes, containers, and environment variables by delegating to tools you already use—like PM2 for process management, Docker for containers, and asdf for runtime versioning.
+A lightweight dev environment runner that uses a single YAML file to define and launch your local development setup. Zapper manages app processes, docker, and environment variables by delegating to tools you already use—like PM2 for process management, Docker for docker, and asdf for runtime versioning.
 
 ## Features
 
 - **Simple Configuration**: Single `zap.yaml` file to define your entire dev stack
 - **Process Management**: Uses PM2 for reliable process management with auto-restart
-- **Container Support**: Full Docker integration for databases, caches, and services
+- **Docker Support**: Full Docker integration for databases, caches, and services
 - **Environment Variables**: Flexible env var management with interpolation
 - **Service Dependencies**: Automatic dependency resolution and startup ordering
 - **Health Monitoring**: Built-in health checks and status reporting
@@ -56,7 +56,7 @@ services:
 
   database:
     name: database
-    type: container
+    type: docker
     image: postgres:15
     ports:
       - "5432:5432"
@@ -104,13 +104,13 @@ api:
     PORT: 8000
 ```
 
-#### Container Services
+#### Docker Services
 Use Docker for databases, caches, and other services:
 
 ```yaml
 database:
   name: database
-  type: container
+  type: docker
   image: postgres:15
   ports:
     - "5432:5432"
@@ -192,7 +192,7 @@ zap clone                 # Clone all repos (or pass --service to clone one)
 
 - Node.js 18+
 - PM2 (`npm install -g pm2`)
-- Docker (for container services)
+- Docker (for docker services)
 - asdf (optional, for runtime versioning)
 - GitHub CLI (`brew install gh`) if using `git_method: cli`
 
@@ -220,7 +220,7 @@ pnpm dev
 src/
 ├── config/           # Configuration parsing and validation
 ├── process/          # PM2 process management
-├── containers/       # Docker container management
+├── containers/       # Docker management
 ├── runtime/          # asdf runtime version management
 ├── cli/              # Command line interface
 ├── core/             # Main orchestrator

@@ -76,8 +76,9 @@ export class Zapper {
 
   private getContainers(): Array<[string, Container]> {
     if (!this.config) throw new Error("Config not loaded");
-    if (!this.config.containers) return [];
-    return Object.entries(this.config.containers).map(([name, c]) => [name, c]);
+    const dockerServices = this.config.docker || this.config.containers;
+    if (!dockerServices) return [];
+    return Object.entries(dockerServices).map(([name, c]) => [name, c]);
   }
 
   private resolveAliasesToCanonical(names?: string[]): string[] | undefined {
@@ -155,10 +156,10 @@ export class Zapper {
         whitelist.map((k) => [k, mergedYamlEnvs[k] ?? "(missing)"]),
       );
       logger.debug(
-        `container ${name} whitelist (with values):`,
+        `docker ${name} whitelist (with values):`,
         whitelistWithValues,
       );
-      logger.debug(`container ${name} resolved env:`, c.resolvedEnv || {});
+      logger.debug(`docker ${name} resolved env:`, c.resolvedEnv || {});
     }
 
     // Start bare metal via PM2
@@ -167,7 +168,7 @@ export class Zapper {
       await this.planExecutor!.executePlan(plan, "start", this.config.project);
     }
 
-    // Start containers via Docker
+    // Start docker via Docker
     for (const [name, c] of containersToStart) {
       const dockerName = `zap.${this.config.project}.${name}`;
 
@@ -212,7 +213,7 @@ export class Zapper {
         command: c.command,
         labels,
       });
-      logger.info(`Started container ${dockerName}`);
+      logger.info(`Started docker ${dockerName}`);
     }
   }
 
@@ -249,7 +250,7 @@ export class Zapper {
     for (const [name] of containersToStop) {
       const dockerName = `zap.${this.config.project}.${name}`;
       await DockerManager.stopContainer(dockerName);
-      logger.info(`Stopped container ${dockerName}`);
+      logger.info(`Stopped docker ${dockerName}`);
     }
   }
 

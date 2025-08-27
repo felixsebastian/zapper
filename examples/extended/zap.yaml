@@ -14,7 +14,7 @@ bare_metal:
     cmd: npm run dev
     cwd: ./api
     env: [PORT, DATABASE_URL]
-containers:
+docker:
   database:
     aliases: [db]
     image: postgres:15

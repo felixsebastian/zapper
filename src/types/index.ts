@@ -2,18 +2,12 @@ export interface Process {
   name: string;
   cmd: string;
   cwd?: string;
-  // Backward compat: allow legacy 'envs', but prefer 'env'
   envs?: string[];
-  // Whitelist of environment variable keys
   env?: string[];
-  // Optional shorthand aliases for this service
   aliases?: string[];
-  // Computed resolved env map used internally for execution
   resolvedEnv?: Record<string, string>;
   source?: string;
-  // Optional GitHub repository in the form "owner/repo" or a full URL
   repo?: string;
-  // Optional per-process env files (take precedence over global)
   env_files?: string[];
 }
 
@@ -22,7 +16,6 @@ export interface Volume {
   internal_dir: string;
 }
 
-// Accept either structured volume objects or docker -v style "name:/path" strings
 export type ContainerVolume = Volume | string;
 
 export interface Container {
@@ -33,22 +26,18 @@ export interface Container {
   volumes?: ContainerVolume[];
   networks?: string[];
   command?: string;
-  // Optional shorthand aliases for this container service
   aliases?: string[];
-  // Computed resolved env map used internally for execution
   resolvedEnv?: Record<string, string>;
 }
 
 export interface ZapperConfig {
   project: string;
   env_files?: string[];
-  // Preferred Git clone method (default: ssh)
   git_method?: "http" | "ssh" | "cli";
   bare_metal?: Record<string, Process>;
+  docker?: Record<string, Container>;
   containers?: Record<string, Container>;
-  // Backward compatibility
   processes?: Process[];
-  // One-off tasks
   tasks?: Record<string, Task>;
 }
 
