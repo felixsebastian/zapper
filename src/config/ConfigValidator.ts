@@ -1,5 +1,5 @@
 import { existsSync } from "fs";
-import { ZapperConfig, Process, Container, Volume, Task } from "../types";
+import { ZapperConfig, Process, Container, Volume, Task } from "../utils";
 import { assertValidName } from "../utils/validators";
 
 export class ConfigValidator {

@@ -7,7 +7,7 @@ import {
   existsSync,
 } from "fs";
 import path from "path";
-import { Process, ProcessInfo } from "../types";
+import { Process, ProcessInfo } from "../utils";
 import { logger } from "../utils/logger";
 
 export class Pm2Manager {

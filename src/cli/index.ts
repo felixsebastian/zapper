@@ -1,1 +1,1 @@
-export { CommandParser } from "./command-parser";
+export { CommandParser } from "./CommandParser";

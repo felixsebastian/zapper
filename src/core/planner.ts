@@ -1,19 +1,7 @@
-import { ZapperConfig, Process, Container } from "../types";
-import { Pm2Manager } from "../process/pm2-manager";
-import { DockerManager } from "../containers";
-
-export type ServiceType = "bare_metal" | "docker";
-export type ActionType = "start" | "stop";
-
-export interface Action {
-  type: ActionType;
-  serviceType: ServiceType;
-  name: string;
-}
-
-export interface ActionPlan {
-  actions: Action[];
-}
+import { ZapperConfig, Process, Container } from "../utils";
+import { Pm2Manager } from "../process/Pm2Manager";
+import { DockerManager } from "../docker";
+import { Action, ActionPlan } from "../types";
 
 export class Planner {
   constructor(private readonly config: ZapperConfig) {}

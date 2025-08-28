@@ -1,4 +1,4 @@
-import { DockerWrapper } from "./docker-wrapper";
+import { runDocker } from "./runDocker";
 
 interface DockerConfig {
   image: string;
@@ -26,7 +26,7 @@ export class DockerManager {
   ): Promise<void> {
     // Ensure a clean slate: remove any existing container with this name
     try {
-      await DockerWrapper.run(["rm", "-f", name]);
+      await runDocker(["rm", "-f", name]);
     } catch (e) {
       // ignore if container doesn't exist
     }
@@ -46,25 +46,25 @@ export class DockerManager {
     args.push(config.image);
     if (config.command) args.push(config.command);
 
-    await DockerWrapper.run(args);
+    await runDocker(args);
   }
 
   static async stopContainer(name: string): Promise<void> {
     // Prefer removing containers entirely to avoid name conflicts on next start
-    await DockerWrapper.run(["rm", "-f", name]);
+    await runDocker(["rm", "-f", name]);
   }
 
   static async restartContainer(name: string): Promise<void> {
-    await DockerWrapper.run(["restart", name]);
+    await runDocker(["restart", name]);
   }
 
   static async removeContainer(name: string): Promise<void> {
-    await DockerWrapper.run(["rm", "-f", name]);
+    await runDocker(["rm", "-f", name]);
   }
 
   static async getContainerInfo(name: string): Promise<DockerContainer | null> {
     try {
-      const result = await DockerWrapper.run([
+      const result = await runDocker([
         "inspect",
         "--format",
         "{{json .}}",
@@ -91,12 +91,7 @@ export class DockerManager {
 
   static async listContainers(): Promise<DockerContainer[]> {
     try {
-      const result = await DockerWrapper.run([
-        "ps",
-        "-a",
-        "--format",
-        "{{json .}}",
-      ]);
+      const result = await runDocker(["ps", "-a", "--format", "{{json .}}"]);
       const lines = result
         .trim()
         .split("\n")
@@ -128,7 +123,7 @@ export class DockerManager {
 
   static async createNetwork(name: string): Promise<void> {
     try {
-      await DockerWrapper.run(["network", "create", name]);
+      await runDocker(["network", "create", name]);
     } catch (error) {
       // ignore if exists
     }
@@ -136,7 +131,7 @@ export class DockerManager {
 
   static async removeNetwork(name: string): Promise<void> {
     try {
-      await DockerWrapper.run(["network", "rm", name]);
+      await runDocker(["network", "rm", name]);
     } catch (error) {
       // ignore if missing
     }
@@ -144,7 +139,7 @@ export class DockerManager {
 
   static async createVolume(name: string): Promise<void> {
     try {
-      await DockerWrapper.run(["volume", "create", name]);
+      await runDocker(["volume", "create", name]);
     } catch (error) {
       // ignore if exists
     }

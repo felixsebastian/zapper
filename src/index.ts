@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-import { CommandParser } from "./cli/command-parser";
-import { Zapper } from "./core/zapper";
+import { CommandParser } from "./cli";
+import { Zapper } from "./core/Zapper";
 import { logger, LogLevel } from "./utils/logger";
 import { confirm } from "./utils/prompt";
-import { Pm2Manager } from "./process/pm2-manager";
-import { DockerManager } from "./containers";
+import { Pm2Manager } from "./process";
+import { DockerManager } from "./docker";
 
 declare const process: {
   argv: string[];

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ConfigValidator } from "./config-validator";
-import { ZapperConfig, Process } from "../types";
+import { ConfigValidator } from "./ConfigValidator";
+import { ZapperConfig, Process } from "../utils";
 
 describe("ConfigValidator", () => {
   it("should validate correct config with bare_metal", () => {

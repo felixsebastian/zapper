@@ -1,4 +1,4 @@
-import { CliOptions, Command } from "../types";
+import { CliOptions, Command } from "../utils";
 
 export class CommandParser {
   static parse(args: string[]): CliOptions {

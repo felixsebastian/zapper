@@ -1,5 +1,5 @@
-import { Process } from "../types";
-import { Pm2Manager } from "./pm2-manager";
+import { Process } from "../utils";
+import { Pm2Manager } from "./Pm2Manager";
 
 export class Pm2Executor {
   private projectName?: string;

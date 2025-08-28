@@ -1,3 +1,3 @@
-export { YamlParser } from "./yaml-parser";
-export { ConfigValidator } from "./config-validator";
-export { EnvResolver } from "./env-resolver";
+export { parseYamlFile, parseYamlString } from "./yamlParser";
+export { ConfigValidator } from "./ConfigValidator";
+export { EnvResolver } from "./EnvResolver";

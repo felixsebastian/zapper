@@ -1,15 +1,15 @@
-import { YamlParser } from "../config/yaml-parser";
-import { ConfigValidator } from "../config/config-validator";
-import { EnvResolver } from "../config/env-resolver";
-import { Pm2Executor } from "../process/pm2-executor";
-import { ZapperConfig, Process, Container } from "../types";
+import { parseYamlFile } from "../config/yamlParser";
+import { ConfigValidator } from "../config/ConfigValidator";
+import { EnvResolver } from "../config/EnvResolver";
+import { Pm2Executor } from "../process/Pm2Executor";
+import { ZapperConfig, Process, Container } from "../utils";
 import path from "path";
 import { logger } from "../utils/logger";
 import * as fs from "fs";
 import { execSync } from "child_process";
-import { resolveConfigPath } from "../utils/find-up";
-import { Planner } from "./planner";
-import { ActionExecutor } from "./action-executor";
+import { resolveConfigPath } from "../utils/findUp";
+import { Planner } from "./Planner";
+import { executeActions } from "./actionExecutor";
 
 export class Zapper {
   private config: ZapperConfig | null = null;
@@ -21,7 +21,7 @@ export class Zapper {
     try {
       const resolvedPath = resolveConfigPath(configPath) ?? configPath;
       this.configDir = path.dirname(path.resolve(resolvedPath));
-      this.config = YamlParser.parse(resolvedPath);
+      this.config = parseYamlFile(resolvedPath);
 
       if (this.config.env_files && this.config.env_files.length > 0) {
         this.config.env_files = this.config.env_files.map((p) =>
@@ -106,12 +106,6 @@ export class Zapper {
       throw new Error("No processes defined in config");
 
     const planner = new Planner(this.config);
-    const executor = new ActionExecutor(
-      this.config.project,
-      this.configDir,
-      this.config,
-    );
-
     const canonical = this.resolveAliasesToCanonical(processNames);
     const plan = await planner.plan("start", canonical, this.config.project);
     if (canonical && plan.actions.length === 0)
@@ -119,19 +113,18 @@ export class Zapper {
         `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
       );
 
-    await executor.execute(plan);
+    await executeActions(
+      this.config,
+      this.config.project,
+      this.configDir,
+      plan,
+    );
   }
 
   async stopProcesses(processNames?: string[]): Promise<void> {
     if (!this.config) throw new Error("Config not loaded");
 
     const planner = new Planner(this.config);
-    const executor = new ActionExecutor(
-      this.config.project,
-      this.configDir,
-      this.config,
-    );
-
     const canonical = this.resolveAliasesToCanonical(processNames);
     const plan = await planner.plan("stop", canonical, this.config.project);
     if (canonical && plan.actions.length === 0)
@@ -139,23 +132,27 @@ export class Zapper {
         `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
       );
 
-    await executor.execute(plan);
+    await executeActions(
+      this.config,
+      this.config.project,
+      this.configDir,
+      plan,
+    );
   }
 
   async restartProcesses(processNames?: string[]): Promise<void> {
     if (!this.config) throw new Error("Config not loaded");
 
     const planner = new Planner(this.config);
-    const executor = new ActionExecutor(
-      this.config.project,
-      this.configDir,
-      this.config,
-    );
-
     const canonical = this.resolveAliasesToCanonical(processNames);
     const plan = await planner.plan("restart", canonical, this.config.project);
 
-    await executor.execute(plan);
+    await executeActions(
+      this.config,
+      this.config.project,
+      this.configDir,
+      plan,
+    );
   }
 
   async showLogs(processName: string, follow: boolean = false): Promise<void> {

@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from "fs";
 import path from "path";
 import { parse } from "yaml";
 import { parse as dotenvParse } from "dotenv";
-import { ZapperConfig, Process, Task, Container } from "../types";
+import { ZapperConfig, Process, Task, Container } from "../utils";
 import { logger } from "../utils/logger";
 
 interface RawEnvFile {

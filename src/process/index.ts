@@ -1,1 +1,2 @@
-export { Pm2Manager } from "./pm2-manager";
+export * from "./Pm2Manager";
+export * from "./Pm2Executor";
