@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { DockerWrapper } from "./docker-wrapper";
 
 interface DockerConfig {
   image: string;
@@ -24,68 +24,52 @@ export class DockerManager {
     name: string,
     config: DockerConfig,
   ): Promise<void> {
+    // Ensure a clean slate: remove any existing container with this name
+    try {
+      await DockerWrapper.run(["rm", "-f", name]);
+    } catch (e) {
+      // ignore if container doesn't exist
+    }
     const args = ["run", "-d", "--name", name];
 
-    if (config.labels) {
-      for (const [key, value] of Object.entries(config.labels)) {
-        args.push("--label", `${key}=${value}`);
-      }
-    }
-
-    if (config.ports) {
-      for (const port of config.ports) {
-        args.push("-p", port);
-      }
-    }
-
-    if (config.volumes) {
-      for (const volume of config.volumes) {
-        args.push("-v", volume);
-      }
-    }
-
-    if (config.networks) {
-      for (const network of config.networks) {
-        args.push("--network", network);
-      }
-    }
-
-    if (config.environment) {
-      for (const [key, value] of Object.entries(config.environment)) {
-        args.push("-e", `${key}=${value}`);
-      }
-    }
+    if (config.labels)
+      for (const [k, v] of Object.entries(config.labels))
+        args.push("--label", `${k}=${v}`);
+    if (config.ports) for (const p of config.ports) args.push("-p", p);
+    if (config.volumes) for (const v of config.volumes) args.push("-v", v);
+    if (config.networks)
+      for (const n of config.networks) args.push("--network", n);
+    if (config.environment)
+      for (const [k, v] of Object.entries(config.environment))
+        args.push("-e", `${k}=${v}`);
 
     args.push(config.image);
+    if (config.command) args.push(config.command);
 
-    if (config.command) {
-      args.push(config.command);
-    }
-
-    await this.runDockerCommand(args);
+    await DockerWrapper.run(args);
   }
 
   static async stopContainer(name: string): Promise<void> {
-    await this.runDockerCommand(["stop", name]);
+    // Prefer removing containers entirely to avoid name conflicts on next start
+    await DockerWrapper.run(["rm", "-f", name]);
   }
 
   static async restartContainer(name: string): Promise<void> {
-    await this.runDockerCommand(["restart", name]);
+    await DockerWrapper.run(["restart", name]);
   }
 
   static async removeContainer(name: string): Promise<void> {
-    await this.runDockerCommand(["rm", "-f", name]);
+    await DockerWrapper.run(["rm", "-f", name]);
   }
 
   static async getContainerInfo(name: string): Promise<DockerContainer | null> {
     try {
-      const result = await this.runDockerCommand([
+      const result = await DockerWrapper.run([
         "inspect",
         "--format",
         "{{json .}}",
         name,
       ]);
-
       const raw = JSON.parse(result) as Record<string, unknown>;
       const state = raw["State"] as Record<string, unknown> | undefined;
       const net = raw["NetworkSettings"] as Record<string, unknown> | undefined;
@@ -107,13 +91,12 @@ export class DockerManager {
 
   static async listContainers(): Promise<DockerContainer[]> {
     try {
-      const result = await this.runDockerCommand([
+      const result = await DockerWrapper.run([
         "ps",
         "-a",
         "--format",
         "{{json .}}",
       ]);
-
       const lines = result
         .trim()
         .split("\n")
@@ -121,7 +104,6 @@ export class DockerManager {
       const containers = lines.map(
         (line) => JSON.parse(line) as Record<string, unknown>,
       );
-
       return containers.map((raw) => ({
         id: (raw["ID"] as string) || (raw["Id"] as string) || "",
         name: (raw["Names"] as string) || (raw["Name"] as string) || "",
@@ -146,56 +128,25 @@ export class DockerManager {
 
   static async createNetwork(name: string): Promise<void> {
     try {
-      await this.runDockerCommand(["network", "create", name]);
+      await DockerWrapper.run(["network", "create", name]);
     } catch (error) {
-      // Network might already exist, ignore error
+      // ignore if exists
     }
   }
 
   static async removeNetwork(name: string): Promise<void> {
     try {
-      await this.runDockerCommand(["network", "rm", name]);
+      await DockerWrapper.run(["network", "rm", name]);
     } catch (error) {
-      // Network might not exist, ignore error
+      // ignore if missing
     }
   }
 
   static async createVolume(name: string): Promise<void> {
     try {
-      await this.runDockerCommand(["volume", "create", name]);
+      await DockerWrapper.run(["volume", "create", name]);
     } catch (error) {
-      // Volume may already exist; ignore to keep idempotent
+      // ignore if exists
     }
-  }
-
-  private static runDockerCommand(args: string[]): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const child = spawn("docker", args, {
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-
-      let output = "";
-      let error = "";
-
-      child.stdout.on("data", (data) => {
-        output += data.toString();
-      });
-
-      child.stderr.on("data", (data) => {
-        error += data.toString();
-      });
-
-      child.on("close", (code) => {
-        if (code === 0) {
-          resolve(output.trim());
-        } else {
-          reject(new Error(`Docker command failed: ${error}`));
-        }
-      });
-
-      child.on("error", (err) => {
-        reject(new Error(`Failed to run Docker command: ${err.message}`));
-      });
-    });
   }
 }

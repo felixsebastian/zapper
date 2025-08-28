@@ -195,6 +195,26 @@ async function main() {
         break;
       }
 
+      case "checkout": {
+        const branch = options.service;
+        if (!branch)
+          throw new Error(
+            "Branch name required: zap checkout --service <branch>",
+          );
+        await zapper.gitCheckoutAll(branch);
+        break;
+      }
+
+      case "pull": {
+        await zapper.gitPullAll();
+        break;
+      }
+
+      case "gitstatus": {
+        await zapper.gitStatusAll();
+        break;
+      }
+
       default:
         logger.info(CommandParser.getHelp());
         break;

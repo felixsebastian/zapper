@@ -1,20 +1,36 @@
-import { Process } from "../types";
-import {
-  ExecutionPlan,
-  ExecutionStrategy,
-  ProcessExecutor,
-} from "./strategies";
 import { logger } from "../utils/logger";
+import { ExecutionPlan, ExecutionStep } from "./strategies";
+import { Process } from "../types";
+import { DockerManager } from "../containers";
+
+export type ActionType = "start" | "stop" | "restart";
+
+export interface Action {
+  type: ActionType;
+  process: Process;
+}
+
+export interface ActionPlan {
+  actions: Action[];
+}
 
 export class PlanExecutor {
   constructor(
-    private strategy: ExecutionStrategy,
-    private executor: ProcessExecutor,
+    private strategy: {
+      createPlan(processes: Process[]): ExecutionPlan;
+      validatePlan(plan: ExecutionPlan): boolean;
+    },
+    private executor: {
+      startProcess(process: Process, projectName: string): Promise<void>;
+      stopProcess(processName: string): Promise<void>;
+      restartProcess(processName: string): Promise<void>;
+      showLogs?(processName: string, follow?: boolean): Promise<void>;
+    },
   ) {}
 
   async executePlan(
     plan: ExecutionPlan,
-    operation: "start" | "stop" | "restart",
+    operation: ActionType,
     projectName?: string,
   ): Promise<void> {
     if (!this.strategy.validatePlan(plan)) {
@@ -36,7 +52,7 @@ export class PlanExecutor {
 
     for (const step of plan.steps) {
       try {
-        step.status = "running";
+        (step as ExecutionStep).status = "running";
         logger.debug(
           `[${step.order}/${plan.totalSteps}] ${operation}ing ${step.process.name}`,
         );
@@ -55,11 +71,10 @@ export class PlanExecutor {
             break;
         }
 
-        step.status = "completed";
-        // per-service success moved to debug
+        (step as ExecutionStep).status = "completed";
         logger.debug(`${step.process.name} ${opPast}`);
       } catch (error) {
-        step.status = "failed";
+        (step as ExecutionStep).status = "failed";
         logger.error(`Failed to ${operation} ${step.process.name}:`, error);
         throw error;
       }
@@ -70,5 +85,40 @@ export class PlanExecutor {
 
   createPlan(processes: Process[]): ExecutionPlan {
     return this.strategy.createPlan(processes);
+  }
+
+  async executeActionPlan(
+    plan: {
+      actions: Array<{
+        type: "start" | "stop";
+        serviceType: "bare_metal" | "docker";
+        name: string;
+        process?: Process;
+      }>;
+    },
+    projectName: string,
+    lookup: (name: string) => {
+      process?: Process;
+      container?: { name: string };
+    },
+  ): Promise<void> {
+    // Execute sequentially for now
+    for (const action of plan.actions) {
+      if (action.serviceType === "bare_metal") {
+        const proc = action.process || lookup(action.name).process;
+        if (!proc) throw new Error(`Process not found for ${action.name}`);
+        if (action.type === "start")
+          await this.executor.startProcess(proc, projectName);
+        else await this.executor.stopProcess(proc.name);
+      } else {
+        const dockerName = `zap.${projectName}.${action.name}`;
+        if (action.type === "start") {
+          // For docker start via executor, Zapper still prepares full config; this path is unused for now
+          await DockerManager.restartContainer(dockerName);
+        } else {
+          await DockerManager.stopContainer(dockerName);
+        }
+      }
+    }
   }
 }

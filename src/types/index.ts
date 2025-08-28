@@ -62,7 +62,10 @@ export type Command =
   | "logs"
   | "reset"
   | "clone"
-  | "task";
+  | "task"
+  | "checkout"
+  | "pull"
+  | "gitstatus";
 
 export interface CliOptions {
   command: Command;

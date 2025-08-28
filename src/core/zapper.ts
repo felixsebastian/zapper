@@ -10,7 +10,8 @@ import { logger } from "../utils/logger";
 import * as fs from "fs";
 import { execSync } from "child_process";
 import { resolveConfigPath } from "../utils/find-up";
-import { DockerManager } from "../containers";
+import { Planner } from "./planner";
+import { ActionExecutor } from "./action-executor";
 
 export class Zapper {
   private config: ZapperConfig | null = null;
@@ -106,208 +107,72 @@ export class Zapper {
   }
 
   async startProcesses(processNames?: string[]): Promise<void> {
-    if (!this.config) {
-      throw new Error("Config not loaded");
-    }
+    if (!this.config) throw new Error("Config not loaded");
 
     const allProcesses = this.getProcesses();
     const allContainers = this.getContainers();
-    if (allProcesses.length === 0 && allContainers.length === 0) {
+    if (allProcesses.length === 0 && allContainers.length === 0)
       throw new Error("No processes defined in config");
-    }
+
+    const planner = new Planner(this.config);
+    const executor = new ActionExecutor(
+      this.config.project,
+      this.configDir,
+      this.config,
+    );
 
     const canonical = this.resolveAliasesToCanonical(processNames);
-
-    const processesToStart = canonical
-      ? allProcesses.filter((p) => canonical.includes(p.name))
-      : allProcesses.filter(
-          (p) => !Array.isArray(p.profiles) || p.profiles.length === 0,
-        );
-    const containersToStart = canonical
-      ? allContainers.filter(([name]) => canonical.includes(name))
-      : allContainers.filter(
-          ([, c]) => !Array.isArray(c.profiles) || c.profiles.length === 0,
-        );
-
-    if (
-      canonical &&
-      processesToStart.length === 0 &&
-      containersToStart.length === 0
-    ) {
+    const plan = await planner.plan("start", canonical, this.config.project);
+    if (canonical && plan.actions.length === 0)
       throw new Error(
         `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
       );
-    }
 
-    const mergedYamlEnvs = EnvResolver.getMergedEnvFromFiles(this.config);
-    logger.debug("merged yaml envs:", mergedYamlEnvs);
-
-    for (const p of processesToStart) {
-      const whitelist = Array.isArray(p.env) ? p.env : [];
-      const whitelistWithValues = Object.fromEntries(
-        whitelist.map((k) => [k, mergedYamlEnvs[k] ?? "(missing)"]),
-      );
-      logger.debug(
-        `process ${p.name} whitelist (with values):`,
-        whitelistWithValues,
-      );
-      logger.debug(`process ${p.name} resolved env:`, p.resolvedEnv || {});
-    }
-
-    for (const [name, c] of containersToStart) {
-      const whitelist = Array.isArray(c.env) ? c.env : [];
-      const whitelistWithValues = Object.fromEntries(
-        whitelist.map((k) => [k, mergedYamlEnvs[k] ?? "(missing)"]),
-      );
-      logger.debug(
-        `docker ${name} whitelist (with values):`,
-        whitelistWithValues,
-      );
-      logger.debug(`docker ${name} resolved env:`, c.resolvedEnv || {});
-    }
-
-    // Start bare metal via PM2
-    if (processesToStart.length > 0) {
-      const plan = this.planExecutor!.createPlan(processesToStart);
-      await this.planExecutor!.executePlan(plan, "start", this.config.project);
-    }
-
-    // Start docker via Docker
-    for (const [name, c] of containersToStart) {
-      const dockerName = `zap.${this.config.project}.${name}`;
-
-      // Prepare ports passthrough
-      const ports = Array.isArray(c.ports) ? c.ports : [];
-
-      // Prepare volumes: support string form "name:/path" and object form
-      const volumeBindings: string[] = [];
-      const ensureVolumeNames: string[] = [];
-      if (Array.isArray(c.volumes)) {
-        for (const v of c.volumes) {
-          if (typeof v === "string") {
-            const [volName, internal] = v.split(":");
-            ensureVolumeNames.push(volName);
-            volumeBindings.push(`${volName}:${internal}`);
-          } else {
-            ensureVolumeNames.push(v.name);
-            volumeBindings.push(`${v.name}:${v.internal_dir}`);
-          }
-        }
-      }
-      for (const vol of ensureVolumeNames)
-        await DockerManager.createVolume(vol);
-
-      // Build env map from resolvedEnv
-      const envMap = c.resolvedEnv || {};
-
-      // Compose-like labels to assist grouping in UIs
-      const labels = {
-        "com.docker.compose.project": this.config.project,
-        "com.docker.compose.service": name,
-        "com.zapper.project": this.config.project,
-        "com.zapper.service": name,
-      } as Record<string, string>;
-
-      await DockerManager.startContainer(dockerName, {
-        image: c.image,
-        ports,
-        volumes: volumeBindings,
-        networks: c.networks,
-        environment: envMap,
-        command: c.command,
-        labels,
-      });
-      logger.info(`Started docker ${dockerName}`);
-    }
+    await executor.execute(plan);
   }
 
   async stopProcesses(processNames?: string[]): Promise<void> {
-    if (!this.config) {
-      throw new Error("Config not loaded");
-    }
+    if (!this.config) throw new Error("Config not loaded");
 
-    const allProcesses = this.getProcesses();
-    const allContainers = this.getContainers();
+    const planner = new Planner(this.config);
+    const executor = new ActionExecutor(
+      this.config.project,
+      this.configDir,
+      this.config,
+    );
+
     const canonical = this.resolveAliasesToCanonical(processNames);
-    const processesToStop = canonical
-      ? allProcesses.filter((p) => canonical.includes(p.name))
-      : allProcesses;
-    const containersToStop = canonical
-      ? allContainers.filter(([name]) => canonical.includes(name))
-      : allContainers;
-
-    if (
-      canonical &&
-      processesToStop.length === 0 &&
-      containersToStop.length === 0
-    ) {
+    const plan = await planner.plan("stop", canonical, this.config.project);
+    if (canonical && plan.actions.length === 0)
       throw new Error(
         `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
       );
-    }
 
-    // Stop bare metal via PM2
-    if (processesToStop.length > 0) {
-      const plan = this.planExecutor!.createPlan(processesToStop);
-      await this.planExecutor!.executePlan(plan, "stop");
-    }
-
-    // Stop docker via Docker
-    for (const [name] of containersToStop) {
-      const dockerName = `zap.${this.config!.project}.${name}`;
-      await DockerManager.stopContainer(dockerName);
-      logger.info(`Stopped docker ${dockerName}`);
-    }
+    await executor.execute(plan);
   }
 
   async restartProcesses(processNames?: string[]): Promise<void> {
-    if (!this.config) {
-      throw new Error("Config not loaded");
-    }
+    if (!this.config) throw new Error("Config not loaded");
 
-    const allProcesses = this.getProcesses();
-    const allContainers = this.getContainers();
+    const planner = new Planner(this.config);
+    const executor = new ActionExecutor(
+      this.config.project,
+      this.configDir,
+      this.config,
+    );
+
     const canonical = this.resolveAliasesToCanonical(processNames);
-    const processesToRestart = canonical
-      ? allProcesses.filter((p) => canonical.includes(p.name))
-      : allProcesses;
-    const containersToRestart = canonical
-      ? allContainers.filter(([name]) => canonical.includes(name))
-      : allContainers;
+    const plan = await planner.plan("restart", canonical, this.config.project);
 
-    if (
-      canonical &&
-      processesToRestart.length === 0 &&
-      containersToRestart.length === 0
-    ) {
-      throw new Error(
-        `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
-      );
-    }
-
-    // Restart bare metal via PM2
-    if (processesToRestart.length > 0) {
-      const plan = this.planExecutor!.createPlan(processesToRestart);
-      await this.planExecutor!.executePlan(plan, "restart");
-    }
-
-    // Restart docker via Docker
-    for (const [name] of containersToRestart) {
-      const dockerName = `zap.${this.config!.project}.${name}`;
-      await DockerManager.restartContainer(dockerName);
-      logger.info(`Restarted docker ${dockerName}`);
-    }
+    await executor.execute(plan);
   }
 
   async showLogs(processName: string, follow: boolean = false): Promise<void> {
-    // For logs, we don't need to check the config - we can show logs for any PM2 process
-    // Use a default project name if config is not loaded
     const projectName = this.config?.project || "default";
     const configDir = this.configDir || ".";
 
     const pm2Executor = new Pm2Executor(projectName, configDir);
 
-    // Try to resolve alias if config is available; otherwise pass-through
     const name = this.config
       ? this.resolveServiceName(processName)
       : processName;
@@ -338,10 +203,8 @@ export class Zapper {
       return;
     }
 
-    // Stop all processes and containers
     await this.stopProcesses();
 
-    // Remove the .zap directory
     const zapDir = path.join(this.configDir!, ".zap");
     if (fs.existsSync(zapDir)) {
       fs.rmSync(zapDir, { recursive: true, force: true });
@@ -507,5 +370,86 @@ export class Zapper {
     };
 
     execTask(taskName);
+  }
+
+  // Git utilities for bare_metal repos
+  private getBareMetalTargets(): Array<{ name: string; cwd: string }> {
+    if (!this.config || !this.configDir) return [];
+    const entries = this.config.bare_metal
+      ? Object.entries(this.config.bare_metal)
+      : [];
+    return entries
+      .filter(([, p]) => !!p.repo)
+      .map(([name, p]) => {
+        const cwd = p.cwd && p.cwd.trim().length > 0 ? p.cwd : name;
+        const resolved = path.isAbsolute(cwd)
+          ? cwd
+          : path.join(this.configDir as string, cwd);
+        return { name, cwd: resolved };
+      });
+  }
+
+  private isGitRepo(dir: string): boolean {
+    try {
+      return fs.existsSync(path.join(dir, ".git"));
+    } catch {
+      return false;
+    }
+  }
+
+  async gitCheckoutAll(branch: string): Promise<void> {
+    const targets = this.getBareMetalTargets();
+    for (const t of targets) {
+      if (!this.isGitRepo(t.cwd)) continue;
+      try {
+        const status = execSync("git status --porcelain", { cwd: t.cwd })
+          .toString()
+          .trim();
+        if (status.length > 0) {
+          const ts = new Date().toISOString().replace(/[:.]/g, "-");
+          execSync(`git add -A`, { cwd: t.cwd, stdio: "inherit" });
+          execSync(`git commit -m "[WIP] ${ts}"`, {
+            cwd: t.cwd,
+            stdio: "inherit",
+          });
+        }
+        execSync(`git fetch --all`, { cwd: t.cwd, stdio: "inherit" });
+        execSync(`git checkout ${branch}`, { cwd: t.cwd, stdio: "inherit" });
+      } catch (e) {
+        logger.warn(`Failed to checkout in ${t.name}: ${e}`);
+      }
+    }
+  }
+
+  async gitPullAll(): Promise<void> {
+    const targets = this.getBareMetalTargets();
+    for (const t of targets) {
+      if (!this.isGitRepo(t.cwd)) continue;
+      try {
+        execSync(`git pull --ff-only`, { cwd: t.cwd, stdio: "inherit" });
+      } catch (e) {
+        logger.warn(`Failed to pull in ${t.name}: ${e}`);
+      }
+    }
+  }
+
+  async gitStatusAll(): Promise<void> {
+    const targets = this.getBareMetalTargets();
+    for (const t of targets) {
+      if (!this.isGitRepo(t.cwd)) continue;
+      try {
+        const branch = execSync(`git rev-parse --abbrev-ref HEAD`, {
+          cwd: t.cwd,
+        })
+          .toString()
+          .trim();
+        const dirty =
+          execSync(`git status --porcelain`, { cwd: t.cwd }).toString().trim()
+            .length > 0;
+        logger.info(`${t.name}: ${branch}  ${dirty ? "dirty" : "clean"}`);
+      } catch (e) {
+        logger.warn(`Failed to get status in ${t.name}: ${e}`);
+      }
+    }
   }
 }

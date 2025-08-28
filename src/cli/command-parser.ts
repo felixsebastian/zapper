@@ -14,7 +14,7 @@ export class CommandParser {
     const command = cleanArgs[0] as string;
     if (!this.isValidCommand(command)) {
       throw new Error(
-        `Invalid command: ${command}. Valid commands: up/start/s, down/stop/delete, restart, status, logs, reset, clone, task`,
+        `Invalid command: ${command}. Valid commands: up/start/s, down/stop/delete, restart, status, logs, reset, clone, task, checkout, pull, gitstatus`,
       );
     }
 
@@ -108,6 +108,9 @@ export class CommandParser {
     reset: [],
     clone: [],
     task: ["t"],
+    checkout: ["co"],
+    pull: [],
+    gitstatus: ["gs"],
   } as const;
 
   private static readonly aliasToCanonical: Record<string, Command> = (() => {
@@ -130,17 +133,20 @@ export class CommandParser {
 Usage: zap <command> [options]
 
 Commands:
-  up       Start all processes or a specific process (aliases: start, s)
-  down     Stop all processes or a specific process (aliases: stop, delete)
-  restart  Restart all processes or a specific process
-  status   Show status (PM2 + Docker) filtered to current project by default
-  logs     Show logs for a specific process (requires --service, follows by default)
-  reset    Stop all processes and delete the .zap directory
-  clone    Clone all repos defined in bare_metal services (respects git_method)
-  task     Run a one-off task by name (alias: t)
+  up         Start all processes or a specific process (aliases: start, s)
+  down       Stop all processes or a specific process (aliases: stop, delete)
+  restart    Restart all processes or a specific process
+  status     Show status (PM2 + Docker) filtered to current project by default
+  logs       Show logs for a specific process (requires --service, follows by default)
+  reset      Stop all processes and delete the .zap directory
+  clone      Clone all repos defined in bare_metal services (respects git_method)
+  task       Run a one-off task by name (alias: t)
+  checkout   Switch all bare_metal repos to the given branch (alias: co)
+  pull       Pull latest for all bare_metal repos
+  gitstatus  List branch and dirty/clean for all bare_metal repos (alias: gs)
 
 Options:
-  --service <name>  Target a specific process or task
+  --service <name>  Target a specific process or task (for checkout, branch name)
   --all            Include processes from all projects (for status)
   --force, -y      Force the operation
   --follow, -f     Follow logs (default)
@@ -149,18 +155,6 @@ Options:
   --verbose, -v    Increase logging verbosity
   --quiet, -q      Reduce logging output
   --debug, -d      Enable debug logging
-
-Examples:
-  zap up                    # Start all processes
-  zap up --service test     # Start only the test process
-  zap down --all            # Stop all processes
-  zap status                # Show status for current project processes and docker
-  zap logs --service test   # Show logs for test process
-  zap reset --force         # Stop all processes and remove .zap without prompt
-  zap clone                 # Clone all repos to their cwd folders
-  zap clone --service api   # Clone only the api service repo
-  zap task build            # Run the 'build' task
-  zap t test                # Alias for running 'test' task
 `;
   }
 }
