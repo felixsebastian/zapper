@@ -1,8 +1,6 @@
 import { YamlParser } from "../config/yaml-parser";
 import { ConfigValidator } from "../config/config-validator";
 import { EnvResolver } from "../config/env-resolver";
-import { SequentialStrategy } from "./strategies/sequential-strategy";
-import { PlanExecutor } from "./plan-executor";
 import { Pm2Executor } from "../process/pm2-executor";
 import { ZapperConfig, Process, Container } from "../types";
 import path from "path";
@@ -15,7 +13,6 @@ import { ActionExecutor } from "./action-executor";
 
 export class Zapper {
   private config: ZapperConfig | null = null;
-  private planExecutor: PlanExecutor | null = null;
   private configDir: string | null = null;
 
   constructor() {}
@@ -26,7 +23,6 @@ export class Zapper {
       this.configDir = path.dirname(path.resolve(resolvedPath));
       this.config = YamlParser.parse(resolvedPath);
 
-      // Normalize env_files to absolute paths relative to the config file directory
       if (this.config.env_files && this.config.env_files.length > 0) {
         this.config.env_files = this.config.env_files.map((p) =>
           path.isAbsolute(p) ? p : path.join(this.configDir as string, p),
@@ -35,10 +31,6 @@ export class Zapper {
 
       ConfigValidator.validate(this.config);
       this.config = EnvResolver.resolve(this.config);
-
-      const strategy = new SequentialStrategy();
-      const executor = new Pm2Executor(this.config.project, this.configDir);
-      this.planExecutor = new PlanExecutor(strategy, executor);
     } catch (error) {
       throw new Error(`Failed to load config: ${error}`);
     }
@@ -57,14 +49,13 @@ export class Zapper {
       throw new Error("Config not loaded");
     }
 
-    // Prefer bare_metal over legacy processes
     if (
       this.config.bare_metal &&
       Object.keys(this.config.bare_metal).length > 0
     ) {
       return Object.entries(this.config.bare_metal).map(([name, process]) => ({
         ...process,
-        name: process.name || name, // Ensure name is set
+        name: process.name || name,
       }));
     }
 
