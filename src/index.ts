@@ -3,7 +3,7 @@
 import { CommandParser } from "./cli";
 import { Zapper } from "./core/Zapper";
 import { logger, LogLevel } from "./utils/logger";
-import { confirm } from "./utils/prompt";
+import { confirm } from "./utils/confirm";
 import { Pm2Manager } from "./process";
 import { DockerManager } from "./docker";
 

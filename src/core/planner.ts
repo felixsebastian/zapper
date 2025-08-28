@@ -8,12 +8,14 @@ export class Planner {
 
   private getProcesses(): Process[] {
     const { bare_metal, processes } = this.config;
+
     if (bare_metal && Object.keys(bare_metal).length > 0) {
-      return Object.entries(bare_metal).map(([name, p]) => ({
-        ...p,
-        name: p.name || name,
+      return Object.entries(bare_metal).map(([name, process]) => ({
+        ...process,
+        name: process.name || name,
       }));
     }
+
     return Array.isArray(processes) ? processes : [];
   }
 
@@ -40,6 +42,7 @@ export class Planner {
           containers: allContainers.filter(([name]) => targets.includes(name)),
         };
       }
+
       return {
         processes: allProcesses.filter(
           (p) => !Array.isArray(p.profiles) || p.profiles.length === 0,
@@ -57,6 +60,7 @@ export class Planner {
         containers: allContainers.filter(([name]) => targets.includes(name)),
       };
     }
+
     return { processes: allProcesses, containers: allContainers };
   }
 
@@ -65,7 +69,6 @@ export class Planner {
     targets: string[] | undefined,
     projectName: string,
   ): Promise<ActionPlan> {
-    // For restart, we currently implement as stop + start of the same set
     if (op === "restart") {
       const stopPlan = await this.plan("stop", targets, projectName);
       const names = stopPlan.actions.map((a) => a.name);
@@ -74,13 +77,14 @@ export class Planner {
     }
 
     const selection = this.select(op, targets);
-
     const pm2List = await Pm2Manager.listProcesses();
+
     const runningPm2 = new Set(
       pm2List
         .filter((p) => p.status.toLowerCase() === "online")
         .map((p) => p.name),
     );
+
     const isPm2Running = (name: string) =>
       runningPm2.has(`zap.${projectName}.${name}`);
 
@@ -95,36 +99,44 @@ export class Planner {
             name: p.name,
           });
       }
+
       for (const [name] of selection.containers) {
         const info = await DockerManager.getContainerInfo(
           `zap.${projectName}.${name}`,
         );
+
         const running =
           !!info &&
           (info.status.toLowerCase() === "running" ||
             info.status.toLowerCase().includes("up"));
+
         if (!running)
           actions.push({ type: "start", serviceType: "docker", name });
       }
     } else if (op === "stop") {
       for (const p of selection.processes) {
-        if (isPm2Running(p.name))
+        if (isPm2Running(p.name)) {
           actions.push({
             type: "stop",
             serviceType: "bare_metal",
             name: p.name,
           });
+        }
       }
+
       for (const [name] of selection.containers) {
         const info = await DockerManager.getContainerInfo(
           `zap.${projectName}.${name}`,
         );
+
         const running =
           !!info &&
           (info.status.toLowerCase() === "running" ||
             info.status.toLowerCase().includes("up"));
-        if (running)
+
+        if (running) {
           actions.push({ type: "stop", serviceType: "docker", name });
+        }
       }
     }
 

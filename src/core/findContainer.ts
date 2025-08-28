@@ -6,7 +6,7 @@ export const findContainer = (
 ): [string, Container] | undefined => {
   const docker = config.docker || config.containers;
   if (!docker) return undefined;
-  const c = docker[name];
-  if (!c) return undefined;
-  return [name, c];
+  const container = docker[name];
+  if (!container) return undefined;
+  return [name, container];
 };

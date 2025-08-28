@@ -3,26 +3,13 @@ import { CliOptions, Command } from "../utils";
 export class CommandParser {
   static parse(args: string[]): CliOptions {
     const options: Partial<CliOptions> = {};
-
-    // Remove node and script name from args
     const cleanArgs = args.slice(2);
-
-    if (cleanArgs.length === 0) {
-      throw new Error("No command specified. Use: zap <command> [options]");
-    }
-
+    if (cleanArgs.length === 0) throw new Error("No command specified.");
     const command = cleanArgs[0] as string;
-    if (!this.isValidCommand(command)) {
-      throw new Error(
-        `Invalid command: ${command}. Valid commands: up/start/s, down/stop/delete, restart, status, logs, reset, clone, task, checkout, pull, gitstatus`,
-      );
-    }
-
-    // Preserve invoked string and resolve canonical
+    if (!this.isValidCommand(command)) throw new Error(`Invalid command.`);
     options.invoked = command;
     options.command = this.aliasToCanonical[command] as Command;
 
-    // Parse remaining arguments
     for (let i = 1; i < cleanArgs.length; i++) {
       const arg = cleanArgs[i];
 

@@ -10,11 +10,11 @@ import { execSync } from "child_process";
 import { resolveConfigPath } from "../utils/findUp";
 import { Planner } from "./Planner";
 import { executeActions } from "./actionExecutor";
+import { confirm } from "../utils/confirm";
 
 export class Zapper {
   private config: ZapperConfig | null = null;
   private configDir: string | null = null;
-
   constructor() {}
 
   async loadConfig(configPath: string = "zap.yaml"): Promise<void> {
@@ -77,18 +77,22 @@ export class Zapper {
     if (!names || !this.config) return names;
     const aliasToName = new Map<string, string>();
     const processes = this.getProcesses();
+
     for (const p of processes) {
       aliasToName.set(p.name, p.name);
       if (Array.isArray(p.aliases)) {
         for (const a of p.aliases) aliasToName.set(a, p.name);
       }
     }
+
     const containers = this.getContainers();
+
     for (const [name, c] of containers) {
       aliasToName.set(name, name);
       if (Array.isArray(c.aliases))
         for (const a of c.aliases) aliasToName.set(a, name);
     }
+
     return names.map((n) => aliasToName.get(n) || n);
   }
 
@@ -102,16 +106,20 @@ export class Zapper {
 
     const allProcesses = this.getProcesses();
     const allContainers = this.getContainers();
-    if (allProcesses.length === 0 && allContainers.length === 0)
+
+    if (allProcesses.length === 0 && allContainers.length === 0) {
       throw new Error("No processes defined in config");
+    }
 
     const planner = new Planner(this.config);
     const canonical = this.resolveAliasesToCanonical(processNames);
     const plan = await planner.plan("start", canonical, this.config.project);
-    if (canonical && plan.actions.length === 0)
+
+    if (canonical && plan.actions.length === 0) {
       throw new Error(
         `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
       );
+    }
 
     await executeActions(
       this.config,
@@ -127,10 +135,12 @@ export class Zapper {
     const planner = new Planner(this.config);
     const canonical = this.resolveAliasesToCanonical(processNames);
     const plan = await planner.plan("stop", canonical, this.config.project);
-    if (canonical && plan.actions.length === 0)
+
+    if (canonical && plan.actions.length === 0) {
       throw new Error(
         `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
       );
+    }
 
     await executeActions(
       this.config,
@@ -142,7 +152,6 @@ export class Zapper {
 
   async restartProcesses(processNames?: string[]): Promise<void> {
     if (!this.config) throw new Error("Config not loaded");
-
     const planner = new Planner(this.config);
     const canonical = this.resolveAliasesToCanonical(processNames);
     const plan = await planner.plan("restart", canonical, this.config.project);
@@ -158,33 +167,23 @@ export class Zapper {
   async showLogs(processName: string, follow: boolean = false): Promise<void> {
     const projectName = this.config?.project || "default";
     const configDir = this.configDir || ".";
-
     const pm2Executor = new Pm2Executor(projectName, configDir);
 
     const name = this.config
       ? this.resolveServiceName(processName)
       : processName;
+
     await pm2Executor.showLogs(name, follow);
   }
 
   async reset(force = false): Promise<void> {
-    if (!this.config) {
-      throw new Error("Config not loaded");
-    }
+    if (!this.config) throw new Error("Config not loaded");
 
     const proceed = force
       ? true
-      : await new Promise<boolean>((resolve) => {
-          process.stdout.write(
-            "This will stop all processes and remove the .zap directory. Continue? (y/N) ",
-          );
-          process.stdin.resume();
-          process.stdin.setEncoding("utf8");
-          process.stdin.once("data", (data: string) => {
-            const answer = data.trim().toLowerCase();
-            resolve(answer === "y" || answer === "yes");
-          });
-        });
+      : await confirm(
+          "This will stop all processes and remove the .zap directory. Continue?",
+        );
 
     if (!proceed) {
       logger.info("Aborted.");
@@ -192,8 +191,8 @@ export class Zapper {
     }
 
     await this.stopProcesses();
-
     const zapDir = path.join(this.configDir!, ".zap");
+
     if (fs.existsSync(zapDir)) {
       fs.rmSync(zapDir, { recursive: true, force: true });
       logger.info("Removed .zap directory.");
@@ -204,7 +203,6 @@ export class Zapper {
 
   async cloneRepos(processNames?: string[]): Promise<void> {
     if (!this.config || !this.configDir) throw new Error("Config not loaded");
-
     const method = this.config.git_method || "ssh";
 
     const allBareMetal = this.config.bare_metal
@@ -215,6 +213,7 @@ export class Zapper {
       : [];
 
     const canonical = this.resolveAliasesToCanonical(processNames);
+
     const targets = canonical
       ? allBareMetal.filter((p) => canonical.includes(p.name))
       : allBareMetal;
@@ -224,26 +223,31 @@ export class Zapper {
       return;
     }
 
-    for (const svc of targets) {
-      if (!svc.repo) {
-        logger.debug(`Skipping ${svc.name}: no repo field`);
+    for (const process of targets) {
+      if (!process.repo) {
+        logger.debug(`Skipping ${process.name}: no repo field`);
         continue;
       }
 
       const destDir = (() => {
-        const cwd = svc.cwd && svc.cwd.trim().length > 0 ? svc.cwd : svc.name;
+        const cwd =
+          process.cwd && process.cwd.trim().length > 0
+            ? process.cwd
+            : process.name;
+
         return path.isAbsolute(cwd)
           ? cwd
           : path.join(this.configDir as string, cwd);
       })();
 
-      const repoSpec = svc.repo;
+      const repoSpec = process.repo;
 
       const ensureDir = (dir: string) => {
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       };
 
       const isGitRepo = (dir: string) => fs.existsSync(path.join(dir, ".git"));
+
       const isEmptyDir = (dir: string) => {
         try {
           const files = fs.readdirSync(dir);
@@ -254,17 +258,21 @@ export class Zapper {
       };
 
       const toSshUrl = (spec: string) => {
-        if (spec.startsWith("git@") || spec.startsWith("ssh://")) return spec;
-        if (spec.startsWith("http://") || spec.startsWith("https://"))
-          return spec; // assume provided URL desired as-is
+        if (spec.startsWith("git@")) return spec;
+        if (spec.startsWith("ssh://")) return spec;
+        if (spec.startsWith("http://")) return spec;
+        if (spec.startsWith("https://")) return spec;
         return `git@github.com:${spec}.git`;
       };
 
       const toHttpUrl = (spec: string) => {
-        if (spec.startsWith("http://") || spec.startsWith("https://"))
-          return spec;
-        if (spec.startsWith("git@"))
+        if (spec.startsWith("http://")) return spec;
+        if (spec.startsWith("https://")) return spec;
+
+        if (spec.startsWith("git@")) {
           return `https://github.com/${spec.split(":")[1]?.replace(/\.git$/, "")}.git`;
+        }
+
         return `https://github.com/${spec}.git`;
       };
 
@@ -275,17 +283,18 @@ export class Zapper {
         const parentIsRepo = isGitRepo(dir);
 
         if (!fs.existsSync(dir) || isEmptyDir(dir)) {
-          logger.info(`Cloning ${svc.name} -> ${dir}`);
+          logger.info(`Cloning ${process.name} -> ${dir}`);
+
           execSync(`git clone ${url} ${folderName}`, {
             cwd: parent,
             stdio: "inherit",
           });
         } else if (parentIsRepo || isGitRepo(dir)) {
-          logger.info(`Pulling ${svc.name} in ${dir}`);
+          logger.info(`Pulling ${process.name} in ${dir}`);
           execSync(`git -C ${dir} pull --ff-only`, { stdio: "inherit" });
         } else {
           logger.warn(
-            `Destination ${dir} exists and is not empty. Skipping ${svc.name}.`,
+            `Destination ${dir} exists and is not empty. Skipping ${process.name}.`,
           );
         }
       };
@@ -294,15 +303,16 @@ export class Zapper {
         const parent = path.dirname(dir);
         ensureDir(parent);
         const target = dir;
+
         if (!fs.existsSync(dir) || isEmptyDir(dir)) {
-          logger.info(`Cloning (gh) ${svc.name} -> ${target}`);
+          logger.info(`Cloning (gh) ${process.name} -> ${target}`);
           execSync(`gh repo clone ${spec} ${target}`, { stdio: "inherit" });
         } else if (isGitRepo(dir)) {
-          logger.info(`Pulling ${svc.name} in ${dir}`);
+          logger.info(`Pulling ${process.name} in ${dir}`);
           execSync(`git -C ${dir} pull --ff-only`, { stdio: "inherit" });
         } else {
           logger.warn(
-            `Destination ${dir} exists and is not empty. Skipping ${svc.name}.`,
+            `Destination ${dir} exists and is not empty. Skipping ${process.name}.`,
           );
         }
       };
@@ -312,15 +322,17 @@ export class Zapper {
         else if (method === "http") cloneWithGit(toHttpUrl(repoSpec), destDir);
         else cloneWithGit(toSshUrl(repoSpec), destDir);
       } catch (e) {
-        logger.warn(`Failed to clone ${svc.name}: ${e}`);
+        logger.warn(`Failed to clone ${process.name}: ${e}`);
       }
     }
   }
 
   async runTask(taskName: string): Promise<void> {
     if (!this.config) throw new Error("Config not loaded");
-    if (!this.config.tasks || Object.keys(this.config.tasks).length === 0)
+
+    if (!this.config.tasks || Object.keys(this.config.tasks).length === 0) {
       throw new Error("No tasks defined in config");
+    }
 
     const tasks = this.config.tasks;
     const baseCwd = this.configDir || process.cwd();
@@ -332,20 +344,24 @@ export class Zapper {
 
     const execTask = (name: string, stack: string[] = []) => {
       if (!tasks[name]) throw new Error(`Task not found: ${name}`);
-      if (stack.includes(name))
+
+      if (stack.includes(name)) {
         throw new Error(
           `Circular task reference detected: ${[...stack, name].join(" -> ")}`,
         );
+      }
 
-      const t = tasks[name];
+      const task = tasks[name];
+
       const env = {
         ...process.env,
-        ...(t.resolvedEnv || {}),
+        ...(task.resolvedEnv || {}),
       } as NodeJS.ProcessEnv;
-      const cwd = resolveCwd(t.cwd);
 
-      logger.info(`Running task: ${name}${t.desc ? ` — ${t.desc}` : ""}`);
-      for (const cmd of t.cmds) {
+      const cwd = resolveCwd(task.cwd);
+      logger.info(`Running task: ${name}${task.desc ? ` — ${task.desc}` : ""}`);
+
+      for (const cmd of task.cmds) {
         if (typeof cmd === "string") {
           logger.debug(`$ ${cmd}`);
           execSync(cmd, { stdio: "inherit", cwd, env });
@@ -360,19 +376,23 @@ export class Zapper {
     execTask(taskName);
   }
 
-  // Git utilities for bare_metal repos
   private getBareMetalTargets(): Array<{ name: string; cwd: string }> {
     if (!this.config || !this.configDir) return [];
+
     const entries = this.config.bare_metal
       ? Object.entries(this.config.bare_metal)
       : [];
+
     return entries
       .filter(([, p]) => !!p.repo)
-      .map(([name, p]) => {
-        const cwd = p.cwd && p.cwd.trim().length > 0 ? p.cwd : name;
+      .map(([name, process]) => {
+        const cwd =
+          process.cwd && process.cwd.trim().length > 0 ? process.cwd : name;
+
         const resolved = path.isAbsolute(cwd)
           ? cwd
           : path.join(this.configDir as string, cwd);
+
         return { name, cwd: resolved };
       });
   }
@@ -387,56 +407,72 @@ export class Zapper {
 
   async gitCheckoutAll(branch: string): Promise<void> {
     const targets = this.getBareMetalTargets();
-    for (const t of targets) {
-      if (!this.isGitRepo(t.cwd)) continue;
+
+    for (const target of targets) {
+      if (!this.isGitRepo(target.cwd)) continue;
+
       try {
-        const status = execSync("git status --porcelain", { cwd: t.cwd })
+        const status = execSync("git status --porcelain", { cwd: target.cwd })
           .toString()
           .trim();
+
         if (status.length > 0) {
           const ts = new Date().toISOString().replace(/[:.]/g, "-");
-          execSync(`git add -A`, { cwd: t.cwd, stdio: "inherit" });
+          execSync(`git add -A`, { cwd: target.cwd, stdio: "inherit" });
+
           execSync(`git commit -m "[WIP] ${ts}"`, {
-            cwd: t.cwd,
+            cwd: target.cwd,
             stdio: "inherit",
           });
         }
-        execSync(`git fetch --all`, { cwd: t.cwd, stdio: "inherit" });
-        execSync(`git checkout ${branch}`, { cwd: t.cwd, stdio: "inherit" });
+
+        execSync(`git fetch --all`, { cwd: target.cwd, stdio: "inherit" });
+
+        execSync(`git checkout ${branch}`, {
+          cwd: target.cwd,
+          stdio: "inherit",
+        });
       } catch (e) {
-        logger.warn(`Failed to checkout in ${t.name}: ${e}`);
+        logger.warn(`Failed to checkout in ${target.name}: ${e}`);
       }
     }
   }
 
   async gitPullAll(): Promise<void> {
     const targets = this.getBareMetalTargets();
-    for (const t of targets) {
-      if (!this.isGitRepo(t.cwd)) continue;
+
+    for (const target of targets) {
+      if (!this.isGitRepo(target.cwd)) continue;
+
       try {
-        execSync(`git pull --ff-only`, { cwd: t.cwd, stdio: "inherit" });
+        execSync(`git pull --ff-only`, { cwd: target.cwd, stdio: "inherit" });
       } catch (e) {
-        logger.warn(`Failed to pull in ${t.name}: ${e}`);
+        logger.warn(`Failed to pull in ${target.name}: ${e}`);
       }
     }
   }
 
   async gitStatusAll(): Promise<void> {
     const targets = this.getBareMetalTargets();
-    for (const t of targets) {
-      if (!this.isGitRepo(t.cwd)) continue;
+
+    for (const target of targets) {
+      if (!this.isGitRepo(target.cwd)) continue;
+
       try {
         const branch = execSync(`git rev-parse --abbrev-ref HEAD`, {
-          cwd: t.cwd,
+          cwd: target.cwd,
         })
           .toString()
           .trim();
+
         const dirty =
-          execSync(`git status --porcelain`, { cwd: t.cwd }).toString().trim()
-            .length > 0;
-        logger.info(`${t.name}: ${branch}  ${dirty ? "dirty" : "clean"}`);
+          execSync(`git status --porcelain`, { cwd: target.cwd })
+            .toString()
+            .trim().length > 0;
+
+        logger.info(`${target.name}: ${branch}  ${dirty ? "dirty" : "clean"}`);
       } catch (e) {
-        logger.warn(`Failed to get status in ${t.name}: ${e}`);
+        logger.warn(`Failed to get status in ${target.name}: ${e}`);
       }
     }
   }

@@ -10,19 +10,18 @@ export class ConfigValidator {
     this.validateGitMethod(config);
     this.validateBareMetal(config);
     this.validateDocker(config);
-    // Backward compatibility
     this.validateProcesses(config);
-    // Tasks
     this.validateTasks(config);
 
-    // Global uniqueness across bare_metal and docker for names and aliases
     const seen = new Map<string, string>();
+
     const add = (id: string, where: string) => {
       if (seen.has(id)) {
         throw new Error(
           `Duplicate service identifier '${id}'. Names and aliases must be globally unique across bare_metal and docker`,
         );
       }
+
       seen.set(id, where);
     };
 
@@ -33,7 +32,9 @@ export class ConfigValidator {
           for (const a of proc.aliases) add(a, `bare_metal['${name}'].aliases`);
       }
     }
+
     const containers = config.docker || config.containers;
+
     if (containers) {
       for (const [name, c] of Object.entries(containers)) {
         add(name, `docker['${name}']`);
@@ -42,13 +43,14 @@ export class ConfigValidator {
       }
     }
 
-    // Require at least one process definition (bare_metal, docker, or legacy processes)
     const hasBareMetal =
       typeof config.bare_metal === "object" &&
       config.bare_metal !== null &&
       Object.keys(config.bare_metal).length > 0;
+
     const hasLegacyProcesses =
       Array.isArray(config.processes) && config.processes.length > 0;
+
     const hasDocker =
       typeof (config.docker || config.containers) === "object" &&
       (config.docker || config.containers) !== null &&
@@ -72,6 +74,7 @@ export class ConfigValidator {
       "processes",
       "tasks",
     ]);
+
     for (const key of Object.keys(
       config as unknown as Record<string, unknown>,
     )) {
@@ -80,9 +83,7 @@ export class ConfigValidator {
   }
 
   private static validateProject(config: ZapperConfig): void {
-    if (!config.project) {
-      throw new Error("Config must have a project field");
-    }
+    if (!config.project) throw new Error("Config must have a project field");
     assertValidName(config.project, "Project");
   }
 
@@ -91,10 +92,12 @@ export class ConfigValidator {
       if (!Array.isArray(config.env_files)) {
         throw new Error("env_files must be an array of file paths");
       }
+
       for (const filePath of config.env_files) {
         if (typeof filePath !== "string" || filePath.trim() === "") {
           throw new Error("env_files must contain non-empty string paths");
         }
+
         if (!existsSync(filePath)) {
           throw new Error(`Env file does not exist: ${filePath}`);
         }
@@ -105,10 +108,12 @@ export class ConfigValidator {
   private static validateGitMethod(config: ZapperConfig): void {
     if (config.git_method === undefined) return;
     const allowed = new Set(["http", "ssh", "cli"]);
-    if (!allowed.has(config.git_method))
+
+    if (!allowed.has(config.git_method)) {
       throw new Error(
         `git_method must be one of http | ssh | cli (got: ${config.git_method})`,
       );
+    }
   }
 
   private static validateBareMetal(config: ZapperConfig): void {
@@ -116,20 +121,25 @@ export class ConfigValidator {
       if (typeof config.bare_metal !== "object" || config.bare_metal === null) {
         throw new Error("bare_metal must be an object");
       }
+
       if (Object.keys(config.bare_metal).length === 0) {
         throw new Error("bare_metal must have at least one process defined");
       }
+
       for (const [name, process] of Object.entries(config.bare_metal)) {
         assertValidName(name, "Service");
-        // Ensure the process has a name field matching the key
         if (!process.name) process.name = name;
-        if (process.name !== name)
+
+        if (process.name !== name) {
           throw new Error(
             `Process name '${process.name}' must match its key '${name}'`,
           );
+        }
+
         this.validateProcess(process);
         this.validateProcessKeys(process, name);
-        this.validateAliases(process.aliases, name, "bare_metal");
+        this.validateAliases(process.aliases, "bare_metal");
+
         this.validateProfiles(
           process.profiles,
           `bare_metal['${name}'] profiles`,
@@ -140,21 +150,24 @@ export class ConfigValidator {
 
   private static validateDocker(config: ZapperConfig): void {
     const containers = config.docker || config.containers;
+
     if (containers !== undefined) {
       if (typeof containers !== "object" || containers === null) {
         throw new Error("docker must be an object");
       }
+
       for (const [name, container] of Object.entries(containers)) {
         assertValidName(name, "Service");
         this.validateContainerKeys(container, name);
-        // If container.name is provided, enforce it matches key as a strictness rule
+
         if (container.name && container.name !== name) {
           throw new Error(
             `Docker service name '${container.name}' must match its key '${name}'`,
           );
         }
+
         this.validateContainer(name, container);
-        this.validateAliases(container.aliases, name, "docker");
+        this.validateAliases(container.aliases, "docker");
         this.validateProfiles(container.profiles, `docker['${name}'] profiles`);
       }
     }
@@ -174,9 +187,9 @@ export class ConfigValidator {
       "command",
       "aliases",
       "profiles",
-      // internal
       "resolvedEnv",
     ]);
+
     for (const key of Object.keys(
       container as unknown as Record<string, unknown>,
     )) {
@@ -196,6 +209,7 @@ export class ConfigValidator {
           `Docker service ${name} ports must be an array of strings`,
         );
       }
+
       for (const port of container.ports) {
         if (typeof port !== "string" || port.trim() === "") {
           throw new Error(
@@ -211,6 +225,7 @@ export class ConfigValidator {
           `Docker service ${name} env must be an array of strings`,
         );
       }
+
       this.validateInlineEnvArray(container.env, `Docker service ${name} env`);
     }
 
@@ -218,10 +233,11 @@ export class ConfigValidator {
       if (!Array.isArray(container.volumes)) {
         throw new Error(`Docker service ${name} volumes must be an array`);
       }
+
       for (const volume of container.volumes) {
         if (typeof volume === "string") {
-          // simplified docker-compose style: "name:/container/path"
           const parts = volume.split(":");
+
           if (
             parts.length !== 2 ||
             parts[0].trim() === "" ||
@@ -231,6 +247,7 @@ export class ConfigValidator {
               `Docker service ${name} volume string must be in 'name:/container/path' form`,
             );
           }
+
           if (!parts[1].startsWith("/")) {
             throw new Error(
               `Docker service ${name} volume internal path must be absolute: ${parts[1]}`,
@@ -248,6 +265,7 @@ export class ConfigValidator {
           `Docker service ${name} networks must be an array of strings`,
         );
       }
+
       for (const network of container.networks) {
         if (typeof network !== "string" || network.trim() === "") {
           throw new Error(
@@ -267,15 +285,18 @@ export class ConfigValidator {
 
   private static validateInlineEnvArray(arr: string[], context: string): void {
     const seen = new Set<string>();
+
     for (const key of arr) {
       if (typeof key !== "string" || key.trim() === "") {
         throw new Error(`${context} must contain non-empty strings`);
       }
+
       if (seen.has(key)) {
         throw new Error(
           `Duplicate service identifier '${key}'. Names and aliases must be globally unique across bare_metal and docker`,
         );
       }
+
       seen.add(key);
     }
   }
@@ -299,9 +320,9 @@ export class ConfigValidator {
       "repo",
       "env_files",
       "profiles",
-      // internal
       "resolvedEnv",
     ]);
+
     for (const key of Object.keys(
       process as unknown as Record<string, unknown>,
     )) {
@@ -316,6 +337,7 @@ export class ConfigValidator {
         `Docker service ${serviceName} volume name must be a non-empty string`,
       );
     }
+
     if (
       typeof volume.internal_dir !== "string" ||
       volume.internal_dir.trim() === ""
@@ -324,6 +346,7 @@ export class ConfigValidator {
         `Docker service ${serviceName} volume internal_dir must be a non-empty string`,
       );
     }
+
     if (!volume.internal_dir.startsWith("/")) {
       throw new Error(
         `Docker service ${serviceName} volume internal_dir must be an absolute path`,
@@ -336,6 +359,7 @@ export class ConfigValidator {
       if (typeof config.tasks !== "object" || config.tasks === null) {
         throw new Error("tasks must be an object");
       }
+
       for (const [name, task] of Object.entries(
         config.tasks as Record<string, Task>,
       )) {
@@ -353,9 +377,9 @@ export class ConfigValidator {
       "env",
       "cwd",
       "env_files",
-      // internal
       "resolvedEnv",
     ]);
+
     for (const key of Object.keys(task as unknown as Record<string, unknown>)) {
       if (!allowed.has(key))
         throw new Error(`Unknown key in tasks['${name}']: ${key}`);
@@ -366,6 +390,7 @@ export class ConfigValidator {
     }
 
     const cmds = task.cmds;
+
     for (const cmd of cmds) {
       if (
         typeof cmd !== "string" &&
@@ -378,12 +403,12 @@ export class ConfigValidator {
     }
   }
 
-  // Legacy processes validator retained from previous version
   private static validateProcesses(config: ZapperConfig): void {
     if (config.processes !== undefined) {
       if (!Array.isArray(config.processes)) {
         throw new Error("processes must be an array");
       }
+
       for (const process of config.processes) {
         this.validateProcess(process);
         this.validateProcessKeys(process, process.name || "unknown");
@@ -393,20 +418,24 @@ export class ConfigValidator {
 
   private static validateAliases(
     aliases: string[] | undefined,
-    name: string,
     scope: string,
   ): void {
     if (!Array.isArray(aliases)) return;
     const seen = new Set<string>();
+
     for (const a of aliases) {
-      if (typeof a !== "string" || a.trim() === "")
+      if (typeof a !== "string" || a.trim() === "") {
         throw new Error(
           `Duplicate service identifier '${a}'. Names and aliases must be globally unique across bare_metal and ${scope}`,
         );
-      if (seen.has(a))
+      }
+
+      if (seen.has(a)) {
         throw new Error(
           `Duplicate service identifier '${a}'. Names and aliases must be globally unique across bare_metal and ${scope}`,
         );
+      }
+
       seen.add(a);
     }
   }
@@ -416,11 +445,15 @@ export class ConfigValidator {
     context: string,
   ): void {
     if (profiles === undefined) return;
-    if (!Array.isArray(profiles))
+
+    if (!Array.isArray(profiles)) {
       throw new Error(`${context} must be an array of strings`);
+    }
+
     for (const p of profiles) {
-      if (typeof p !== "string" || p.trim() === "")
+      if (typeof p !== "string" || p.trim() === "") {
         throw new Error(`${context} must contain non-empty strings`);
+      }
     }
   }
 }

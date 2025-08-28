@@ -9,9 +9,11 @@ function findProcess(config: ZapperConfig, name: string): Process | undefined {
     const p = config.bare_metal[name];
     return { ...p, name: p.name || name };
   }
+
   if (Array.isArray(config.processes)) {
     return config.processes.find((p) => p.name === name);
   }
+
   return undefined;
 }
 
@@ -38,6 +40,7 @@ export async function executeActions(
     if (action.serviceType === "bare_metal") {
       const proc = findProcess(config, action.name);
       if (!proc) throw new Error(`Process not found: ${action.name}`);
+
       if (action.type === "start") {
         await pm2.startProcess(proc, projectName);
         logger.info(`Started ${proc.name}`);
@@ -55,6 +58,7 @@ export async function executeActions(
         const ports = Array.isArray(c.ports) ? c.ports : [];
         const volumeBindings: string[] = [];
         const ensureVolumeNames: string[] = [];
+
         if (Array.isArray(c.volumes)) {
           for (const v of c.volumes) {
             if (typeof v === "string") {
@@ -67,10 +71,13 @@ export async function executeActions(
             }
           }
         }
-        for (const vol of ensureVolumeNames)
+
+        for (const vol of ensureVolumeNames) {
           await DockerManager.createVolume(vol);
+        }
 
         const envMap = c.resolvedEnv || {};
+
         const labels = {
           "com.docker.compose.project": projectName,
           "com.docker.compose.service": name,
@@ -87,6 +94,7 @@ export async function executeActions(
           command: c.command,
           labels,
         });
+
         logger.info(`Started docker ${dockerName}`);
       } else {
         await DockerManager.stopContainer(dockerName);
