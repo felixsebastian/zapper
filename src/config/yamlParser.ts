@@ -1,11 +1,13 @@
 import { readFileSync } from "fs";
 import { parse } from "yaml";
-import { ZapperConfig } from "../utils";
+import { ZodConfigValidator } from "./ZodConfigValidator";
+import { ZapperConfig } from "./schemas";
 
 export function parseYamlFile(filePath: string): ZapperConfig {
   try {
     const content = readFileSync(filePath, "utf8");
-    return parse(content) as ZapperConfig;
+    const parsed = parse(content);
+    return ZodConfigValidator.validate(parsed);
   } catch (error) {
     throw new Error(`Failed to parse YAML file: ${error}`);
   }

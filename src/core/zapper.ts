@@ -1,8 +1,7 @@
 import { parseYamlFile } from "../config/yamlParser";
-import { ConfigValidator } from "../config/ConfigValidator";
 import { EnvResolver } from "../config/EnvResolver";
 import { Pm2Executor } from "../process/Pm2Executor";
-import { ZapperConfig, Process, Container } from "../utils";
+import { ZapperConfig, Process, Container } from "../config/schemas";
 import path from "path";
 import { logger } from "../utils/logger";
 import * as fs from "fs";
@@ -29,7 +28,7 @@ export class Zapper {
         );
       }
 
-      ConfigValidator.validate(this.config);
+
       this.config = EnvResolver.resolve(this.config);
     } catch (error) {
       throw new Error(`Failed to load config: ${error}`);
@@ -79,9 +78,9 @@ export class Zapper {
     const processes = this.getProcesses();
 
     for (const p of processes) {
-      aliasToName.set(p.name, p.name);
+      aliasToName.set((((p.name as string))), (((p.name as string))));
       if (Array.isArray(p.aliases)) {
-        for (const a of p.aliases) aliasToName.set(a, p.name);
+        for (const a of p.aliases) aliasToName.set(a, (((p.name as string))));
       }
     }
 
@@ -208,14 +207,14 @@ export class Zapper {
     const allBareMetal = this.config.bare_metal
       ? Object.entries(this.config.bare_metal).map(([name, p]) => ({
           ...p,
-          name: p.name || name,
+          name: (((p.name as string))) || name,
         }))
       : [];
 
     const canonical = this.resolveAliasesToCanonical(processNames);
 
     const targets = canonical
-      ? allBareMetal.filter((p) => canonical.includes(p.name))
+      ? allBareMetal.filter((p) => canonical.includes((((p.name as string)))))
       : allBareMetal;
 
     if (targets.length === 0) {

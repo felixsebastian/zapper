@@ -1,4 +1,4 @@
-import { ZapperConfig, Process } from "../utils";
+import { ZapperConfig, Process } from "../config/schemas";
 
 export const findProcess = (
   config: ZapperConfig,

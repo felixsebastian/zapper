@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from "fs";
 import path from "path";
 import { parse } from "yaml";
 import { parse as dotenvParse } from "dotenv";
-import { ZapperConfig, Process, Task, Container } from "../utils";
+import { ZapperConfig, Process, Task, Container } from "../config/schemas";
 import { logger } from "../utils/logger";
 
 interface RawEnvFile {
@@ -188,6 +188,6 @@ export class EnvResolver {
   ): Record<string, string> {
     const proc = resolvedConfig.bare_metal?.[processName];
     if (!proc) throw new Error(`Process ${processName} not found`);
-    return proc.resolvedEnv || {};
+    return (proc.resolvedEnv as Record<string, string>) || {};
   }
 }

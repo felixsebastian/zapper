@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { writeFileSync, unlinkSync } from "fs";
 import { EnvResolver } from "./EnvResolver";
-import { ZapperConfig } from "../utils";
+import { ZapperConfig } from "../config/schemas";
 
 describe("EnvResolver", () => {
   let tempFiles: string[] = [];

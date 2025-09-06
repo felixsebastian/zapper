@@ -1,4 +1,4 @@
-import { Process } from "../utils";
+import { Process } from "../config/schemas";
 import { Pm2Manager } from "./Pm2Manager";
 
 export class Pm2Executor {

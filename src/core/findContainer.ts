@@ -1,4 +1,4 @@
-import { ZapperConfig, Container } from "../utils";
+import { ZapperConfig, Container } from "../config/schemas";
 
 export const findContainer = (
   config: ZapperConfig,

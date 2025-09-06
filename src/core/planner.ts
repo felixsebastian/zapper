@@ -1,4 +1,4 @@
-import { ZapperConfig, Process, Container } from "../utils";
+import { ZapperConfig, Process, Container } from "../config/schemas";
 import { Pm2Manager } from "../process/Pm2Manager";
 import { DockerManager } from "../docker";
 import { Action, ActionPlan } from "../types";
@@ -38,7 +38,7 @@ export class Planner {
     if (op === "start") {
       if (targets && targets.length > 0) {
         return {
-          processes: allProcesses.filter((p) => targets.includes(p.name)),
+          processes: allProcesses.filter((p) => targets.includes((((p.name as string))))),
           containers: allContainers.filter(([name]) => targets.includes(name)),
         };
       }
@@ -56,7 +56,7 @@ export class Planner {
     // stop: don't apply profiles filter
     if (targets && targets.length > 0) {
       return {
-        processes: allProcesses.filter((p) => targets.includes(p.name)),
+        processes: allProcesses.filter((p) => targets.includes((((p.name as string))))),
         containers: allContainers.filter(([name]) => targets.includes(name)),
       };
     }
@@ -82,7 +82,7 @@ export class Planner {
     const runningPm2 = new Set(
       pm2List
         .filter((p) => p.status.toLowerCase() === "online")
-        .map((p) => p.name),
+        .map((p) => (((p.name as string)))),
     );
 
     const isPm2Running = (name: string) =>
@@ -92,11 +92,11 @@ export class Planner {
 
     if (op === "start") {
       for (const p of selection.processes) {
-        if (!isPm2Running(p.name))
+        if (!isPm2Running((((p.name as string)))))
           actions.push({
             type: "start",
             serviceType: "bare_metal",
-            name: p.name,
+            name: (((p.name as string))),
           });
       }
 
@@ -115,11 +115,11 @@ export class Planner {
       }
     } else if (op === "stop") {
       for (const p of selection.processes) {
-        if (isPm2Running(p.name)) {
+        if (isPm2Running((((p.name as string))))) {
           actions.push({
             type: "stop",
             serviceType: "bare_metal",
-            name: p.name,
+            name: (((p.name as string))),
           });
         }
       }

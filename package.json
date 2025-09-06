@@ -34,6 +34,7 @@
   "devDependencies": {
     "@changesets/cli": "^2.27.0",
     "@eslint/js": "^9.0.0",
+    "@types/commander": "^2.12.5",
     "@types/dotenv": "^8.2.3",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
@@ -48,7 +49,9 @@
     "vitest": "^1.0.0"
   },
   "dependencies": {
+    "commander": "^14.0.0",
     "dotenv": "^17.2.1",
-    "yaml": "^2.8.1"
+    "yaml": "^2.8.1",
+    "zod": "^4.1.5"
   }
 }
