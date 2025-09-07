@@ -1,7 +1,9 @@
 import { parseYamlFile } from "../config/yamlParser";
 import { EnvResolver } from "../config/EnvResolver";
 import { Pm2Executor } from "./process/Pm2Executor";
-import { ZapperConfig, Process, Container } from "../config/schemas";
+import { ZapperConfig } from "../config/schemas";
+import { Context, Process, Container } from "../types/Context";
+import { createContext } from "./createContext";
 import path from "path";
 import { logger } from "../utils/logger";
 import * as fs from "fs";
@@ -14,74 +16,54 @@ import { GitManager, cloneRepos as cloneRepositories } from "./git";
 import { getBareMetalTargets } from "../utils";
 
 export class Zapper {
-  private config: ZapperConfig | null = null;
-  private configDir: string | null = null;
+  private context: Context | null = null;
   constructor() {}
 
   async loadConfig(configPath: string = "zap.yaml"): Promise<void> {
     try {
       const resolvedPath = resolveConfigPath(configPath) ?? configPath;
-      this.configDir = path.dirname(path.resolve(resolvedPath));
-      this.config = parseYamlFile(resolvedPath);
+      const projectRoot = path.dirname(path.resolve(resolvedPath));
+      const config = parseYamlFile(resolvedPath, projectRoot);
 
-      if (this.config.env_files && this.config.env_files.length > 0) {
-        this.config.env_files = this.config.env_files.map((p) =>
-          path.isAbsolute(p) ? p : path.join(this.configDir as string, p),
-        );
-      }
+      // Create context from config
+      this.context = createContext(config, projectRoot);
 
-      this.config = EnvResolver.resolve(this.config);
+      // Resolve environment variables with proper path resolution
+      this.context = EnvResolver.resolveContext(this.context);
     } catch (error) {
       throw new Error(`Failed to load config: ${error}`);
     }
   }
 
   getProject(): string | null {
-    return this.config?.project ?? null;
+    return this.context?.projectName ?? null;
   }
 
-  getConfigDir(): string | null {
-    return this.configDir;
+  getProjectRoot(): string | null {
+    return this.context?.projectRoot ?? null;
   }
 
   private getProcesses(): Process[] {
-    if (!this.config) {
-      throw new Error("Config not loaded");
+    if (!this.context) {
+      throw new Error("Context not loaded");
     }
-
-    if (
-      this.config.bare_metal &&
-      Object.keys(this.config.bare_metal).length > 0
-    ) {
-      return Object.entries(this.config.bare_metal).map(([name, process]) => ({
-        ...process,
-        name: process.name || name,
-      }));
-    }
-
-    if (this.config.processes && this.config.processes.length > 0) {
-      return this.config.processes;
-    }
-
-    return [];
+    return this.context.processes;
   }
 
   private getContainers(): Array<[string, Container]> {
-    if (!this.config) throw new Error("Config not loaded");
-    const dockerServices = this.config.docker || this.config.containers;
-    if (!dockerServices) return [];
-    return Object.entries(dockerServices).map(([name, c]) => [name, c]);
+    if (!this.context) throw new Error("Context not loaded");
+    return this.context.containers.map((c) => [c.name, c]);
   }
 
   private resolveAliasesToCanonical(names?: string[]): string[] | undefined {
-    if (!names || !this.config) return names;
+    if (!names || !this.context) return names;
     const aliasToName = new Map<string, string>();
     const processes = this.getProcesses();
 
     for (const p of processes) {
-      aliasToName.set(p.name as string, p.name as string);
+      aliasToName.set(p.name, p.name);
       if (Array.isArray(p.aliases)) {
-        for (const a of p.aliases) aliasToName.set(a, p.name as string);
+        for (const a of p.aliases) aliasToName.set(a, p.name);
       }
     }
 
@@ -101,8 +83,50 @@ export class Zapper {
     return resolved && resolved.length > 0 ? resolved[0] : name;
   }
 
+  // Helper method to create a legacy config for backwards compatibility
+  // TODO: Remove this once all components are updated to use Context
+  private createLegacyConfig(): ZapperConfig {
+    if (!this.context) throw new Error("Context not loaded");
+
+    // Convert processes back to bare_metal format
+    const bare_metal: Record<string, any> = {};
+    for (const process of this.context.processes) {
+      bare_metal[process.name] = {
+        ...process,
+        name: process.name, // Keep the name field for compatibility
+      };
+    }
+
+    // Convert containers back to docker format
+    const docker: Record<string, any> = {};
+    for (const container of this.context.containers) {
+      docker[container.name] = {
+        ...container,
+        name: container.name, // Keep the name field for compatibility
+      };
+    }
+
+    // Convert tasks back to tasks format
+    const tasks: Record<string, any> = {};
+    for (const task of this.context.tasks) {
+      tasks[task.name] = {
+        ...task,
+        name: task.name, // Keep the name field for compatibility
+      };
+    }
+
+    return {
+      project: this.context.projectName,
+      env_files: this.context.envFiles,
+      git_method: this.context.gitMethod,
+      bare_metal,
+      docker,
+      tasks,
+    };
+  }
+
   async startProcesses(processNames?: string[]): Promise<void> {
-    if (!this.config) throw new Error("Config not loaded");
+    if (!this.context) throw new Error("Context not loaded");
 
     const allProcesses = this.getProcesses();
     const allContainers = this.getContainers();
@@ -111,9 +135,16 @@ export class Zapper {
       throw new Error("No processes defined in config");
     }
 
-    const planner = new Planner(this.config);
+    // TODO: Update Planner to work with Context
+    // For now, we'll need a temporary legacy config for backwards compatibility
+    const legacyConfig = this.createLegacyConfig();
+    const planner = new Planner(legacyConfig);
     const canonical = this.resolveAliasesToCanonical(processNames);
-    const plan = await planner.plan("start", canonical, this.config.project);
+    const plan = await planner.plan(
+      "start",
+      canonical,
+      this.context.projectName,
+    );
 
     if (canonical && plan.actions.length === 0) {
       throw new Error(
@@ -122,19 +153,24 @@ export class Zapper {
     }
 
     await executeActions(
-      this.config,
-      this.config.project,
-      this.configDir,
+      legacyConfig,
+      this.context.projectName,
+      this.context.projectRoot,
       plan,
     );
   }
 
   async stopProcesses(processNames?: string[]): Promise<void> {
-    if (!this.config) throw new Error("Config not loaded");
+    if (!this.context) throw new Error("Context not loaded");
 
-    const planner = new Planner(this.config);
+    const legacyConfig = this.createLegacyConfig();
+    const planner = new Planner(legacyConfig);
     const canonical = this.resolveAliasesToCanonical(processNames);
-    const plan = await planner.plan("stop", canonical, this.config.project);
+    const plan = await planner.plan(
+      "stop",
+      canonical,
+      this.context.projectName,
+    );
 
     if (canonical && plan.actions.length === 0) {
       throw new Error(
@@ -143,33 +179,38 @@ export class Zapper {
     }
 
     await executeActions(
-      this.config,
-      this.config.project,
-      this.configDir,
+      legacyConfig,
+      this.context.projectName,
+      this.context.projectRoot,
       plan,
     );
   }
 
   async restartProcesses(processNames?: string[]): Promise<void> {
-    if (!this.config) throw new Error("Config not loaded");
-    const planner = new Planner(this.config);
+    if (!this.context) throw new Error("Context not loaded");
+    const legacyConfig = this.createLegacyConfig();
+    const planner = new Planner(legacyConfig);
     const canonical = this.resolveAliasesToCanonical(processNames);
-    const plan = await planner.plan("restart", canonical, this.config.project);
+    const plan = await planner.plan(
+      "restart",
+      canonical,
+      this.context.projectName,
+    );
 
     await executeActions(
-      this.config,
-      this.config.project,
-      this.configDir,
+      legacyConfig,
+      this.context.projectName,
+      this.context.projectRoot,
       plan,
     );
   }
 
   async showLogs(processName: string, follow: boolean = false): Promise<void> {
-    const projectName = this.config?.project || "default";
-    const configDir = this.configDir || ".";
-    const pm2Executor = new Pm2Executor(projectName, configDir);
+    const projectName = this.context?.projectName || "default";
+    const projectRoot = this.context?.projectRoot || ".";
+    const pm2Executor = new Pm2Executor(projectName, projectRoot);
 
-    const name = this.config
+    const name = this.context
       ? this.resolveServiceName(processName)
       : processName;
 
@@ -177,7 +218,7 @@ export class Zapper {
   }
 
   async reset(force = false): Promise<void> {
-    if (!this.config) throw new Error("Config not loaded");
+    if (!this.context) throw new Error("Context not loaded");
 
     const proceed = force
       ? true
@@ -191,7 +232,7 @@ export class Zapper {
     }
 
     await this.stopProcesses();
-    const zapDir = path.join(this.configDir!, ".zap");
+    const zapDir = path.join(this.context.projectRoot, ".zap");
 
     if (fs.existsSync(zapDir)) {
       fs.rmSync(zapDir, { recursive: true, force: true });
@@ -202,19 +243,29 @@ export class Zapper {
   }
 
   async cloneRepos(processNames?: string[]): Promise<void> {
-    if (!this.config || !this.configDir) throw new Error("Config not loaded");
-    await cloneRepositories(this.config, this.configDir, processNames);
+    if (!this.context) throw new Error("Context not loaded");
+    const legacyConfig = this.createLegacyConfig();
+    await cloneRepositories(
+      legacyConfig,
+      this.context.projectRoot,
+      processNames,
+    );
   }
 
   async runTask(taskName: string): Promise<void> {
-    if (!this.config) throw new Error("Config not loaded");
+    if (!this.context) throw new Error("Context not loaded");
 
-    if (!this.config.tasks || Object.keys(this.config.tasks).length === 0) {
+    if (!this.context.tasks || this.context.tasks.length === 0) {
       throw new Error("No tasks defined in config");
     }
 
-    const tasks = this.config.tasks;
-    const baseCwd = this.configDir || process.cwd();
+    // Convert tasks array back to object format for compatibility
+    const tasks: Record<string, any> = {};
+    for (const task of this.context.tasks) {
+      tasks[task.name] = task;
+    }
+
+    const baseCwd = this.context.projectRoot;
 
     const resolveCwd = (tCwd?: string) => {
       if (!tCwd || tCwd.trim().length === 0) return baseCwd;
@@ -256,7 +307,8 @@ export class Zapper {
   }
 
   private getBareMetalTargets(): Array<{ name: string; cwd: string }> {
-    return getBareMetalTargets(this.config, this.configDir);
+    const legacyConfig = this.createLegacyConfig();
+    return getBareMetalTargets(legacyConfig, this.context?.projectRoot || null);
   }
 
   async gitCheckoutAll(branch: string): Promise<void> {

@@ -2,7 +2,13 @@ import { readFileSync, existsSync } from "fs";
 import path from "path";
 import { parse } from "yaml";
 import { parse as dotenvParse } from "dotenv";
-import { ZapperConfig, Process, Task, Container } from "../config/schemas";
+import {
+  ZapperConfig,
+  Process as ConfigProcess,
+  Task as ConfigTask,
+  Container as ConfigContainer,
+} from "../config/schemas";
+import { Context, Process, Task, Container } from "../types/Context";
 import { logger } from "../utils/logger";
 
 interface RawEnvFile {
@@ -12,6 +18,7 @@ interface RawEnvFile {
 type InlineEnv = { keys: string[]; pairs: Record<string, string> };
 
 export class EnvResolver {
+  // Legacy method for backwards compatibility
   static resolve(config: ZapperConfig): ZapperConfig {
     const resolvedConfig = { ...config };
 
@@ -24,13 +31,13 @@ export class EnvResolver {
     if (resolvedConfig.bare_metal) {
       for (const [name, proc] of Object.entries(resolvedConfig.bare_metal)) {
         if (!proc.name) proc.name = name;
-        this.resolveProcessEnv(proc, mergedEnvFromFiles);
+        this.resolveConfigProcessEnv(proc, mergedEnvFromFiles);
       }
     }
 
     if (resolvedConfig.processes) {
       for (const proc of resolvedConfig.processes) {
-        this.resolveProcessEnv(proc, mergedEnvFromFiles);
+        this.resolveConfigProcessEnv(proc, mergedEnvFromFiles);
       }
     }
 
@@ -39,18 +46,46 @@ export class EnvResolver {
     if (dockerServices) {
       for (const [name, container] of Object.entries(dockerServices)) {
         if (!container.name) container.name = name;
-        this.resolveContainerEnv(container, mergedEnvFromFiles);
+        this.resolveConfigContainerEnv(container, mergedEnvFromFiles);
       }
     }
 
     if (resolvedConfig.tasks) {
       for (const [name, task] of Object.entries(resolvedConfig.tasks)) {
         if (!task.name) task.name = name;
-        this.resolveTaskEnv(task, mergedEnvFromFiles);
+        this.resolveConfigTaskEnv(task, mergedEnvFromFiles);
       }
     }
 
     return resolvedConfig;
+  }
+
+  // New method that works with Context
+  static resolveContext(context: Context): Context {
+    const resolvedContext = { ...context };
+
+    const mergedEnvFromFiles = this.loadAndMergeEnvFiles(
+      resolvedContext.envFiles,
+    );
+
+    logger.debug("Merged env files:", mergedEnvFromFiles);
+
+    // Resolve environment for all processes
+    for (const proc of resolvedContext.processes) {
+      this.resolveProcessEnv(proc, mergedEnvFromFiles, context.projectRoot);
+    }
+
+    // Resolve environment for all containers
+    for (const container of resolvedContext.containers) {
+      this.resolveContainerEnv(container, mergedEnvFromFiles);
+    }
+
+    // Resolve environment for all tasks
+    for (const task of resolvedContext.tasks) {
+      this.resolveTaskEnv(task, mergedEnvFromFiles, context.projectRoot);
+    }
+
+    return resolvedContext;
   }
 
   private static splitInlineEnv(entries?: string[]): InlineEnv {
@@ -66,12 +101,104 @@ export class EnvResolver {
     return result;
   }
 
-  private static resolveProcessEnv(
-    proc: Process,
+  private static resolveConfigProcessEnv(
+    proc: ConfigProcess,
     mergedEnvFromFiles: Record<string, string>,
   ): void {
     logger.debug(`Processing process: ${proc.name}`);
     const local = this.loadAndMergeEnvFiles(proc.env_files);
+    const useLocalOnly = Object.keys(local).length > 0;
+
+    if (useLocalOnly) {
+      const inline = this.splitInlineEnv(proc.env);
+      proc.resolvedEnv = { ...local, ...inline.pairs };
+
+      logger.debug(
+        `Final resolved env for ${proc.name} (local env_files + inline pairs):`,
+        proc.resolvedEnv,
+      );
+
+      return;
+    }
+
+    const inline = this.splitInlineEnv(proc.env);
+
+    const whitelist =
+      inline.keys.length > 0
+        ? inline.keys
+        : Array.isArray(proc.envs)
+          ? proc.envs
+          : [];
+
+    const envSubset: Record<string, string> = {};
+
+    for (const key of whitelist) {
+      const value = mergedEnvFromFiles[key];
+      if (value !== undefined) envSubset[key] = value;
+    }
+
+    proc.resolvedEnv = { ...envSubset, ...inline.pairs };
+    if (!Array.isArray(proc.env)) proc.env = whitelist;
+    logger.debug(`Final resolved env for ${proc.name}:`, proc.resolvedEnv);
+  }
+
+  private static resolveConfigContainerEnv(
+    container: ConfigContainer,
+    mergedEnvFromFiles: Record<string, string>,
+  ): void {
+    const inline = this.splitInlineEnv(container.env);
+    const whitelist = inline.keys;
+    const envSubset: Record<string, string> = {};
+
+    for (const key of whitelist) {
+      const value = mergedEnvFromFiles[key];
+      if (value !== undefined) envSubset[key] = value;
+    }
+
+    container.resolvedEnv = { ...envSubset, ...inline.pairs };
+    container.env = Array.isArray(container.env) ? container.env : whitelist;
+
+    logger.debug(
+      `Final resolved env for docker ${container.name}:`,
+      container.resolvedEnv,
+    );
+  }
+
+  private static resolveConfigTaskEnv(
+    task: ConfigTask,
+    mergedEnvFromFiles: Record<string, string>,
+  ): void {
+    const inline = this.splitInlineEnv(task.env);
+    const whitelist = inline.keys;
+    const envSubset: Record<string, string> = {};
+
+    for (const key of whitelist) {
+      const value = mergedEnvFromFiles[key];
+      if (value !== undefined) envSubset[key] = value;
+    }
+
+    task.resolvedEnv = { ...envSubset, ...inline.pairs };
+    task.env = Array.isArray(task.env) ? task.env : whitelist;
+    logger.debug(`Final resolved env for task ${task.name}:`, task.resolvedEnv);
+  }
+
+  // New Context-aware environment resolution methods
+  private static resolveProcessEnv(
+    proc: Process,
+    mergedEnvFromFiles: Record<string, string>,
+    projectRoot: string,
+  ): void {
+    logger.debug(`Processing process: ${proc.name}`);
+
+    // Resolve process-specific env_files relative to project root
+    let processEnvFiles: string[] | undefined;
+    if (proc.env_files && proc.env_files.length > 0) {
+      processEnvFiles = proc.env_files.map((p) =>
+        path.isAbsolute(p) ? p : path.join(projectRoot, p),
+      );
+    }
+
+    const local = this.loadAndMergeEnvFiles(processEnvFiles);
     const useLocalOnly = Object.keys(local).length > 0;
 
     if (useLocalOnly) {
@@ -132,7 +259,33 @@ export class EnvResolver {
   private static resolveTaskEnv(
     task: Task,
     mergedEnvFromFiles: Record<string, string>,
+    projectRoot: string,
   ): void {
+    logger.debug(`Processing task: ${task.name}`);
+
+    // Resolve task-specific env_files relative to project root
+    let taskEnvFiles: string[] | undefined;
+    if (task.env_files && task.env_files.length > 0) {
+      taskEnvFiles = task.env_files.map((p) =>
+        path.isAbsolute(p) ? p : path.join(projectRoot, p),
+      );
+    }
+
+    const local = this.loadAndMergeEnvFiles(taskEnvFiles);
+    const useLocalOnly = Object.keys(local).length > 0;
+
+    if (useLocalOnly) {
+      const inline = this.splitInlineEnv(task.env);
+      task.resolvedEnv = { ...local, ...inline.pairs };
+
+      logger.debug(
+        `Final resolved env for ${task.name} (local env_files + inline pairs):`,
+        task.resolvedEnv,
+      );
+
+      return;
+    }
+
     const inline = this.splitInlineEnv(task.env);
     const whitelist = inline.keys;
     const envSubset: Record<string, string> = {};
@@ -189,5 +342,14 @@ export class EnvResolver {
     const proc = resolvedConfig.bare_metal?.[processName];
     if (!proc) throw new Error(`Process ${processName} not found`);
     return (proc.resolvedEnv as Record<string, string>) || {};
+  }
+
+  static getProcessEnvFromContext(
+    processName: string,
+    context: Context,
+  ): Record<string, string> {
+    const proc = context.processes.find((p) => p.name === processName);
+    if (!proc) throw new Error(`Process ${processName} not found`);
+    return proc.resolvedEnv || {};
   }
 }

@@ -1,13 +1,16 @@
 import { existsSync } from "fs";
+import path from "path";
 import { ZapperConfigSchema, ZapperConfig } from "./schemas";
 import { ZodError } from "zod";
 
 export class ZodConfigValidator {
-  static validate(config: unknown): ZapperConfig {
+  static validate(config: unknown, projectRoot?: string): ZapperConfig {
     try {
       const validatedConfig = ZapperConfigSchema.parse(config);
       this.autoPopulateNames(validatedConfig);
-      this.validateEnvFiles(validatedConfig);
+      if (projectRoot) {
+        this.validateEnvFiles(validatedConfig, projectRoot);
+      }
       return validatedConfig;
     } catch (error) {
       if (error instanceof ZodError) {
@@ -63,11 +66,21 @@ export class ZodConfigValidator {
     }
   }
 
-  private static validateEnvFiles(config: ZapperConfig): void {
+  private static validateEnvFiles(
+    config: ZapperConfig,
+    projectRoot: string,
+  ): void {
     if (config.env_files) {
       for (const filePath of config.env_files) {
-        if (!existsSync(filePath)) {
-          throw new Error(`Env file does not exist: ${filePath}`);
+        // Resolve relative paths relative to project root
+        const resolvedPath = path.isAbsolute(filePath)
+          ? filePath
+          : path.join(projectRoot, filePath);
+
+        if (!existsSync(resolvedPath)) {
+          throw new Error(
+            `Env file does not exist: ${filePath} (resolved to: ${resolvedPath})`,
+          );
         }
       }
     }

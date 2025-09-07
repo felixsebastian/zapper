@@ -9,6 +9,8 @@ export interface ProcessInfo {
   cwd?: string;
 }
 
+export * from "./Context";
+
 export type Command =
   | "up"
   | "down"
