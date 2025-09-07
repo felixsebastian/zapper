@@ -2,8 +2,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { executeActions } from "./executeActions";
 import { ZapperConfig } from "../utils";
-import { DockerManager } from "../docker";
-import { Pm2Executor } from "../process/Pm2Executor";
+import { DockerManager } from "./docker";
+import { Pm2Executor } from "./process/Pm2Executor";
 import { ActionPlan } from "../types";
 import { findProcess } from "./findProcess";
 import { findContainer } from "./findContainer";

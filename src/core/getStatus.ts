@@ -1,5 +1,5 @@
-import { Pm2Manager } from "../process";
-import { DockerManager } from "../docker";
+import { Pm2Manager } from "./process";
+import { DockerManager } from "./docker";
 
 export interface ServiceStatus {
   service: string;

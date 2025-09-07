@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Planner } from "./Planner";
 import { ZapperConfig } from "../config/schemas";
-import { Pm2Manager } from "../process/Pm2Manager";
-import { DockerManager } from "../docker";
+import { Pm2Manager } from "./process/Pm2Manager";
+import { DockerManager } from "./docker";
 
 // Mock the dependencies
 vi.mock("../process/Pm2Manager");

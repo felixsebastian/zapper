@@ -1,6 +1,6 @@
 import { parseYamlFile } from "../config/yamlParser";
 import { EnvResolver } from "../config/EnvResolver";
-import { Pm2Executor } from "../process/Pm2Executor";
+import { Pm2Executor } from "./process/Pm2Executor";
 import { ZapperConfig, Process, Container } from "../config/schemas";
 import path from "path";
 import { logger } from "../utils/logger";
@@ -10,6 +10,8 @@ import { resolveConfigPath } from "../utils/findUp";
 import { Planner } from "./Planner";
 import { executeActions } from "./executeActions";
 import { confirm } from "../utils/confirm";
+import { GitManager, cloneRepos as cloneRepositories } from "./git";
+import { getBareMetalTargets } from "../utils";
 
 export class Zapper {
   private config: ZapperConfig | null = null;
@@ -201,128 +203,7 @@ export class Zapper {
 
   async cloneRepos(processNames?: string[]): Promise<void> {
     if (!this.config || !this.configDir) throw new Error("Config not loaded");
-    const method = this.config.git_method || "ssh";
-
-    const allBareMetal = this.config.bare_metal
-      ? Object.entries(this.config.bare_metal).map(([name, p]) => ({
-          ...p,
-          name: (p.name as string) || name,
-        }))
-      : [];
-
-    const canonical = this.resolveAliasesToCanonical(processNames);
-
-    const targets = canonical
-      ? allBareMetal.filter((p) => canonical.includes(p.name as string))
-      : allBareMetal;
-
-    if (targets.length === 0) {
-      logger.info("No bare_metal services to clone");
-      return;
-    }
-
-    for (const process of targets) {
-      if (!process.repo) {
-        logger.debug(`Skipping ${process.name}: no repo field`);
-        continue;
-      }
-
-      const destDir = (() => {
-        const cwd =
-          process.cwd && process.cwd.trim().length > 0
-            ? process.cwd
-            : process.name;
-
-        return path.isAbsolute(cwd)
-          ? cwd
-          : path.join(this.configDir as string, cwd);
-      })();
-
-      const repoSpec = process.repo;
-
-      const ensureDir = (dir: string) => {
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      };
-
-      const isGitRepo = (dir: string) => fs.existsSync(path.join(dir, ".git"));
-
-      const isEmptyDir = (dir: string) => {
-        try {
-          const files = fs.readdirSync(dir);
-          return files.length === 0;
-        } catch {
-          return true;
-        }
-      };
-
-      const toSshUrl = (spec: string) => {
-        if (spec.startsWith("git@")) return spec;
-        if (spec.startsWith("ssh://")) return spec;
-        if (spec.startsWith("http://")) return spec;
-        if (spec.startsWith("https://")) return spec;
-        return `git@github.com:${spec}.git`;
-      };
-
-      const toHttpUrl = (spec: string) => {
-        if (spec.startsWith("http://")) return spec;
-        if (spec.startsWith("https://")) return spec;
-
-        if (spec.startsWith("git@")) {
-          return `https://github.com/${spec.split(":")[1]?.replace(/\.git$/, "")}.git`;
-        }
-
-        return `https://github.com/${spec}.git`;
-      };
-
-      const cloneWithGit = (url: string, dir: string) => {
-        const parent = path.dirname(dir);
-        ensureDir(parent);
-        const folderName = path.basename(dir);
-        const parentIsRepo = isGitRepo(dir);
-
-        if (!fs.existsSync(dir) || isEmptyDir(dir)) {
-          logger.info(`Cloning ${process.name} -> ${dir}`);
-
-          execSync(`git clone ${url} ${folderName}`, {
-            cwd: parent,
-            stdio: "inherit",
-          });
-        } else if (parentIsRepo || isGitRepo(dir)) {
-          logger.info(`Pulling ${process.name} in ${dir}`);
-          execSync(`git -C ${dir} pull --ff-only`, { stdio: "inherit" });
-        } else {
-          logger.warn(
-            `Destination ${dir} exists and is not empty. Skipping ${process.name}.`,
-          );
-        }
-      };
-
-      const cloneWithGh = (spec: string, dir: string) => {
-        const parent = path.dirname(dir);
-        ensureDir(parent);
-        const target = dir;
-
-        if (!fs.existsSync(dir) || isEmptyDir(dir)) {
-          logger.info(`Cloning (gh) ${process.name} -> ${target}`);
-          execSync(`gh repo clone ${spec} ${target}`, { stdio: "inherit" });
-        } else if (isGitRepo(dir)) {
-          logger.info(`Pulling ${process.name} in ${dir}`);
-          execSync(`git -C ${dir} pull --ff-only`, { stdio: "inherit" });
-        } else {
-          logger.warn(
-            `Destination ${dir} exists and is not empty. Skipping ${process.name}.`,
-          );
-        }
-      };
-
-      try {
-        if (method === "cli") cloneWithGh(repoSpec, destDir);
-        else if (method === "http") cloneWithGit(toHttpUrl(repoSpec), destDir);
-        else cloneWithGit(toSshUrl(repoSpec), destDir);
-      } catch (e) {
-        logger.warn(`Failed to clone ${process.name}: ${e}`);
-      }
-    }
+    await cloneRepositories(this.config, this.configDir, processNames);
   }
 
   async runTask(taskName: string): Promise<void> {
@@ -375,103 +256,21 @@ export class Zapper {
   }
 
   private getBareMetalTargets(): Array<{ name: string; cwd: string }> {
-    if (!this.config || !this.configDir) return [];
-
-    const entries = this.config.bare_metal
-      ? Object.entries(this.config.bare_metal)
-      : [];
-
-    return entries
-      .filter(([, p]) => !!p.repo)
-      .map(([name, process]) => {
-        const cwd =
-          process.cwd && process.cwd.trim().length > 0 ? process.cwd : name;
-
-        const resolved = path.isAbsolute(cwd)
-          ? cwd
-          : path.join(this.configDir as string, cwd);
-
-        return { name, cwd: resolved };
-      });
-  }
-
-  private isGitRepo(dir: string): boolean {
-    try {
-      return fs.existsSync(path.join(dir, ".git"));
-    } catch {
-      return false;
-    }
+    return getBareMetalTargets(this.config, this.configDir);
   }
 
   async gitCheckoutAll(branch: string): Promise<void> {
     const targets = this.getBareMetalTargets();
-
-    for (const target of targets) {
-      if (!this.isGitRepo(target.cwd)) continue;
-
-      try {
-        const status = execSync("git status --porcelain", { cwd: target.cwd })
-          .toString()
-          .trim();
-
-        if (status.length > 0) {
-          const ts = new Date().toISOString().replace(/[:.]/g, "-");
-          execSync(`git add -A`, { cwd: target.cwd, stdio: "inherit" });
-
-          execSync(`git commit -m "[WIP] ${ts}"`, {
-            cwd: target.cwd,
-            stdio: "inherit",
-          });
-        }
-
-        execSync(`git fetch --all`, { cwd: target.cwd, stdio: "inherit" });
-
-        execSync(`git checkout ${branch}`, {
-          cwd: target.cwd,
-          stdio: "inherit",
-        });
-      } catch (e) {
-        logger.warn(`Failed to checkout in ${target.name}: ${e}`);
-      }
-    }
+    await GitManager.checkoutAll(targets, branch);
   }
 
   async gitPullAll(): Promise<void> {
     const targets = this.getBareMetalTargets();
-
-    for (const target of targets) {
-      if (!this.isGitRepo(target.cwd)) continue;
-
-      try {
-        execSync(`git pull --ff-only`, { cwd: target.cwd, stdio: "inherit" });
-      } catch (e) {
-        logger.warn(`Failed to pull in ${target.name}: ${e}`);
-      }
-    }
+    await GitManager.pullAll(targets);
   }
 
   async gitStatusAll(): Promise<void> {
     const targets = this.getBareMetalTargets();
-
-    for (const target of targets) {
-      if (!this.isGitRepo(target.cwd)) continue;
-
-      try {
-        const branch = execSync(`git rev-parse --abbrev-ref HEAD`, {
-          cwd: target.cwd,
-        })
-          .toString()
-          .trim();
-
-        const dirty =
-          execSync(`git status --porcelain`, { cwd: target.cwd })
-            .toString()
-            .trim().length > 0;
-
-        logger.info(`${target.name}: ${branch}  ${dirty ? "dirty" : "clean"}`);
-      } catch (e) {
-        logger.warn(`Failed to get status in ${target.name}: ${e}`);
-      }
-    }
+    await GitManager.statusAll(targets);
   }
 }

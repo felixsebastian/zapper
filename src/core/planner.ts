@@ -1,6 +1,6 @@
 import { ZapperConfig, Process, Container } from "../config/schemas";
-import { Pm2Manager } from "../process/Pm2Manager";
-import { DockerManager } from "../docker";
+import { Pm2Manager } from "./process/Pm2Manager";
+import { DockerManager } from "./docker";
 import { Action, ActionPlan } from "../types";
 
 export class Planner {

@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { logger } from "../utils/logger";
+import { logger } from "../../utils/logger";
 import * as path from "path";
 
 export interface Task {

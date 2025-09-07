@@ -1,7 +1,7 @@
 import { ZapperConfig } from "../utils";
-import { DockerManager } from "../docker";
+import { DockerManager } from "./docker";
 import { logger } from "../utils/logger";
-import { Pm2Executor } from "../process/Pm2Executor";
+import { Pm2Executor } from "./process/Pm2Executor";
 import { ActionPlan } from "../types";
 import { findProcess } from "./findProcess";
 import { findContainer } from "./findContainer";

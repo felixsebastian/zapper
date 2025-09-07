@@ -7,9 +7,9 @@ import {
   existsSync,
 } from "fs";
 import path from "path";
-import { Process } from "../config/schemas";
-import { ProcessInfo } from "../types/index";
-import { logger } from "../utils/logger";
+import { Process } from "../../config/schemas";
+import { ProcessInfo } from "../../types/index";
+import { logger } from "../../utils/logger";
 
 export class Pm2Manager {
   // Track wrapper scripts by process name for cleanup
@@ -38,7 +38,7 @@ export class Pm2Manager {
 
     // Delete any existing processes with the same name to prevent duplicates
     await this.deleteAllMatchingProcesses(
-      (processConfig.name as string),
+      processConfig.name as string,
       projectName,
       configDir,
     );
@@ -55,7 +55,7 @@ export class Pm2Manager {
     );
 
     logger.debug(
-      `Creating ecosystem for ${(processConfig.name as string)} with env whitelist:`,
+      `Creating ecosystem for ${processConfig.name as string} with env whitelist:`,
       processConfig.env,
     );
 
@@ -67,7 +67,7 @@ export class Pm2Manager {
     const ecosystem = {
       apps: [
         {
-          name: `zap.${projectName}.${(processConfig.name as string)}`,
+          name: `zap.${projectName}.${processConfig.name as string}`,
           script: wrapperScript,
           interpreter: "/bin/bash",
           cwd: (() => {
@@ -77,7 +77,7 @@ export class Pm2Manager {
               : path.join(configDir, processConfig.cwd);
             if (!existsSync(resolved)) {
               logger.warn(
-                `cwd path does not exist for ${(processConfig.name as string)}: ${resolved} (skipping)`,
+                `cwd path does not exist for ${processConfig.name as string}: ${resolved} (skipping)`,
               );
               return configDir;
             }
@@ -86,11 +86,11 @@ export class Pm2Manager {
           env: { ...(process.env || {}), ...(processConfig.resolvedEnv || {}) },
           error_file: path.join(
             logsDir,
-            `${projectName}.${(processConfig.name as string)}-error.log`,
+            `${projectName}.${processConfig.name as string}-error.log`,
           ),
           out_file: path.join(
             logsDir,
-            `${projectName}.${(processConfig.name as string)}-out.log`,
+            `${projectName}.${processConfig.name as string}-out.log`,
           ),
           merge_logs: true,
         },
@@ -99,11 +99,11 @@ export class Pm2Manager {
 
     const tempFile = path.join(
       zapDir,
-      `${projectName}.${(processConfig.name as string)}.${Date.now()}.ecosystem.json`,
+      `${projectName}.${processConfig.name as string}.${Date.now()}.ecosystem.json`,
     );
 
     const ecosystemJson = JSON.stringify(ecosystem, null, 2);
-    logger.debug(`Ecosystem JSON for ${(processConfig.name as string)}:`);
+    logger.debug(`Ecosystem JSON for ${processConfig.name as string}:`);
     logger.debug("─".repeat(50));
     logger.debug(ecosystemJson);
     logger.debug("─".repeat(50));
@@ -114,7 +114,7 @@ export class Pm2Manager {
       await this.runPm2Command(["start", tempFile]);
 
       // Store wrapper script path for cleanup when stopping
-      const processKey = `${projectName}.${(processConfig.name as string)}`;
+      const processKey = `${projectName}.${processConfig.name as string}`;
       this.wrapperScripts.set(processKey, wrapperScript);
     } finally {
       try {
@@ -777,7 +777,7 @@ export class Pm2Manager {
   ): string {
     const zapDir = path.join(configDir, ".zap");
     const timestamp = Date.now();
-    const fileName = `${projectName}.${(processConfig.name as string)}.${timestamp}.sh`;
+    const fileName = `${projectName}.${processConfig.name as string}.${timestamp}.sh`;
     const filePath = path.join(zapDir, fileName);
 
     let content = "#!/bin/bash\n";
