@@ -1,7 +1,7 @@
-import { CommandHandler, CommandContext } from './CommandHandler';
-import { Pm2Manager } from '../process';
-import { DockerManager } from '../docker';
-import { logger } from '../utils/logger';
+import { CommandHandler, CommandContext } from "./CommandHandler";
+import { Pm2Manager } from "../process";
+import { DockerManager } from "../docker";
+import { logger } from "../utils/logger";
 
 export class StatusCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<void> {
@@ -22,9 +22,7 @@ export class StatusCommand extends CommandHandler {
         service: p.name.split(".").pop() || p.name,
         status: p.status,
       }))
-      .filter((p) =>
-        !service ? true : p.service === service,
-      );
+      .filter((p) => (!service ? true : p.service === service));
 
     const allDocker = await DockerManager.listContainers();
     const docker = allDocker
@@ -48,9 +46,7 @@ export class StatusCommand extends CommandHandler {
         if (!all && project) return c.rawName.startsWith(`zap.${project}.`);
         return true;
       })
-      .filter((c) =>
-        !service ? true : c.service === service,
-      );
+      .filter((c) => (!service ? true : c.service === service));
 
     // minimal local color helpers for status text
     const color = {
@@ -84,9 +80,7 @@ export class StatusCommand extends CommandHandler {
     const bareMetalSection = ["⛓️ Bare metal"]
       .concat(
         bareMetal.length > 0
-          ? bareMetal.map(
-              (p) => `${p.service}  ${formatPm2Status(p.status)}`,
-            )
+          ? bareMetal.map((p) => `${p.service}  ${formatPm2Status(p.status)}`)
           : ["(none)"],
       )
       .join("\n");
@@ -94,9 +88,7 @@ export class StatusCommand extends CommandHandler {
     const dockerSection = ["🐳 Docker"]
       .concat(
         docker.length > 0
-          ? docker.map(
-              (c) => `${c.service}  ${formatDockerStatus(c.status)}`,
-            )
+          ? docker.map((c) => `${c.service}  ${formatDockerStatus(c.status)}`)
           : ["(none)"],
       )
       .join("\n");
