@@ -7,3 +7,7 @@ export { logger } from "./logger";
 export { assertValidName } from "./validators";
 export { confirm } from "./confirm";
 export { findFileUpwards as findUp, resolveConfigPath } from "./findUp";
+export * from "./buildAliasMap";
+export * from "./resolveAliasesToCanonical";
+export * from "./resolveServiceName";
+export * from "./getBareMetalTargets";
