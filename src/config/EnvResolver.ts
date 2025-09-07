@@ -18,7 +18,6 @@ interface RawEnvFile {
 type InlineEnv = { keys: string[]; pairs: Record<string, string> };
 
 export class EnvResolver {
-  // Legacy method for backwards compatibility
   static resolve(config: ZapperConfig): ZapperConfig {
     const resolvedConfig = { ...config };
 
@@ -60,7 +59,6 @@ export class EnvResolver {
     return resolvedConfig;
   }
 
-  // New method that works with Context
   static resolveContext(context: Context): Context {
     const resolvedContext = { ...context };
 
@@ -70,17 +68,14 @@ export class EnvResolver {
 
     logger.debug("Merged env files:", mergedEnvFromFiles);
 
-    // Resolve environment for all processes
     for (const proc of resolvedContext.processes) {
       this.resolveProcessEnv(proc, mergedEnvFromFiles, context.projectRoot);
     }
 
-    // Resolve environment for all containers
     for (const container of resolvedContext.containers) {
       this.resolveContainerEnv(container, mergedEnvFromFiles);
     }
 
-    // Resolve environment for all tasks
     for (const task of resolvedContext.tasks) {
       this.resolveTaskEnv(task, mergedEnvFromFiles, context.projectRoot);
     }
@@ -182,7 +177,6 @@ export class EnvResolver {
     logger.debug(`Final resolved env for task ${task.name}:`, task.resolvedEnv);
   }
 
-  // New Context-aware environment resolution methods
   private static resolveProcessEnv(
     proc: Process,
     mergedEnvFromFiles: Record<string, string>,
@@ -190,7 +184,6 @@ export class EnvResolver {
   ): void {
     logger.debug(`Processing process: ${proc.name}`);
 
-    // Resolve process-specific env_files relative to project root
     let processEnvFiles: string[] | undefined;
     if (proc.env_files && proc.env_files.length > 0) {
       processEnvFiles = proc.env_files.map((p) =>
@@ -263,7 +256,6 @@ export class EnvResolver {
   ): void {
     logger.debug(`Processing task: ${task.name}`);
 
-    // Resolve task-specific env_files relative to project root
     let taskEnvFiles: string[] | undefined;
     if (task.env_files && task.env_files.length > 0) {
       taskEnvFiles = task.env_files.map((p) =>
@@ -329,10 +321,6 @@ export class EnvResolver {
     }
 
     return merged;
-  }
-
-  static getMergedEnvFromFiles(config: ZapperConfig): Record<string, string> {
-    return this.loadAndMergeEnvFiles(config.env_files);
   }
 
   static getProcessEnv(
