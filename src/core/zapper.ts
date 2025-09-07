@@ -8,7 +8,7 @@ import * as fs from "fs";
 import { execSync } from "child_process";
 import { resolveConfigPath } from "../utils/findUp";
 import { Planner } from "./Planner";
-import { executeActions } from "./actionExecutor";
+import { executeActions } from "./executeActions";
 import { confirm } from "../utils/confirm";
 
 export class Zapper {
@@ -27,7 +27,6 @@ export class Zapper {
           path.isAbsolute(p) ? p : path.join(this.configDir as string, p),
         );
       }
-
 
       this.config = EnvResolver.resolve(this.config);
     } catch (error) {
@@ -78,9 +77,9 @@ export class Zapper {
     const processes = this.getProcesses();
 
     for (const p of processes) {
-      aliasToName.set((((p.name as string))), (((p.name as string))));
+      aliasToName.set(p.name as string, p.name as string);
       if (Array.isArray(p.aliases)) {
-        for (const a of p.aliases) aliasToName.set(a, (((p.name as string))));
+        for (const a of p.aliases) aliasToName.set(a, p.name as string);
       }
     }
 
@@ -207,14 +206,14 @@ export class Zapper {
     const allBareMetal = this.config.bare_metal
       ? Object.entries(this.config.bare_metal).map(([name, p]) => ({
           ...p,
-          name: (((p.name as string))) || name,
+          name: (p.name as string) || name,
         }))
       : [];
 
     const canonical = this.resolveAliasesToCanonical(processNames);
 
     const targets = canonical
-      ? allBareMetal.filter((p) => canonical.includes((((p.name as string)))))
+      ? allBareMetal.filter((p) => canonical.includes(p.name as string))
       : allBareMetal;
 
     if (targets.length === 0) {

@@ -21,10 +21,10 @@ export async function executeActions(
 
       if (action.type === "start") {
         await pm2.startProcess(proc, projectName);
-        logger.info(`Started ${(proc.name as string)}`);
+        logger.info(`Started ${proc.name as string}`);
       } else {
-        await pm2.stopProcess((proc.name as string));
-        logger.info(`Stopped ${(proc.name as string)}`);
+        await pm2.stopProcess(proc.name as string);
+        logger.info(`Stopped ${proc.name as string}`);
       }
     } else {
       const pair = findContainer(config, action.name);

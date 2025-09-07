@@ -1,3 +1,2 @@
-- bug: restart is broken, it just stops the service. I guess we need the planner to be smarter about creating stop and start tasks in the right order. atm we dont have deps or healthchecks, so it would probably just find the running services, stop them, then start ALL the services whether or not they were running. that would be the action plan list
 - need tests for everything
 - fix tasks proper, currently the cli parsing is hacked in

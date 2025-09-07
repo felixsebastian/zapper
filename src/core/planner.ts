@@ -38,7 +38,9 @@ export class Planner {
     if (op === "start") {
       if (targets && targets.length > 0) {
         return {
-          processes: allProcesses.filter((p) => targets.includes((((p.name as string))))),
+          processes: allProcesses.filter((p) =>
+            targets.includes(p.name as string),
+          ),
           containers: allContainers.filter(([name]) => targets.includes(name)),
         };
       }
@@ -56,7 +58,9 @@ export class Planner {
     // stop: don't apply profiles filter
     if (targets && targets.length > 0) {
       return {
-        processes: allProcesses.filter((p) => targets.includes((((p.name as string))))),
+        processes: allProcesses.filter((p) =>
+          targets.includes(p.name as string),
+        ),
         containers: allContainers.filter(([name]) => targets.includes(name)),
       };
     }
@@ -68,11 +72,11 @@ export class Planner {
     op: "start" | "stop" | "restart",
     targets: string[] | undefined,
     projectName: string,
+    forceStart = false,
   ): Promise<ActionPlan> {
     if (op === "restart") {
       const stopPlan = await this.plan("stop", targets, projectName);
-      const names = stopPlan.actions.map((a) => a.name);
-      const startPlan = await this.plan("start", names, projectName);
+      const startPlan = await this.plan("start", targets, projectName, true);
       return { actions: [...stopPlan.actions, ...startPlan.actions] };
     }
 
@@ -82,7 +86,7 @@ export class Planner {
     const runningPm2 = new Set(
       pm2List
         .filter((p) => p.status.toLowerCase() === "online")
-        .map((p) => (((p.name as string)))),
+        .map((p) => p.name as string),
     );
 
     const isPm2Running = (name: string) =>
@@ -92,11 +96,11 @@ export class Planner {
 
     if (op === "start") {
       for (const p of selection.processes) {
-        if (!isPm2Running((((p.name as string)))))
+        if (forceStart || !isPm2Running(p.name as string))
           actions.push({
             type: "start",
             serviceType: "bare_metal",
-            name: (((p.name as string))),
+            name: p.name as string,
           });
       }
 
@@ -110,16 +114,16 @@ export class Planner {
           (info.status.toLowerCase() === "running" ||
             info.status.toLowerCase().includes("up"));
 
-        if (!running)
+        if (forceStart || !running)
           actions.push({ type: "start", serviceType: "docker", name });
       }
     } else if (op === "stop") {
       for (const p of selection.processes) {
-        if (isPm2Running((((p.name as string))))) {
+        if (isPm2Running(p.name as string)) {
           actions.push({
             type: "stop",
             serviceType: "bare_metal",
-            name: (((p.name as string))),
+            name: p.name as string,
           });
         }
       }
