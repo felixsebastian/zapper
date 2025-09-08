@@ -1,5 +1,12 @@
 # zapper-cli
 
+## 0.2.1
+
+### Patch Changes
+
+- 9f3ecaa: fix tests
+- 8440f9b: fixes
+
 ## 0.2.0
 
 ### Minor Changes
