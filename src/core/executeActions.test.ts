@@ -9,8 +9,7 @@ import { findProcess } from "./findProcess";
 import { findContainer } from "./findContainer";
 
 // Mock all dependencies
-vi.mock("../docker/DockerManager");
-vi.mock("../process/Pm2Executor");
+vi.mock("./docker");
 vi.mock("./findProcess");
 vi.mock("./findContainer");
 vi.mock("../utils/logger", () => ({
@@ -20,6 +19,13 @@ vi.mock("../utils/logger", () => ({
     debug: vi.fn(),
   },
 }));
+
+// Mock Pm2Executor constructor
+vi.mock("./process/Pm2Executor", () => {
+  return {
+    Pm2Executor: vi.fn(),
+  };
+});
 
 describe("executeActions", () => {
   let mockConfig: ZapperConfig;

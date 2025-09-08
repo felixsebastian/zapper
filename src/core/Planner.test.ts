@@ -5,8 +5,8 @@ import { Pm2Manager } from "./process/Pm2Manager";
 import { DockerManager } from "./docker";
 
 // Mock the dependencies
-vi.mock("../process/Pm2Manager");
-vi.mock("../docker/DockerManager");
+vi.mock("./process/Pm2Manager");
+vi.mock("./docker");
 
 describe("Planner", () => {
   let planner: Planner;
@@ -117,7 +117,9 @@ describe("Planner", () => {
       const plan = await planner.plan("restart", undefined, "test-project");
 
       // Should have stop actions for running services
-      const stopActions = plan.actions.filter((a) => a.type === "stop");
+      const stopActions = plan.actions.filter(
+        (a: { type: string }) => a.type === "stop",
+      );
       expect(stopActions).toHaveLength(3); // service1, service2, db
       expect(stopActions).toEqual(
         expect.arrayContaining([
@@ -128,7 +130,9 @@ describe("Planner", () => {
       );
 
       // Should have start actions for ALL services
-      const startActions = plan.actions.filter((a) => a.type === "start");
+      const startActions = plan.actions.filter(
+        (a: { type: string }) => a.type === "start",
+      );
       expect(startActions).toHaveLength(5); // service1, service2, service3, db, redis
       expect(startActions).toEqual(
         expect.arrayContaining([
@@ -142,11 +146,11 @@ describe("Planner", () => {
 
       // Actions should be in order: stops first, then starts
       const stopIndices = plan.actions
-        .map((a, i) => (a.type === "stop" ? i : -1))
-        .filter((i) => i !== -1);
+        .map((a: { type: string }, i: number) => (a.type === "stop" ? i : -1))
+        .filter((i: number) => i !== -1);
       const startIndices = plan.actions
-        .map((a, i) => (a.type === "start" ? i : -1))
-        .filter((i) => i !== -1);
+        .map((a: { type: string }, i: number) => (a.type === "start" ? i : -1))
+        .filter((i: number) => i !== -1);
 
       expect(Math.max(...stopIndices)).toBeLessThan(Math.min(...startIndices));
     });
@@ -200,7 +204,9 @@ describe("Planner", () => {
       );
 
       // Should have stop actions for running services only
-      const stopActions = plan.actions.filter((a) => a.type === "stop");
+      const stopActions = plan.actions.filter(
+        (a: { type: string }) => a.type === "stop",
+      );
       expect(stopActions).toHaveLength(2); // service1, db
       expect(stopActions).toEqual(
         expect.arrayContaining([
@@ -210,7 +216,9 @@ describe("Planner", () => {
       );
 
       // Should have start actions for ALL specified services
-      const startActions = plan.actions.filter((a) => a.type === "start");
+      const startActions = plan.actions.filter(
+        (a: { type: string }) => a.type === "start",
+      );
       expect(startActions).toHaveLength(3); // service1, service2, db
       expect(startActions).toEqual(
         expect.arrayContaining([
@@ -238,7 +246,9 @@ describe("Planner", () => {
       const plan = await planner.plan("restart", ["service1"], "test-project");
 
       // Should have stop action for running service
-      const stopActions = plan.actions.filter((a) => a.type === "stop");
+      const stopActions = plan.actions.filter(
+        (a: { type: string }) => a.type === "stop",
+      );
       expect(stopActions).toHaveLength(1);
       expect(stopActions[0]).toEqual({
         type: "stop",
@@ -247,7 +257,9 @@ describe("Planner", () => {
       });
 
       // Should have start action for the service
-      const startActions = plan.actions.filter((a) => a.type === "start");
+      const startActions = plan.actions.filter(
+        (a: { type: string }) => a.type === "start",
+      );
       expect(startActions).toHaveLength(1);
       expect(startActions[0]).toEqual({
         type: "start",
@@ -270,11 +282,15 @@ describe("Planner", () => {
       const plan = await planner.plan("restart", undefined, "test-project");
 
       // Should have no stop actions
-      const stopActions = plan.actions.filter((a) => a.type === "stop");
+      const stopActions = plan.actions.filter(
+        (a: { type: string }) => a.type === "stop",
+      );
       expect(stopActions).toHaveLength(0);
 
       // Should have start actions for ALL services
-      const startActions = plan.actions.filter((a) => a.type === "start");
+      const startActions = plan.actions.filter(
+        (a: { type: string }) => a.type === "start",
+      );
       expect(startActions).toHaveLength(5); // service1, service2, service3, db, redis
       expect(startActions).toEqual(
         expect.arrayContaining([
@@ -352,7 +368,9 @@ describe("Planner", () => {
       );
 
       // Should have stop actions for running services only
-      const stopActions = plan.actions.filter((a) => a.type === "stop");
+      const stopActions = plan.actions.filter(
+        (a: { type: string }) => a.type === "stop",
+      );
       expect(stopActions).toHaveLength(2); // service1, db
       expect(stopActions).toEqual(
         expect.arrayContaining([
@@ -362,7 +380,9 @@ describe("Planner", () => {
       );
 
       // Should have start actions for ALL specified services
-      const startActions = plan.actions.filter((a) => a.type === "start");
+      const startActions = plan.actions.filter(
+        (a: { type: string }) => a.type === "start",
+      );
       expect(startActions).toHaveLength(4); // service1, service2, db, redis
       expect(startActions).toEqual(
         expect.arrayContaining([
@@ -391,11 +411,15 @@ describe("Planner", () => {
       const plan = await planner.plan("restart", ["service1"], "test-project");
 
       // Should have no stop actions (service not running)
-      const stopActions = plan.actions.filter((a) => a.type === "stop");
+      const stopActions = plan.actions.filter(
+        (a: { type: string }) => a.type === "stop",
+      );
       expect(stopActions).toHaveLength(0);
 
       // Should have start action for the service
-      const startActions = plan.actions.filter((a) => a.type === "start");
+      const startActions = plan.actions.filter(
+        (a: { type: string }) => a.type === "start",
+      );
       expect(startActions).toHaveLength(1);
       expect(startActions[0]).toEqual({
         type: "start",
