@@ -101,11 +101,11 @@ export class CommanderCli {
       .command("logs")
       .alias("l")
       .description("Show logs for a specific process")
-      .requiredOption("--service <name>", "Target a specific process")
+      .argument("<service>", "Service to show logs for")
       .option("-f, --follow", "Follow logs (default)", true)
       .option("--no-follow", "Do not follow logs (print and exit)")
-      .action(async (options, command) => {
-        await this.executeCommand("logs", options.service, command);
+      .action(async (service, options, command) => {
+        await this.executeCommand("logs", service, command);
       });
 
     this.program
@@ -130,9 +130,9 @@ export class CommanderCli {
       .command("task")
       .alias("t")
       .description("Run a one-off task by name")
-      .requiredOption("--service <name>", "Task name to run")
-      .action(async (options, command) => {
-        await this.executeCommand("task", options.service, command);
+      .argument("<task>", "Task name to run")
+      .action(async (task, options, command) => {
+        await this.executeCommand("task", task, command);
       });
 
     this.program

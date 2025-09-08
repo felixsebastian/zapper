@@ -5,7 +5,7 @@ export class TaskCommand extends CommandHandler {
     const { zapper, service } = context;
 
     if (!service) {
-      throw new Error("Task name required: zap task --service <name>");
+      throw new Error("Task name is required for task command");
     }
 
     await zapper.runTask(service);

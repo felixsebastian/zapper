@@ -6,9 +6,7 @@ export class LogsCommand extends CommandHandler {
     const { zapper, service, options } = context;
 
     if (!service) {
-      throw new Error(
-        "Service name required for logs command. Use: zap logs --service <name>",
-      );
+      throw new Error("Service name is required for logs command");
     }
 
     const follow = options.follow ?? true;
