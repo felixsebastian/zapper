@@ -1,0 +1,5 @@
+---
+"zapper-cli": patch
+---
+
+fixes
