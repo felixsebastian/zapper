@@ -2,16 +2,24 @@ import { existsSync } from "fs";
 import path from "path";
 import { ZapperConfigSchema, ZapperConfig } from "./schemas";
 import { ZodError } from "zod";
+import { WhitelistResolver } from "./WhitelistResolver";
 
 export class ZodConfigValidator {
   static validate(config: unknown, projectRoot?: string): ZapperConfig {
     try {
       const validatedConfig = ZapperConfigSchema.parse(config);
-      this.autoPopulateNames(validatedConfig);
+
+      // Validate whitelist references early
+      WhitelistResolver.validateReferences(validatedConfig);
+
+      // Resolve whitelist references to arrays
+      const resolvedConfig = WhitelistResolver.resolve(validatedConfig);
+
+      this.autoPopulateNames(resolvedConfig);
       if (projectRoot) {
-        this.validateEnvFiles(validatedConfig, projectRoot);
+        this.validateEnvFiles(resolvedConfig, projectRoot);
       }
-      return validatedConfig;
+      return resolvedConfig;
     } catch (error) {
       if (error instanceof ZodError) {
         const errorMessages = error.issues.map((err) => {

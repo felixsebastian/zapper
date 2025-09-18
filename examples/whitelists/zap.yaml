@@ -1,0 +1,58 @@
+project: whitelist-example
+
+# Define reusable environment variable lists
+whitelists:
+  common-vars: 
+    - NODE_ENV
+    - LOG_LEVEL
+    - PORT
+  
+  frontend-vars:
+    - API_URL
+    - SENTRY_DSN
+    - FEATURE_FLAGS
+  
+  backend-vars:
+    - DATABASE_URL
+    - REDIS_URL
+    - JWT_SECRET
+    - SMTP_HOST
+  
+  db-vars:
+    - POSTGRES_DB
+    - POSTGRES_USER
+    - POSTGRES_PASSWORD
+
+# Use whitelists by referencing their names
+bare_metal:
+  frontend:
+    cmd: npm run dev
+    env: frontend-vars  # Reference to whitelist
+    
+  backend:
+    cmd: npm run server
+    env: backend-vars   # Reference to whitelist
+    
+  # You can also mix whitelists with regular arrays
+  monitoring:
+    cmd: npm run monitoring
+    env: [MONITORING_URL, ALERT_WEBHOOK]  # Regular array
+
+docker:
+  database:
+    image: postgres:15
+    env: db-vars  # Reference to whitelist
+    ports: ["5432:5432"]
+    
+  redis:
+    image: redis:7-alpine
+    env: common-vars  # Reuse common vars for redis
+    ports: ["6379:6379"]
+
+tasks:
+  deploy:
+    desc: Deploy the application
+    env: common-vars  # Reference to whitelist in tasks too
+    cmds:
+      - npm run build
+      - npm run deploy

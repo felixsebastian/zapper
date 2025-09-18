@@ -73,10 +73,10 @@ export async function executeActions(
           labels,
         });
 
-        logger.info(`Started docker ${dockerName}`);
+        logger.info(`Started ${name}`);
       } else {
         await DockerManager.stopContainer(dockerName);
-        logger.info(`Stopped docker ${dockerName}`);
+        logger.info(`Stopped ${name}`);
       }
     }
   }

@@ -6,7 +6,7 @@ import { Context, Process, Container, Task } from "../types/Context";
  * Creates a Context object from a ZapperConfig.
  * Transforms the config into a more usable format for the rest of the application.
  *
- * @param config The validated ZapperConfig
+ * @param config The validated ZapperConfig (with whitelists already resolved)
  * @param projectRoot Absolute path to directory containing zap.yaml
  * @returns Context object ready for use throughout the application
  */

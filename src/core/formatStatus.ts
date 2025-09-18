@@ -20,7 +20,7 @@ export function formatStatus(statusResult: StatusResult): string {
     const bareMetalSection = ["💾 Bare metal"]
       .concat(
         statusResult.bareMetal.map(
-          (p) => `${p.service}  ${formatServiceStatus(p.status)}`,
+          (p) => `${p.service} ${formatServiceStatus(p.status)}`,
         ),
       )
       .join("\n");
@@ -31,7 +31,7 @@ export function formatStatus(statusResult: StatusResult): string {
     const dockerSection = ["🐳 Docker"]
       .concat(
         statusResult.docker.map(
-          (c) => `${c.service}  ${formatServiceStatus(c.status)}`,
+          (c) => `${c.service} ${formatServiceStatus(c.status)}`,
         ),
       )
       .join("\n");

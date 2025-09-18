@@ -83,9 +83,16 @@ export class EnvResolver {
     return resolvedContext;
   }
 
-  private static splitInlineEnv(entries?: string[]): InlineEnv {
+  private static splitInlineEnv(entries?: string[] | string): InlineEnv {
     const result: InlineEnv = { keys: [], pairs: {} };
-    if (!Array.isArray(entries)) return result;
+    if (!Array.isArray(entries)) {
+      if (typeof entries === "string") {
+        throw new Error(
+          `EnvResolver received string env reference '${entries}' - this should have been resolved by WhitelistResolver`,
+        );
+      }
+      return result;
+    }
 
     for (const raw of entries) {
       const idx = raw.indexOf("=");
