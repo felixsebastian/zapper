@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.3.0
+
+### Minor Changes
+
+- 420d9a3: added whitelists section
+
 ## 0.2.1
 
 ### Patch Changes
