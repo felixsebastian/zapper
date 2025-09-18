@@ -75,6 +75,7 @@ export const TaskSchema = z.object({
   cmds: z.array(TaskCmdSchema).min(1, "Task must have at least one command"),
   env: z.array(z.string()).optional(),
   cwd: z.string().optional(),
+  aliases: z.array(validNameSchema).optional(),
   resolvedEnv: z.record(z.string(), z.string()).optional(),
   env_files: z.array(z.string()).optional(),
 });

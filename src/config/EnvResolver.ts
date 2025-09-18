@@ -25,7 +25,7 @@ export class EnvResolver {
       resolvedConfig.env_files,
     );
 
-    logger.debug("Merged env files:", mergedEnvFromFiles);
+    logger.debug("Merged env files:", { data: mergedEnvFromFiles });
 
     if (resolvedConfig.bare_metal) {
       for (const [name, proc] of Object.entries(resolvedConfig.bare_metal)) {
@@ -66,7 +66,7 @@ export class EnvResolver {
       resolvedContext.envFiles,
     );
 
-    logger.debug("Merged env files:", mergedEnvFromFiles);
+    logger.debug("Merged env files:", { data: mergedEnvFromFiles });
 
     for (const proc of resolvedContext.processes) {
       this.resolveProcessEnv(proc, mergedEnvFromFiles, context.projectRoot);
@@ -110,7 +110,7 @@ export class EnvResolver {
 
       logger.debug(
         `Final resolved env for ${proc.name} (local env_files + inline pairs):`,
-        proc.resolvedEnv,
+        { data: proc.resolvedEnv },
       );
 
       return;
@@ -134,7 +134,10 @@ export class EnvResolver {
 
     proc.resolvedEnv = { ...envSubset, ...inline.pairs };
     if (!Array.isArray(proc.env)) proc.env = whitelist;
-    logger.debug(`Final resolved env for ${proc.name}:`, proc.resolvedEnv);
+
+    logger.debug(`Final resolved env for ${proc.name}:`, {
+      data: proc.resolvedEnv,
+    });
   }
 
   private static resolveConfigContainerEnv(
@@ -153,10 +156,9 @@ export class EnvResolver {
     container.resolvedEnv = { ...envSubset, ...inline.pairs };
     container.env = Array.isArray(container.env) ? container.env : whitelist;
 
-    logger.debug(
-      `Final resolved env for docker ${container.name}:`,
-      container.resolvedEnv,
-    );
+    logger.debug(`Final resolved env for docker ${container.name}:`, {
+      data: container.resolvedEnv,
+    });
   }
 
   private static resolveConfigTaskEnv(
@@ -174,7 +176,9 @@ export class EnvResolver {
 
     task.resolvedEnv = { ...envSubset, ...inline.pairs };
     task.env = Array.isArray(task.env) ? task.env : whitelist;
-    logger.debug(`Final resolved env for task ${task.name}:`, task.resolvedEnv);
+    logger.debug(`Final resolved env for task ${task.name}:`, {
+      data: task.resolvedEnv,
+    });
   }
 
   private static resolveProcessEnv(
@@ -200,7 +204,7 @@ export class EnvResolver {
 
       logger.debug(
         `Final resolved env for ${proc.name} (local env_files + inline pairs):`,
-        proc.resolvedEnv,
+        { data: proc.resolvedEnv },
       );
 
       return;
@@ -224,7 +228,10 @@ export class EnvResolver {
 
     proc.resolvedEnv = { ...envSubset, ...inline.pairs };
     if (!Array.isArray(proc.env)) proc.env = whitelist;
-    logger.debug(`Final resolved env for ${proc.name}:`, proc.resolvedEnv);
+
+    logger.debug(`Final resolved env for ${proc.name}:`, {
+      data: proc.resolvedEnv,
+    });
   }
 
   private static resolveContainerEnv(
@@ -243,10 +250,9 @@ export class EnvResolver {
     container.resolvedEnv = { ...envSubset, ...inline.pairs };
     container.env = Array.isArray(container.env) ? container.env : whitelist;
 
-    logger.debug(
-      `Final resolved env for docker ${container.name}:`,
-      container.resolvedEnv,
-    );
+    logger.debug(`Final resolved env for docker ${container.name}:`, {
+      data: container.resolvedEnv,
+    });
   }
 
   private static resolveTaskEnv(
@@ -272,7 +278,7 @@ export class EnvResolver {
 
       logger.debug(
         `Final resolved env for ${task.name} (local env_files + inline pairs):`,
-        task.resolvedEnv,
+        { data: task.resolvedEnv },
       );
 
       return;
@@ -289,7 +295,10 @@ export class EnvResolver {
 
     task.resolvedEnv = { ...envSubset, ...inline.pairs };
     task.env = Array.isArray(task.env) ? task.env : whitelist;
-    logger.debug(`Final resolved env for task ${task.name}:`, task.resolvedEnv);
+
+    logger.debug(`Final resolved env for task ${task.name}:`, {
+      data: task.resolvedEnv,
+    });
   }
 
   private static loadAndMergeEnvFiles(

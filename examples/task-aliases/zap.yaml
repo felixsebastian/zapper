@@ -1,0 +1,26 @@
+project: task-aliases-demo
+bare_metal:
+  frontend:
+    cmd: echo "Starting frontend..."
+    aliases: [fe, f]
+tasks:
+  build:
+    desc: Build the project
+    aliases: [b]
+    cmds:
+      - echo "Building project..."
+      - echo "Build complete!"
+  test:
+    desc: Run tests
+    aliases: [t, tests]
+    cmds:
+      - echo "Running tests..."
+      - { task: build }
+      - echo "Tests complete!"
+  deploy:
+    desc: Deploy to production
+    aliases: [d, prod]
+    cmds:
+      - { task: test }
+      - echo "Deploying to production..."
+      - echo "Deployment complete!"

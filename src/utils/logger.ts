@@ -27,6 +27,11 @@ const emoji = {
   success: "⚡️",
 };
 
+interface Options {
+  data?: unknown;
+  noEmoji?: boolean;
+}
+
 export class Logger {
   private level: LogLevel;
   private silent: boolean;
@@ -62,46 +67,48 @@ export class Logger {
   private withEmojiPrefix(
     kind: "error" | "warn" | "info" | "debug" | "success",
     message: string,
+    disable?: boolean,
   ): string {
+    if (disable) return message;
     // Ensure single space between emoji and message
     return `${this.prefix()}${emoji[kind]} ${message}`;
   }
 
-  error(message: string, data?: unknown): void {
+  error(message: string, options: Options = {}): void {
     if (!this.shouldLog(LogLevel.ERROR)) return;
-    const msg = `${this.withEmojiPrefix("error", message)}${this.formatData(data)}`;
+    const msg = `${this.withEmojiPrefix("error", message, options.noEmoji)}${this.formatData(options.data)}`;
     (
       globalThis as { console?: { error: (msg: string) => void } }
     ).console?.error(`${colors.red}${msg}${colors.reset}`);
   }
 
-  warn(message: string, data?: unknown): void {
+  warn(message: string, options: Options = {}): void {
     if (!this.shouldLog(LogLevel.WARN)) return;
-    const msg = `${this.withEmojiPrefix("warn", message)}${this.formatData(data)}`;
+    const msg = `${this.withEmojiPrefix("warn", message, options.noEmoji)}${this.formatData(options.data)}`;
     (globalThis as { console?: { warn: (msg: string) => void } }).console?.warn(
       `${colors.yellow}${msg}${colors.reset}`,
     );
   }
 
-  info(message: string, data?: unknown): void {
+  info(message: string, options: Options = {}): void {
     if (!this.shouldLog(LogLevel.INFO)) return;
-    const msg = `${this.withEmojiPrefix("info", message)}${this.formatData(data)}`;
+    const msg = `${this.withEmojiPrefix("info", message, options.noEmoji)}${this.formatData(options.data)}`;
     (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
       `${colors.white}${msg}${colors.reset}`,
     );
   }
 
-  debug(message: string, data?: unknown): void {
+  debug(message: string, options: Options = {}): void {
     if (!this.shouldLog(LogLevel.DEBUG)) return;
-    const msg = `${this.withEmojiPrefix("debug", message)}${this.formatData(data)}`;
+    const msg = `${this.withEmojiPrefix("debug", message, options.noEmoji)}${this.formatData(options.data)}`;
     (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
       msg,
     );
   }
 
-  success(message: string, data?: unknown): void {
+  success(message: string, options: Options = {}): void {
     if (!this.shouldLog(LogLevel.INFO)) return;
-    const msg = `${this.withEmojiPrefix("success", message)}${this.formatData(data)}`;
+    const msg = `${this.withEmojiPrefix("success", message, options.noEmoji)}${this.formatData(options.data)}`;
     (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
       `${colors.green}${msg}${colors.reset}`,
     );

@@ -56,13 +56,12 @@ export class Pm2Manager {
 
     logger.debug(
       `Creating ecosystem for ${processConfig.name as string} with env whitelist:`,
-      processConfig.env,
+      { data: processConfig.env },
     );
 
-    logger.debug(
-      `Final env for PM2 ecosystem:`,
-      processConfig.resolvedEnv ?? {},
-    );
+    logger.debug(`Final env for PM2 ecosystem:`, {
+      data: processConfig.resolvedEnv,
+    });
 
     const ecosystem = {
       apps: [

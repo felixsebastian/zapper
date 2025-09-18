@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { parseYamlFile } from "../config/yamlParser";
 import { EnvResolver } from "../config/EnvResolver";
 import { Pm2Executor } from "./process/Pm2Executor";
@@ -43,6 +44,10 @@ export class Zapper {
     return this.context?.projectRoot ?? null;
   }
 
+  getContext(): Context | null {
+    return this.context;
+  }
+
   private getProcesses(): Process[] {
     if (!this.context) {
       throw new Error("Context not loaded");
@@ -81,6 +86,23 @@ export class Zapper {
   resolveServiceName(name: string): string {
     const resolved = this.resolveAliasesToCanonical([name]);
     return resolved && resolved.length > 0 ? resolved[0] : name;
+  }
+
+  private buildTaskAliasMap(): Record<string, string> {
+    if (!this.context || !this.context.tasks) return {};
+
+    const aliasToName = new Map<string, string>();
+
+    for (const task of this.context.tasks) {
+      aliasToName.set(task.name, task.name);
+      if (Array.isArray(task.aliases)) {
+        for (const alias of task.aliases) {
+          aliasToName.set(alias, task.name);
+        }
+      }
+    }
+
+    return Object.fromEntries(aliasToName);
   }
 
   // Helper method to create a legacy config for backwards compatibility
@@ -259,6 +281,16 @@ export class Zapper {
       throw new Error("No tasks defined in config");
     }
 
+    // Build task alias map for resolution
+    const taskAliasMap = this.buildTaskAliasMap();
+    const resolvedTaskName = taskAliasMap[taskName];
+
+    if (!resolvedTaskName) {
+      throw new Error(
+        `Task not found: ${taskName}. Check task names or aliases`,
+      );
+    }
+
     // Convert tasks array back to object format for compatibility
     const tasks: Record<string, any> = {};
     for (const task of this.context.tasks) {
@@ -273,15 +305,17 @@ export class Zapper {
     };
 
     const execTask = (name: string, stack: string[] = []) => {
-      if (!tasks[name]) throw new Error(`Task not found: ${name}`);
+      // Resolve aliases for nested task calls too
+      const resolvedName = taskAliasMap[name] || name;
+      if (!tasks[resolvedName]) throw new Error(`Task not found: ${name}`);
 
-      if (stack.includes(name)) {
+      if (stack.includes(resolvedName)) {
         throw new Error(
-          `Circular task reference detected: ${[...stack, name].join(" -> ")}`,
+          `Circular task reference detected: ${[...stack, resolvedName].join(" -> ")}`,
         );
       }
 
-      const task = tasks[name];
+      const task = tasks[resolvedName];
 
       const env = {
         ...process.env,
@@ -289,21 +323,23 @@ export class Zapper {
       } as NodeJS.ProcessEnv;
 
       const cwd = resolveCwd(task.cwd);
-      logger.info(`Running task: ${name}${task.desc ? ` — ${task.desc}` : ""}`);
+      logger.info(
+        `Running task: ${resolvedName}${task.desc ? ` — ${task.desc}` : ""}`,
+      );
 
       for (const cmd of task.cmds) {
         if (typeof cmd === "string") {
           logger.debug(`$ ${cmd}`);
           execSync(cmd, { stdio: "inherit", cwd, env });
         } else if (cmd && typeof cmd === "object" && "task" in cmd) {
-          execTask(cmd.task, [...stack, name]);
+          execTask(cmd.task, [...stack, resolvedName]);
         } else {
-          throw new Error(`Invalid command in task ${name}`);
+          throw new Error(`Invalid command in task ${resolvedName}`);
         }
       }
     };
 
-    execTask(taskName);
+    execTask(resolvedTaskName);
   }
 
   private getBareMetalTargets(): Array<{ name: string; cwd: string }> {

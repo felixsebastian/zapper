@@ -65,7 +65,7 @@ describe("Logger", () => {
 
   it("should format data correctly", () => {
     const testData = { key: "value" };
-    logger.info("test message", testData);
+    logger.info("test message", { data: testData });
     const call = consoleSpy.log.mock.calls[0][0] as string;
     expect(call).toContain("test message");
     expect(call).toContain('{"key":"value"}');
