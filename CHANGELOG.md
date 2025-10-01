@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.4.0
+
+### Minor Changes
+
+- 38c044e: git method options
+
 ## 0.3.0
 
 ### Minor Changes
