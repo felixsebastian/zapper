@@ -122,6 +122,11 @@ export class CommanderCli {
         "Clone all repos defined in bare_metal services (respects git_method)",
       )
       .argument("[service]", "Service to clone")
+      .option(
+        "--http",
+        "Use HTTP for git cloning (overrides config git_method)",
+      )
+      .option("--ssh", "Use SSH for git cloning (overrides config git_method)")
       .action(async (service, options, command) => {
         await this.executeCommand("clone", service, command);
       });
@@ -179,7 +184,7 @@ export class CommanderCli {
     }
 
     const zapper = new Zapper();
-    await zapper.loadConfig(allOptions.config);
+    await zapper.loadConfig(allOptions.config, allOptions);
 
     const resolvedService = service
       ? zapper.resolveServiceName(service)

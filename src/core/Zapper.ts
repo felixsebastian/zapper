@@ -20,20 +20,47 @@ export class Zapper {
   private context: Context | null = null;
   constructor() {}
 
-  async loadConfig(configPath: string = "zap.yaml"): Promise<void> {
+  async loadConfig(
+    configPath: string = "zap.yaml",
+    cliOptions?: Record<string, any>,
+  ): Promise<void> {
     try {
       const resolvedPath = resolveConfigPath(configPath) ?? configPath;
       const projectRoot = path.dirname(path.resolve(resolvedPath));
       const config = parseYamlFile(resolvedPath, projectRoot);
 
+      // Apply CLI overrides to config
+      const configWithOverrides = this.applyCliOverrides(config, cliOptions);
+
       // Create context from config
-      this.context = createContext(config, projectRoot);
+      this.context = createContext(configWithOverrides, projectRoot);
 
       // Resolve environment variables with proper path resolution
       this.context = EnvResolver.resolveContext(this.context);
     } catch (error) {
       throw new Error(`Failed to load config: ${error}`);
     }
+  }
+
+  private applyCliOverrides(
+    config: ZapperConfig,
+    cliOptions?: Record<string, any>,
+  ): ZapperConfig {
+    if (!cliOptions) return config;
+
+    const configWithOverrides = { ...config };
+
+    // Handle git method CLI overrides
+    if (cliOptions.http && cliOptions.ssh) {
+      throw new Error("Cannot specify both --http and --ssh options");
+    }
+    if (cliOptions.http) {
+      configWithOverrides.git_method = "http";
+    } else if (cliOptions.ssh) {
+      configWithOverrides.git_method = "ssh";
+    }
+
+    return configWithOverrides;
   }
 
   getProject(): string | null {
