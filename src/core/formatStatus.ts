@@ -40,3 +40,7 @@ export function formatStatus(statusResult: StatusResult): string {
 
   return sections.join("\n\n");
 }
+
+export function formatStatusAsJson(statusResult: StatusResult): string {
+  return JSON.stringify(statusResult);
+}

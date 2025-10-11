@@ -93,6 +93,7 @@ export class CommanderCli {
       )
       .argument("[service]", "Service to show status for")
       .option("-a, --all", "Include processes from all projects")
+      .option("-j, --json", "Output status as minified JSON")
       .action(async (service, options, command) => {
         await this.executeCommand("status", service, command);
       });
