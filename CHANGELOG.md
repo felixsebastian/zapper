@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.6.0
+
+### Minor Changes
+
+- 3ebd608: task list
+
 ## 0.5.0
 
 ### Minor Changes
