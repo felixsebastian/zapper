@@ -14,6 +14,7 @@ import {
   CheckoutCommand,
   PullCommand,
   GitStatusCommand,
+  ConfigCommand,
   CommandContext,
   CommandHandler,
 } from "../commands";
@@ -40,6 +41,7 @@ export class CommanderCli {
     this.commandHandlers.set("checkout", new CheckoutCommand());
     this.commandHandlers.set("pull", new PullCommand());
     this.commandHandlers.set("gitstatus", new GitStatusCommand());
+    this.commandHandlers.set("config", new ConfigCommand());
   }
 
   private setupProgram(): void {
@@ -166,6 +168,18 @@ export class CommanderCli {
       .description("List branch and dirty/clean for all bare_metal repos")
       .action(async (options, command) => {
         await this.executeCommand("gitstatus", undefined, command);
+      });
+
+    this.program
+      .command("config")
+      .description("Show the processed config object as minified JSON")
+      .option(
+        "--show-envs",
+        "Include environment variable configurations in output",
+      )
+      .option("--pretty", "Format JSON output with indentation")
+      .action(async (options, command) => {
+        await this.executeCommand("config", undefined, command);
       });
   }
 

@@ -22,7 +22,8 @@ export type Command =
   | "task"
   | "checkout"
   | "pull"
-  | "gitstatus";
+  | "gitstatus"
+  | "config";
 
 export interface CliOptions {
   command: Command;

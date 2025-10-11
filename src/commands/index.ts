@@ -10,3 +10,4 @@ export { TaskCommand } from "./TaskCommand";
 export { CheckoutCommand } from "./CheckoutCommand";
 export { PullCommand } from "./PullCommand";
 export { GitStatusCommand } from "./GitStatusCommand";
+export { ConfigCommand } from "./ConfigCommand";
