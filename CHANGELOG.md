@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.5.0
+
+### Minor Changes
+
+- 2c9e7d1: add json status output
+
 ## 0.4.0
 
 ### Minor Changes
