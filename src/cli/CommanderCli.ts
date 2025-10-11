@@ -135,8 +135,11 @@ export class CommanderCli {
     this.program
       .command("task")
       .alias("t")
-      .description("Run a one-off task by name")
-      .argument("<task>", "Task name to run")
+      .description(
+        "Run a one-off task by name, or list all tasks if no task specified",
+      )
+      .argument("[task]", "Task name to run")
+      .option("-j, --json", "Output task list as minified JSON")
       .action(async (task, options, command) => {
         await this.executeCommand("task", task, command);
       });
