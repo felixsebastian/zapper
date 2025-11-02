@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.9.0
+
+### Minor Changes
+
+- 6edbd25: Profile disabling
+
 ## 0.8.0
 
 ### Minor Changes
