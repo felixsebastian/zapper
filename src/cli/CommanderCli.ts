@@ -154,10 +154,11 @@ export class CommanderCli {
       .command("profile")
       .alias("p")
       .description(
-        "Manage profiles: show interactive picker, enable a profile, or list all profiles",
+        "Manage profiles: show interactive picker, enable a profile, list all profiles, or disable active profile",
       )
       .argument("[profile]", "Profile name to enable")
       .option("--list", "List all available profiles")
+      .option("--disable", "Disable the currently active profile")
       .option(
         "-j, --json",
         "Output profile list as minified JSON (use with --list)",

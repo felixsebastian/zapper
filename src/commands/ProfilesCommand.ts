@@ -14,6 +14,15 @@ export class ProfilesCommand extends CommandHandler {
       throw new Error("Context not loaded");
     }
 
+    // Handle --disable flag
+    if (options.disable) {
+      await this.disableProfile(
+        zapperContext.projectRoot,
+        zapperContext.state.activeProfile,
+      );
+      return;
+    }
+
     // Handle --list flag
     if (options.list) {
       const json = !!options.json;
@@ -90,6 +99,23 @@ export class ProfilesCommand extends CommandHandler {
 
     logger.info(`Starting services: ${servicesToStart.join(", ")}`);
     await zapper.startProcesses(servicesToStart);
+  }
+
+  private async disableProfile(
+    projectRoot: string,
+    currentActiveProfile?: string,
+  ): Promise<void> {
+    if (!currentActiveProfile) {
+      logger.info("No active profile to disable");
+      return;
+    }
+
+    logger.info(`Disabling active profile: ${currentActiveProfile}`);
+
+    // Remove the active profile from state
+    saveState(projectRoot, { activeProfile: undefined });
+
+    logger.info("Active profile disabled");
   }
 
   private async showInteractivePicker(
