@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from "zod";
 
 export const processValidation = <T extends z.ZodTypeAny>(schema: T) =>

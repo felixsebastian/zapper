@@ -55,7 +55,7 @@ export async function getStatus(
 
   // If no context is provided, fall back to original behavior
   if (!context) {
-    const filtered = pm2List.filter((p) => {
+    const filtered = pm2List.filter(() => {
       if (all) return true;
       return true; // Show all since we don't have project context
     });

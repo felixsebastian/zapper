@@ -5,7 +5,7 @@ import { logger } from "../utils/logger";
 
 export function loadState(projectRoot: string): ZapperState {
   const statePath = path.join(projectRoot, ".zap", "state.json");
-  
+
   // Return default state if file doesn't exist
   if (!fs.existsSync(statePath)) {
     return {
@@ -16,10 +16,10 @@ export function loadState(projectRoot: string): ZapperState {
   try {
     const stateContent = fs.readFileSync(statePath, "utf-8");
     const rawState = JSON.parse(stateContent);
-    
+
     // Validate with Zod schema
     const validatedState = ZapperStateSchema.parse(rawState);
-    
+
     logger.debug(`Loaded state from ${statePath}`, { data: validatedState });
     return validatedState;
   } catch (error) {
@@ -31,15 +31,18 @@ export function loadState(projectRoot: string): ZapperState {
   }
 }
 
-export function saveState(projectRoot: string, state: Partial<ZapperState>): void {
+export function saveState(
+  projectRoot: string,
+  state: Partial<ZapperState>,
+): void {
   const zapDir = path.join(projectRoot, ".zap");
   const statePath = path.join(zapDir, "state.json");
-  
+
   // Ensure .zap directory exists
   if (!fs.existsSync(zapDir)) {
     fs.mkdirSync(zapDir, { recursive: true });
   }
-  
+
   // Load existing state and merge with new state
   const existingState = loadState(projectRoot);
   const newState: ZapperState = {

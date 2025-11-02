@@ -1,5 +1,4 @@
 import {
-  ZapperConfig,
   Process as ConfigProcess,
   Container as ConfigContainer,
   Task as ConfigTask,

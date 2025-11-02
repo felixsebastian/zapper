@@ -2,6 +2,8 @@ import { CommandHandler, CommandContext } from "./CommandHandler";
 import { formatProfiles, formatProfilesAsJson } from "../core/formatProfiles";
 import { logger } from "../utils/logger";
 import { saveState } from "../config/stateLoader";
+import { Zapper } from "../core/Zapper";
+import { Process, Container } from "../types/Context";
 
 export class ProfilesCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<void> {
@@ -38,10 +40,17 @@ export class ProfilesCommand extends CommandHandler {
     }
 
     // Handle interactive picker
-    await this.showInteractivePicker(zapperContext.profiles, zapperContext.state.activeProfile);
+    await this.showInteractivePicker(
+      zapperContext.profiles,
+      zapperContext.state.activeProfile,
+    );
   }
 
-  private async enableProfile(zapper: any, profileName: string, projectRoot: string): Promise<void> {
+  private async enableProfile(
+    zapper: Zapper,
+    profileName: string,
+    projectRoot: string,
+  ): Promise<void> {
     logger.info(`Enabling profile: ${profileName}`);
 
     // Save the active profile to state
@@ -49,10 +58,13 @@ export class ProfilesCommand extends CommandHandler {
 
     // Get all services that have this profile
     const context = zapper.getContext();
+    if (!context) {
+      throw new Error("Context not loaded");
+    }
     const servicesToStart: string[] = [];
 
     // Check processes
-    context.processes.forEach((process: any) => {
+    context.processes.forEach((process: Process) => {
       if (
         Array.isArray(process.profiles) &&
         process.profiles.includes(profileName)
@@ -62,7 +74,7 @@ export class ProfilesCommand extends CommandHandler {
     });
 
     // Check containers
-    context.containers.forEach((container: any) => {
+    context.containers.forEach((container: Container) => {
       if (
         Array.isArray(container.profiles) &&
         container.profiles.includes(profileName)

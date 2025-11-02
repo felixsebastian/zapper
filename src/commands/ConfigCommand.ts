@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { CommandHandler, CommandContext } from "./CommandHandler";
 
 export class ConfigCommand extends CommandHandler {
