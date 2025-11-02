@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.9.1
+
+### Patch Changes
+
+- ef650f4: Fix profile state updates
+
 ## 0.9.0
 
 ### Minor Changes
