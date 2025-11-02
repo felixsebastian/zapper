@@ -11,3 +11,7 @@ For running the program for testing purposes, create example projects like:
 Remember to `pnpm build` and link (its ususally already linked). Then cd into the example project and zap away.
 
 Make sure to clean up after, stopping processes and deleting the relevant .zap folders.
+
+## Test & build
+
+Test with `pnpm test`, build with `pnpm build` and fix linting issues with `pnpm lint:fix`.

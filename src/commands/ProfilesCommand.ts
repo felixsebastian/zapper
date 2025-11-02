@@ -1,8 +1,7 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
 import { formatProfiles, formatProfilesAsJson } from "../core/formatProfiles";
 import { logger } from "../utils/logger";
-import { saveState } from "../config/stateLoader";
-import { Zapper } from "../core/Zapper";
+import { StateManager } from "../core/StateManager";
 import { Process, Container } from "../types/Context";
 
 export class ProfilesCommand extends CommandHandler {
@@ -16,8 +15,13 @@ export class ProfilesCommand extends CommandHandler {
 
     // Handle --disable flag
     if (options.disable) {
-      await this.disableProfile(
+      const stateManager = new StateManager(
+        zapper,
         zapperContext.projectRoot,
+        options.config,
+      );
+      await this.disableProfile(
+        stateManager,
         zapperContext.state.activeProfile,
       );
       return;
@@ -44,7 +48,12 @@ export class ProfilesCommand extends CommandHandler {
         );
       }
 
-      await this.enableProfile(zapper, service, zapperContext.projectRoot);
+      const stateManager = new StateManager(
+        zapper,
+        zapperContext.projectRoot,
+        options.config,
+      );
+      await this.enableProfile(stateManager, service);
       return;
     }
 
@@ -56,24 +65,23 @@ export class ProfilesCommand extends CommandHandler {
   }
 
   private async enableProfile(
-    zapper: Zapper,
+    stateManager: StateManager,
     profileName: string,
-    projectRoot: string,
   ): Promise<void> {
     logger.info(`Enabling profile: ${profileName}`);
 
-    // Save the active profile to state
-    saveState(projectRoot, { activeProfile: profileName });
+    // Update the active profile state (this also reloads config)
+    await stateManager.setActiveProfile(profileName);
 
-    // Get all services that have this profile
-    const context = zapper.getContext();
-    if (!context) {
+    // Get all services that have this profile from the updated context
+    const zapperContext = stateManager.getZapper().getContext();
+    if (!zapperContext) {
       throw new Error("Context not loaded");
     }
     const servicesToStart: string[] = [];
 
     // Check processes
-    context.processes.forEach((process: Process) => {
+    zapperContext.processes.forEach((process: Process) => {
       if (
         Array.isArray(process.profiles) &&
         process.profiles.includes(profileName)
@@ -83,7 +91,7 @@ export class ProfilesCommand extends CommandHandler {
     });
 
     // Check containers
-    context.containers.forEach((container: Container) => {
+    zapperContext.containers.forEach((container: Container) => {
       if (
         Array.isArray(container.profiles) &&
         container.profiles.includes(profileName)
@@ -98,11 +106,11 @@ export class ProfilesCommand extends CommandHandler {
     }
 
     logger.info(`Starting services: ${servicesToStart.join(", ")}`);
-    await zapper.startProcesses(servicesToStart);
+    await stateManager.getZapper().startProcesses(servicesToStart);
   }
 
   private async disableProfile(
-    projectRoot: string,
+    stateManager: StateManager,
     currentActiveProfile?: string,
   ): Promise<void> {
     if (!currentActiveProfile) {
@@ -112,10 +120,14 @@ export class ProfilesCommand extends CommandHandler {
 
     logger.info(`Disabling active profile: ${currentActiveProfile}`);
 
-    // Remove the active profile from state
-    saveState(projectRoot, { activeProfile: undefined });
+    // Clear the active profile state (this also reloads config)
+    await stateManager.clearActiveProfile();
 
     logger.info("Active profile disabled");
+
+    // Run startAll to bring system to good state (stop services that were only running due to the disabled profile)
+    logger.info("Adjusting services to match new state...");
+    await stateManager.getZapper().startProcesses(); // This will call startAll with no active profile
   }
 
   private async showInteractivePicker(
