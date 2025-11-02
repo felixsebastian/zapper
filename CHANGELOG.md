@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.9.2
+
+### Patch Changes
+
+- 2d5635b: Fix start all command
+
 ## 0.9.1
 
 ### Patch Changes
