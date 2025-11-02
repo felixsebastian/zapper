@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.7.0
+
+### Minor Changes
+
+- config cmds
+
 ## 0.6.0
 
 ### Minor Changes
