@@ -162,29 +162,35 @@ describe("Planner - Profile-based StartAll", () => {
   });
 
   describe("startAll without active profile", () => {
-    it("should start all services when no profile is active", async () => {
-      // Mock current state: all services running
+    it("should stop profile services and start no-profile services", async () => {
+      // Mock current state: all services running (including profile services that shouldn't be)
       mockPm2Manager.listProcesses.mockResolvedValue([
-        createMockProcessInfo("zap.test-project.api", "online"),
-        createMockProcessInfo("zap.test-project.frontend", "online"),
-        createMockProcessInfo("zap.test-project.worker", "online"),
-        createMockProcessInfo("zap.test-project.monitor", "online"),
+        createMockProcessInfo("zap.test-project.api", "stopped"), // No profile, should start
+        createMockProcessInfo("zap.test-project.frontend", "online"), // dev profile, should stop
+        createMockProcessInfo("zap.test-project.worker", "online"), // prod profile, should stop
+        createMockProcessInfo("zap.test-project.monitor", "online"), // prod profile, should stop
       ]);
 
       mockDockerManager.getContainerInfo
-        .mockResolvedValueOnce(
-          createMockDockerContainer("zap.test-project.cache", "running"),
-        )
+        .mockResolvedValueOnce(null) // cache - not running, no profile, should start
         .mockResolvedValueOnce(
           createMockDockerContainer("zap.test-project.database", "running"),
-        )
+        ) // dev+prod profile, should stop
         .mockResolvedValueOnce(
           createMockDockerContainer("zap.test-project.analytics", "running"),
-        );
+        ); // prod profile, should stop
 
       const plan = await planner.plan("start", undefined, "test-project");
 
-      expect(plan.actions).toEqual([]); // No actions needed, all already running
+      expect(plan.actions).toEqual([
+        { type: "start", serviceType: "bare_metal", name: "api" }, // No profile
+        { type: "stop", serviceType: "bare_metal", name: "frontend" }, // Has profile
+        { type: "stop", serviceType: "bare_metal", name: "worker" }, // Has profile
+        { type: "stop", serviceType: "bare_metal", name: "monitor" }, // Has profile
+        { type: "start", serviceType: "docker", name: "cache" }, // No profile
+        { type: "stop", serviceType: "docker", name: "database" }, // Has profile
+        { type: "stop", serviceType: "docker", name: "analytics" }, // Has profile
+      ]);
     });
   });
 

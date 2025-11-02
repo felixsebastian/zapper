@@ -107,7 +107,9 @@ export class Planner {
         Array.isArray(process.profiles) && process.profiles.length > 0;
       const shouldRun =
         !hasProfiles ||
-        (process.profiles && process.profiles.includes(activeProfile));
+        (activeProfile &&
+          process.profiles &&
+          process.profiles.includes(activeProfile));
 
       if (shouldRun && (forceStart || !isRunning)) {
         // Should be running but isn't -> START
@@ -141,7 +143,9 @@ export class Planner {
         Array.isArray(container.profiles) && container.profiles.length > 0;
       const shouldRun =
         !hasProfiles ||
-        (container.profiles && container.profiles.includes(activeProfile));
+        (activeProfile &&
+          container.profiles &&
+          container.profiles.includes(activeProfile));
 
       if (shouldRun && (forceStart || !isRunning)) {
         // Should be running but isn't -> START
@@ -189,16 +193,8 @@ export class Planner {
 
     const actions: Action[] = [];
 
-    if (op === "start" && (!targets || targets.length === 0) && activeProfile) {
-      // For startAll with active profile: go through ALL services and decide START|STOP|SKIP
-      await this.planStartAllWithProfile(
-        projectName,
-        activeProfile,
-        forceStart,
-        actions,
-      );
-    } else {
-      // For targeted operations or no active profile: use the old selection-based logic
+    // Handle targeted operations (ignore profiles - they're overrides)
+    if (targets && targets.length > 0) {
       const selection = this.select(op, targets, activeProfile);
 
       const pm2List = await Pm2Manager.listProcesses();
@@ -257,6 +253,51 @@ export class Planner {
           if (running) {
             actions.push({ type: "stop", serviceType: "docker", name });
           }
+        }
+      }
+    } else if (op === "start") {
+      // For startAll: always use the unified logic that handles profiles correctly
+      await this.planStartAllWithProfile(
+        projectName,
+        activeProfile || "",
+        forceStart,
+        actions,
+      );
+    } else {
+      // stopAll - for now keep the old logic, but this could be unified too
+      const selection = this.select(op, targets, activeProfile);
+
+      const pm2List = await Pm2Manager.listProcesses();
+      const runningPm2 = new Set(
+        pm2List
+          .filter((p) => p.status.toLowerCase() === "online")
+          .map((p) => p.name as string),
+      );
+      const isPm2Running = (name: string) =>
+        runningPm2.has(`zap.${projectName}.${name}`);
+
+      for (const p of selection.processes) {
+        if (isPm2Running(p.name as string)) {
+          actions.push({
+            type: "stop",
+            serviceType: "bare_metal",
+            name: p.name as string,
+          });
+        }
+      }
+
+      for (const [name] of selection.containers) {
+        const info = await DockerManager.getContainerInfo(
+          `zap.${projectName}.${name}`,
+        );
+
+        const running =
+          !!info &&
+          (info.status.toLowerCase() === "running" ||
+            info.status.toLowerCase().includes("up"));
+
+        if (running) {
+          actions.push({ type: "stop", serviceType: "docker", name });
         }
       }
     }

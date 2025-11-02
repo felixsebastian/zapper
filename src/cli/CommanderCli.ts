@@ -20,6 +20,7 @@ import {
   CommandContext,
   CommandHandler,
 } from "../commands";
+import packageJson from "../../package.json";
 
 export class CommanderCli {
   private program: Command;
@@ -52,7 +53,7 @@ export class CommanderCli {
     this.program
       .name("zap")
       .description("Lightweight dev environment runner")
-      .version("0.2.0");
+      .version(packageJson.version);
 
     this.program
       .option("--config <file>", "Use a specific config file", "zap.yaml")
