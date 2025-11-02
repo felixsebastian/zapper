@@ -193,6 +193,8 @@ export class Zapper {
       "start",
       canonical,
       this.context.projectName,
+      false,
+      this.context.state.activeProfile,
     );
 
     if (canonical && plan.actions.length === 0) {
@@ -219,6 +221,8 @@ export class Zapper {
       "stop",
       canonical,
       this.context.projectName,
+      false,
+      this.context.state.activeProfile,
     );
 
     if (canonical && plan.actions.length === 0) {
@@ -244,6 +248,8 @@ export class Zapper {
       "restart",
       canonical,
       this.context.projectName,
+      false,
+      this.context.state.activeProfile,
     );
 
     await executeActions(

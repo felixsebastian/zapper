@@ -107,11 +107,17 @@ export const ZapperConfigSchema = processValidation(
   ),
 );
 
+export const ZapperStateSchema = z.object({
+  activeProfile: z.string().optional(),
+  lastUpdated: z.string().optional(),
+});
+
 export type Process = z.infer<typeof ProcessSchema>;
 export type Container = z.infer<typeof ContainerSchema>;
 export type Volume = z.infer<typeof VolumeSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type ZapperConfig = z.infer<typeof ZapperConfigSchema>;
+export type ZapperState = z.infer<typeof ZapperStateSchema>;
 
 // Resolved types after whitelist resolution - env fields are guaranteed to be arrays
 export type ResolvedProcess = Omit<Process, "env"> & {

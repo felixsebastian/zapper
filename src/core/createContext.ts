@@ -1,6 +1,7 @@
 import path from "path";
 import { ZapperConfig } from "../config/schemas";
 import { Context, Process, Container, Task } from "../types/Context";
+import { loadState } from "../config/stateLoader";
 
 /**
  * Creates a Context object from a ZapperConfig.
@@ -73,6 +74,28 @@ export function createContext(
     );
   }
 
+  // Extract all unique profiles from processes and containers
+  const profileSet = new Set<string>();
+
+  // Add profiles from processes
+  processes.forEach((process) => {
+    if (Array.isArray(process.profiles)) {
+      process.profiles.forEach((profile) => profileSet.add(profile));
+    }
+  });
+
+  // Add profiles from containers
+  containers.forEach((container) => {
+    if (Array.isArray(container.profiles)) {
+      container.profiles.forEach((profile) => profileSet.add(profile));
+    }
+  });
+
+  const profiles = Array.from(profileSet).sort();
+
+  // Load and validate state from state.json
+  const state = loadState(projectRoot);
+
   return {
     projectName: config.project,
     projectRoot,
@@ -81,5 +104,7 @@ export function createContext(
     processes,
     containers,
     tasks,
+    profiles,
+    state,
   };
 }

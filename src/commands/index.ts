@@ -7,6 +7,8 @@ export { LogsCommand } from "./LogsCommand";
 export { ResetCommand } from "./ResetCommand";
 export { CloneCommand } from "./CloneCommand";
 export { TaskCommand } from "./TaskCommand";
+export { ProfilesCommand } from "./ProfilesCommand";
+export { StateCommand } from "./StateCommand";
 export { CheckoutCommand } from "./CheckoutCommand";
 export { PullCommand } from "./PullCommand";
 export { GitStatusCommand } from "./GitStatusCommand";

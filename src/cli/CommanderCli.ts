@@ -11,6 +11,8 @@ import {
   ResetCommand,
   CloneCommand,
   TaskCommand,
+  ProfilesCommand,
+  StateCommand,
   CheckoutCommand,
   PullCommand,
   GitStatusCommand,
@@ -38,6 +40,8 @@ export class CommanderCli {
     this.commandHandlers.set("reset", new ResetCommand());
     this.commandHandlers.set("clone", new CloneCommand());
     this.commandHandlers.set("task", new TaskCommand());
+    this.commandHandlers.set("profile", new ProfilesCommand());
+    this.commandHandlers.set("state", new StateCommand());
     this.commandHandlers.set("checkout", new CheckoutCommand());
     this.commandHandlers.set("pull", new PullCommand());
     this.commandHandlers.set("gitstatus", new GitStatusCommand());
@@ -144,6 +148,29 @@ export class CommanderCli {
       .option("-j, --json", "Output task list as minified JSON")
       .action(async (task, options, command) => {
         await this.executeCommand("task", task, command);
+      });
+
+    this.program
+      .command("profile")
+      .alias("p")
+      .description(
+        "Manage profiles: show interactive picker, enable a profile, or list all profiles",
+      )
+      .argument("[profile]", "Profile name to enable")
+      .option("--list", "List all available profiles")
+      .option(
+        "-j, --json",
+        "Output profile list as minified JSON (use with --list)",
+      )
+      .action(async (profile, options, command) => {
+        await this.executeCommand("profile", profile, command);
+      });
+
+    this.program
+      .command("state")
+      .description("Show the current state JSON")
+      .action(async (options, command) => {
+        await this.executeCommand("state", undefined, command);
       });
 
     this.program

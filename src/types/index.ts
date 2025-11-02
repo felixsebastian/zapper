@@ -20,6 +20,8 @@ export type Command =
   | "reset"
   | "clone"
   | "task"
+  | "profile"
+  | "state"
   | "checkout"
   | "pull"
   | "gitstatus"

@@ -3,6 +3,7 @@ import {
   Process as ConfigProcess,
   Container as ConfigContainer,
   Task as ConfigTask,
+  ZapperState,
 } from "../config/schemas";
 
 // Enhanced types that include name field and other context-specific data
@@ -29,4 +30,6 @@ export interface Context {
   processes: Process[]; // Combines bare_metal and processes from config
   containers: Container[]; // Combines docker and containers from config
   tasks: Task[]; // Tasks from config
+  profiles: string[]; // All unique profiles from processes and containers
+  state: ZapperState; // Validated state from state.json
 }

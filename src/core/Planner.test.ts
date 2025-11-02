@@ -1,431 +1,227 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Planner } from "./Planner";
-import { ZapperConfig } from "../config/schemas";
 import { Pm2Manager } from "./process/Pm2Manager";
 import { DockerManager } from "./docker";
+import { ZapperConfig } from "../config/schemas";
 
-// Mock the dependencies
+// Mock the managers
 vi.mock("./process/Pm2Manager");
 vi.mock("./docker");
 
-describe("Planner", () => {
+const mockPm2Manager = vi.mocked(Pm2Manager);
+const mockDockerManager = vi.mocked(DockerManager);
+
+describe("Planner - Profile-based StartAll", () => {
   let planner: Planner;
-  let mockConfig: ZapperConfig;
+  let config: ZapperConfig;
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    mockConfig = {
+    
+    config = {
       project: "test-project",
       bare_metal: {
-        service1: {
-          name: "service1",
-          cmd: "echo 'service1'",
-        },
-        service2: {
-          name: "service2",
-          cmd: "echo 'service2'",
-        },
-        service3: {
-          name: "service3",
-          cmd: "echo 'service3'",
-        },
+        api: { cmd: "npm start" }, // No profile
+        frontend: { cmd: "npm run dev", profiles: ["dev"] },
+        worker: { cmd: "npm run worker", profiles: ["prod"] },
+        monitor: { cmd: "npm run monitor", profiles: ["prod", "monitoring"] },
       },
       docker: {
-        db: {
-          image: "postgres:15",
-          ports: ["5432:5432"],
-        },
-        redis: {
-          image: "redis:7",
-          ports: ["6379:6379"],
-        },
+        cache: { image: "redis:7" }, // No profile
+        database: { image: "postgres:15", profiles: ["dev", "prod"] },
+        analytics: { image: "elasticsearch:8", profiles: ["prod"] },
       },
     };
-
-    planner = new Planner(mockConfig);
+    
+    planner = new Planner(config);
   });
 
-  describe("restart planning", () => {
-    it("should restart all services - stop running ones, start all", async () => {
-      // Mock PM2 to return service1 and service2 as running
-      vi.mocked(Pm2Manager.listProcesses).mockResolvedValue([
-        {
-          name: "zap.test-project.service1",
-          status: "online",
-          pid: 1,
-          uptime: 100,
-          memory: 50,
-          cpu: 10,
-          restarts: 0,
-        },
-        {
-          name: "zap.test-project.service2",
-          status: "online",
-          pid: 2,
-          uptime: 200,
-          memory: 60,
-          cpu: 15,
-          restarts: 0,
-        },
-        {
-          name: "zap.test-project.service3",
-          status: "stopped",
-          pid: 3,
-          uptime: 0,
-          memory: 0,
-          cpu: 0,
-          restarts: 1,
-        },
+  describe("startAll with dev profile", () => {
+    it("should start services with no profile + dev profile, stop prod-only services", async () => {
+      // Mock current state: prod services running, dev services stopped
+      mockPm2Manager.listProcesses.mockResolvedValue([
+        { name: "zap.test-project.api", status: "stopped" },
+        { name: "zap.test-project.frontend", status: "stopped" },
+        { name: "zap.test-project.worker", status: "online" }, // Should be stopped
+        { name: "zap.test-project.monitor", status: "online" }, // Should be stopped
       ]);
 
-      // Mock Docker to return db as running, redis as stopped
-      vi.mocked(DockerManager.getContainerInfo)
-        .mockResolvedValueOnce({
-          id: "db1",
-          name: "db",
-          status: "running",
-          ports: [],
-          networks: [],
-          created: "2024-01-01",
-        }) // db (for stop plan)
-        .mockResolvedValueOnce({
-          id: "redis1",
-          name: "redis",
-          status: "stopped",
-          ports: [],
-          networks: [],
-          created: "2024-01-01",
-        }) // redis (for stop plan)
-        .mockResolvedValueOnce({
-          id: "db1",
-          name: "db",
-          status: "running",
-          ports: [],
-          networks: [],
-          created: "2024-01-01",
-        }) // db (for start plan)
-        .mockResolvedValueOnce({
-          id: "redis1",
-          name: "redis",
-          status: "stopped",
-          ports: [],
-          networks: [],
-          created: "2024-01-01",
-        }); // redis (for start plan)
+      mockDockerManager.getContainerInfo
+        .mockResolvedValueOnce(null) // cache - not running
+        .mockResolvedValueOnce(null) // database - not running  
+        .mockResolvedValueOnce({ status: "running" }); // analytics - running, should be stopped
 
-      const plan = await planner.plan("restart", undefined, "test-project");
+      const plan = await planner.plan("start", undefined, "test-project", false, "dev");
 
-      // Should have stop actions for running services
-      const stopActions = plan.actions.filter(
-        (a: { type: string }) => a.type === "stop",
-      );
-      expect(stopActions).toHaveLength(3); // service1, service2, db
-      expect(stopActions).toEqual(
-        expect.arrayContaining([
-          { type: "stop", serviceType: "bare_metal", name: "service1" },
-          { type: "stop", serviceType: "bare_metal", name: "service2" },
-          { type: "stop", serviceType: "docker", name: "db" },
-        ]),
-      );
-
-      // Should have start actions for ALL services
-      const startActions = plan.actions.filter(
-        (a: { type: string }) => a.type === "start",
-      );
-      expect(startActions).toHaveLength(5); // service1, service2, service3, db, redis
-      expect(startActions).toEqual(
-        expect.arrayContaining([
-          { type: "start", serviceType: "bare_metal", name: "service1" },
-          { type: "start", serviceType: "bare_metal", name: "service2" },
-          { type: "start", serviceType: "bare_metal", name: "service3" },
-          { type: "start", serviceType: "docker", name: "db" },
-          { type: "start", serviceType: "docker", name: "redis" },
-        ]),
-      );
-
-      // Actions should be in order: stops first, then starts
-      const stopIndices = plan.actions
-        .map((a: { type: string }, i: number) => (a.type === "stop" ? i : -1))
-        .filter((i: number) => i !== -1);
-      const startIndices = plan.actions
-        .map((a: { type: string }, i: number) => (a.type === "start" ? i : -1))
-        .filter((i: number) => i !== -1);
-
-      expect(Math.max(...stopIndices)).toBeLessThan(Math.min(...startIndices));
+      expect(plan.actions).toEqual([
+        // Actions are processed in order: processes first, then containers
+        { type: "start", serviceType: "bare_metal", name: "api" },
+        { type: "start", serviceType: "bare_metal", name: "frontend" },
+        { type: "stop", serviceType: "bare_metal", name: "worker" },
+        { type: "stop", serviceType: "bare_metal", name: "monitor" },
+        { type: "start", serviceType: "docker", name: "cache" },
+        { type: "start", serviceType: "docker", name: "database" },
+        { type: "stop", serviceType: "docker", name: "analytics" },
+      ]);
     });
 
-    it("should restart specific services - stop if running, start all specified", async () => {
-      // Mock PM2 to return service1 as running, service2 as stopped
-      vi.mocked(Pm2Manager.listProcesses).mockResolvedValue([
-        {
-          name: "zap.test-project.service1",
-          status: "online",
-          pid: 1,
-          uptime: 100,
-          memory: 50,
-          cpu: 10,
-          restarts: 0,
-        },
-        {
-          name: "zap.test-project.service2",
-          status: "stopped",
-          pid: 2,
-          uptime: 0,
-          memory: 0,
-          cpu: 0,
-          restarts: 1,
-        },
+    it("should skip services already in correct state", async () => {
+      // Mock current state: correct services running
+      mockPm2Manager.listProcesses.mockResolvedValue([
+        { name: "zap.test-project.api", status: "online" }, // Correct
+        { name: "zap.test-project.frontend", status: "online" }, // Correct
+        { name: "zap.test-project.worker", status: "stopped" }, // Correct
+        { name: "zap.test-project.monitor", status: "stopped" }, // Correct
       ]);
 
-      // Mock Docker to return db as running
-      vi.mocked(DockerManager.getContainerInfo)
-        .mockResolvedValueOnce({
-          id: "db1",
-          name: "db",
-          status: "running",
-          ports: [],
-          networks: [],
-          created: "2024-01-01",
-        }) // db (for stop plan)
-        .mockResolvedValueOnce({
-          id: "db1",
-          name: "db",
-          status: "running",
-          ports: [],
-          networks: [],
-          created: "2024-01-01",
-        }); // db (for start plan)
+      mockDockerManager.getContainerInfo
+        .mockResolvedValueOnce({ status: "running" }) // cache - correct
+        .mockResolvedValueOnce({ status: "running" }) // database - correct
+        .mockResolvedValueOnce(null); // analytics - correct (stopped)
 
-      const plan = await planner.plan(
-        "restart",
-        ["service1", "service2", "db"],
-        "test-project",
-      );
+      const plan = await planner.plan("start", undefined, "test-project", false, "dev");
 
-      // Should have stop actions for running services only
-      const stopActions = plan.actions.filter(
-        (a: { type: string }) => a.type === "stop",
-      );
-      expect(stopActions).toHaveLength(2); // service1, db
-      expect(stopActions).toEqual(
-        expect.arrayContaining([
-          { type: "stop", serviceType: "bare_metal", name: "service1" },
-          { type: "stop", serviceType: "docker", name: "db" },
-        ]),
-      );
-
-      // Should have start actions for ALL specified services
-      const startActions = plan.actions.filter(
-        (a: { type: string }) => a.type === "start",
-      );
-      expect(startActions).toHaveLength(3); // service1, service2, db
-      expect(startActions).toEqual(
-        expect.arrayContaining([
-          { type: "start", serviceType: "bare_metal", name: "service1" },
-          { type: "start", serviceType: "bare_metal", name: "service2" },
-          { type: "start", serviceType: "docker", name: "db" },
-        ]),
-      );
+      expect(plan.actions).toEqual([]); // No actions needed
     });
+  });
 
-    it("should restart single service - stop if running, start it", async () => {
-      // Mock PM2 to return service1 as running
-      vi.mocked(Pm2Manager.listProcesses).mockResolvedValue([
-        {
-          name: "zap.test-project.service1",
-          status: "online",
-          pid: 1,
-          uptime: 100,
-          memory: 50,
-          cpu: 10,
-          restarts: 0,
-        },
+  describe("startAll with prod profile", () => {
+    it("should start prod services, stop dev-only services", async () => {
+      // Mock current state: dev services running, prod services stopped
+      mockPm2Manager.listProcesses.mockResolvedValue([
+        { name: "zap.test-project.api", status: "online" }, // Keep running
+        { name: "zap.test-project.frontend", status: "online" }, // Should be stopped
+        { name: "zap.test-project.worker", status: "stopped" }, // Should be started
+        { name: "zap.test-project.monitor", status: "stopped" }, // Should be started
       ]);
 
-      const plan = await planner.plan("restart", ["service1"], "test-project");
+      mockDockerManager.getContainerInfo
+        .mockResolvedValueOnce({ status: "running" }) // cache - keep running
+        .mockResolvedValueOnce({ status: "running" }) // database - keep running (has prod profile)
+        .mockResolvedValueOnce(null); // analytics - should be started
 
-      // Should have stop action for running service
-      const stopActions = plan.actions.filter(
-        (a: { type: string }) => a.type === "stop",
-      );
-      expect(stopActions).toHaveLength(1);
-      expect(stopActions[0]).toEqual({
-        type: "stop",
-        serviceType: "bare_metal",
-        name: "service1",
-      });
+      const plan = await planner.plan("start", undefined, "test-project", false, "prod");
 
-      // Should have start action for the service
-      const startActions = plan.actions.filter(
-        (a: { type: string }) => a.type === "start",
-      );
-      expect(startActions).toHaveLength(1);
-      expect(startActions[0]).toEqual({
-        type: "start",
-        serviceType: "bare_metal",
-        name: "service1",
-      });
+      expect(plan.actions).toEqual([
+        // Actions are processed in order: processes first, then containers
+        { type: "stop", serviceType: "bare_metal", name: "frontend" },
+        { type: "start", serviceType: "bare_metal", name: "worker" },
+        { type: "start", serviceType: "bare_metal", name: "monitor" },
+        { type: "start", serviceType: "docker", name: "analytics" },
+      ]);
     });
+  });
 
-    it("should restart services that are not running - no stop actions, start all", async () => {
-      // Mock PM2 to return no running services
-      vi.mocked(Pm2Manager.listProcesses).mockResolvedValue([]);
-
-      // Mock Docker to return no running containers
-      vi.mocked(DockerManager.getContainerInfo)
-        .mockResolvedValueOnce(null) // db (for stop plan)
-        .mockResolvedValueOnce(null) // redis (for stop plan)
-        .mockResolvedValueOnce(null) // db (for start plan)
-        .mockResolvedValueOnce(null); // redis (for start plan)
-
-      const plan = await planner.plan("restart", undefined, "test-project");
-
-      // Should have no stop actions
-      const stopActions = plan.actions.filter(
-        (a: { type: string }) => a.type === "stop",
-      );
-      expect(stopActions).toHaveLength(0);
-
-      // Should have start actions for ALL services
-      const startActions = plan.actions.filter(
-        (a: { type: string }) => a.type === "start",
-      );
-      expect(startActions).toHaveLength(5); // service1, service2, service3, db, redis
-      expect(startActions).toEqual(
-        expect.arrayContaining([
-          { type: "start", serviceType: "bare_metal", name: "service1" },
-          { type: "start", serviceType: "bare_metal", name: "service2" },
-          { type: "start", serviceType: "bare_metal", name: "service3" },
-          { type: "start", serviceType: "docker", name: "db" },
-          { type: "start", serviceType: "docker", name: "redis" },
-        ]),
-      );
-    });
-
-    it("should handle mixed running states correctly", async () => {
-      // Mock PM2 to return service1 as running, service2 as stopped, service3 not in targets
-      vi.mocked(Pm2Manager.listProcesses).mockResolvedValue([
-        {
-          name: "zap.test-project.service1",
-          status: "online",
-          pid: 1,
-          uptime: 100,
-          memory: 50,
-          cpu: 10,
-          restarts: 0,
-        },
-        {
-          name: "zap.test-project.service3",
-          status: "online",
-          pid: 3,
-          uptime: 300,
-          memory: 70,
-          cpu: 20,
-          restarts: 0,
-        },
+  describe("startAll with no active profile", () => {
+    it("should only start services with no profiles", async () => {
+      mockPm2Manager.listProcesses.mockResolvedValue([
+        { name: "zap.test-project.api", status: "stopped" },
+        { name: "zap.test-project.frontend", status: "stopped" },
+        { name: "zap.test-project.worker", status: "stopped" },
+        { name: "zap.test-project.monitor", status: "stopped" },
       ]);
 
-      // Mock Docker to return db as running, redis as stopped
-      vi.mocked(DockerManager.getContainerInfo)
-        .mockResolvedValueOnce({
-          id: "db1",
-          name: "db",
-          status: "running",
-          ports: [],
-          networks: [],
-          created: "2024-01-01",
-        }) // db (for stop plan)
-        .mockResolvedValueOnce({
-          id: "redis1",
-          name: "redis",
-          status: "stopped",
-          ports: [],
-          networks: [],
-          created: "2024-01-01",
-        }) // redis (for stop plan)
-        .mockResolvedValueOnce({
-          id: "db1",
-          name: "db",
-          status: "running",
-          ports: [],
-          networks: [],
-          created: "2024-01-01",
-        }) // db (for start plan)
-        .mockResolvedValueOnce({
-          id: "redis1",
-          name: "redis",
-          status: "stopped",
-          ports: [],
-          networks: [],
-          created: "2024-01-01",
-        }); // redis (for start plan)
+      mockDockerManager.getContainerInfo
+        .mockResolvedValueOnce(null) // cache
+        .mockResolvedValueOnce(null) // database
+        .mockResolvedValueOnce(null); // analytics
 
-      const plan = await planner.plan(
-        "restart",
-        ["service1", "service2", "db", "redis"],
-        "test-project",
-      );
+      // No active profile - should fall back to old logic
+      const plan = await planner.plan("start", undefined, "test-project", false, undefined);
 
-      // Should have stop actions for running services only
-      const stopActions = plan.actions.filter(
-        (a: { type: string }) => a.type === "stop",
-      );
-      expect(stopActions).toHaveLength(2); // service1, db
-      expect(stopActions).toEqual(
-        expect.arrayContaining([
-          { type: "stop", serviceType: "bare_metal", name: "service1" },
-          { type: "stop", serviceType: "docker", name: "db" },
-        ]),
-      );
-
-      // Should have start actions for ALL specified services
-      const startActions = plan.actions.filter(
-        (a: { type: string }) => a.type === "start",
-      );
-      expect(startActions).toHaveLength(4); // service1, service2, db, redis
-      expect(startActions).toEqual(
-        expect.arrayContaining([
-          { type: "start", serviceType: "bare_metal", name: "service1" },
-          { type: "start", serviceType: "bare_metal", name: "service2" },
-          { type: "start", serviceType: "docker", name: "db" },
-          { type: "start", serviceType: "docker", name: "redis" },
-        ]),
-      );
+      // Should only start services with no profiles
+      expect(plan.actions).toEqual([
+        { type: "start", serviceType: "bare_metal", name: "api" },
+        { type: "start", serviceType: "docker", name: "cache" },
+      ]);
     });
+  });
 
-    it("should restart single stopped service correctly", async () => {
-      // Mock PM2 to return service1 as stopped
-      vi.mocked(Pm2Manager.listProcesses).mockResolvedValue([
-        {
-          name: "zap.test-project.service1",
-          status: "stopped",
-          pid: 1,
-          uptime: 0,
-          memory: 0,
-          cpu: 0,
-          restarts: 1,
-        },
+  describe("targeted start (ignores profiles)", () => {
+    it("should start specific service regardless of profile", async () => {
+      mockPm2Manager.listProcesses.mockResolvedValue([
+        { name: "zap.test-project.worker", status: "stopped" },
       ]);
 
-      const plan = await planner.plan("restart", ["service1"], "test-project");
+      const plan = await planner.plan("start", ["worker"], "test-project", false, "dev");
 
-      // Should have no stop actions (service not running)
-      const stopActions = plan.actions.filter(
-        (a: { type: string }) => a.type === "stop",
-      );
-      expect(stopActions).toHaveLength(0);
+      expect(plan.actions).toEqual([
+        { type: "start", serviceType: "bare_metal", name: "worker" },
+      ]);
+    });
 
-      // Should have start action for the service
-      const startActions = plan.actions.filter(
-        (a: { type: string }) => a.type === "start",
-      );
-      expect(startActions).toHaveLength(1);
-      expect(startActions[0]).toEqual({
-        type: "start",
-        serviceType: "bare_metal",
-        name: "service1",
-      });
+    it("should start multiple specific services regardless of profiles", async () => {
+      mockPm2Manager.listProcesses.mockResolvedValue([
+        { name: "zap.test-project.worker", status: "stopped" },
+        { name: "zap.test-project.frontend", status: "stopped" },
+      ]);
+
+      mockDockerManager.getContainerInfo
+        .mockResolvedValueOnce(null); // analytics
+
+      const plan = await planner.plan("start", ["worker", "frontend", "analytics"], "test-project", false, "prod");
+
+      expect(plan.actions).toEqual([
+        { type: "start", serviceType: "bare_metal", name: "frontend" },
+        { type: "start", serviceType: "bare_metal", name: "worker" },
+        { type: "start", serviceType: "docker", name: "analytics" },
+      ]);
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should handle services with multiple profiles", async () => {
+      // monitor has both "prod" and "monitoring" profiles
+      mockPm2Manager.listProcesses.mockResolvedValue([
+        { name: "zap.test-project.monitor", status: "stopped" },
+      ]);
+
+      // Test with "monitoring" profile - should start monitor
+      const plan = await planner.plan("start", undefined, "test-project", false, "monitoring");
+
+      expect(plan.actions).toEqual([
+        { type: "start", serviceType: "bare_metal", name: "api" }, // no profile
+        { type: "start", serviceType: "bare_metal", name: "monitor" }, // has monitoring profile
+        { type: "start", serviceType: "docker", name: "cache" }, // no profile
+      ]);
+    });
+
+    it("should handle empty config gracefully", async () => {
+      const emptyPlanner = new Planner({ project: "empty" });
+      
+      mockPm2Manager.listProcesses.mockResolvedValue([]);
+
+      const plan = await emptyPlanner.plan("start", undefined, "empty", false, "dev");
+
+      expect(plan.actions).toEqual([]);
+    });
+  });
+
+  describe("forceStart behavior", () => {
+    it("should restart services even if already running when forceStart=true", async () => {
+      mockPm2Manager.listProcesses.mockResolvedValue([
+        { name: "zap.test-project.api", status: "online" },
+        { name: "zap.test-project.frontend", status: "online" },
+        { name: "zap.test-project.worker", status: "stopped" }, // prod service
+        { name: "zap.test-project.monitor", status: "stopped" }, // prod service
+      ]);
+
+      mockDockerManager.getContainerInfo
+        .mockResolvedValueOnce({ status: "running" }) // cache
+        .mockResolvedValueOnce({ status: "running" }) // database
+        .mockResolvedValueOnce({ status: "running" }); // analytics (prod service, should be stopped)
+
+      const plan = await planner.plan("start", undefined, "test-project", true, "dev");
+
+      expect(plan.actions).toEqual([
+        // Force start even though already running (for services that should run)
+        { type: "start", serviceType: "bare_metal", name: "api" },
+        { type: "start", serviceType: "bare_metal", name: "frontend" },
+        { type: "start", serviceType: "docker", name: "cache" },
+        { type: "start", serviceType: "docker", name: "database" },
+        // Stop services that don't match profile (even with forceStart)
+        { type: "stop", serviceType: "docker", name: "analytics" },
+      ]);
     });
   });
 });
