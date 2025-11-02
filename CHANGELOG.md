@@ -1,5 +1,12 @@
 # zapper-cli
 
+## 0.7.0
+
+### Minor Changes
+
+- 40346a0: config cmds
+- 2ce15e2: Profiles implementation
+
 ## 0.6.0
 
 ### Minor Changes
