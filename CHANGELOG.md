@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.8.0
+
+### Minor Changes
+
+- 2b3ca78: Profiles implementation
+
 ## 0.7.0
 
 ### Minor Changes
