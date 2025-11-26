@@ -1,11 +1,9 @@
-import { existsSync } from "fs";
-import path from "path";
 import { ZapperConfigSchema, ZapperConfig } from "./schemas";
 import { ZodError } from "zod";
 import { WhitelistResolver } from "./WhitelistResolver";
 
 export class ZodConfigValidator {
-  static validate(config: unknown, projectRoot?: string): ZapperConfig {
+  static validate(config: unknown): ZapperConfig {
     try {
       const validatedConfig = ZapperConfigSchema.parse(config);
 
@@ -16,9 +14,6 @@ export class ZodConfigValidator {
       const resolvedConfig = WhitelistResolver.resolve(validatedConfig);
 
       this.autoPopulateNames(resolvedConfig);
-      if (projectRoot) {
-        this.validateEnvFiles(resolvedConfig, projectRoot);
-      }
       return resolvedConfig;
     } catch (error) {
       if (error instanceof ZodError) {
@@ -69,26 +64,6 @@ export class ZodConfigValidator {
       for (const [name, task] of Object.entries(config.tasks)) {
         if (!task.name) {
           task.name = name;
-        }
-      }
-    }
-  }
-
-  private static validateEnvFiles(
-    config: ZapperConfig,
-    projectRoot: string,
-  ): void {
-    if (config.env_files) {
-      for (const filePath of config.env_files) {
-        // Resolve relative paths relative to project root
-        const resolvedPath = path.isAbsolute(filePath)
-          ? filePath
-          : path.join(projectRoot, filePath);
-
-        if (!existsSync(resolvedPath)) {
-          throw new Error(
-            `Env file does not exist: ${filePath} (resolved to: ${resolvedPath})`,
-          );
         }
       }
     }

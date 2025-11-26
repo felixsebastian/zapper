@@ -104,12 +104,6 @@ export async function getStatus(
     const runningProcess = pm2List.find((p) => p.name === expectedPm2Name);
 
     const rawStatus = runningProcess ? runningProcess.status : "not started";
-    const isRunning = rawStatus !== "not started";
-    const hasProfiles =
-      Array.isArray(process.profiles) && process.profiles.length > 0;
-
-    // Filter out stopped processes that are in profiles (disabled by default)
-    if (!isRunning && hasProfiles) continue;
 
     bareMetal.push({
       service: process.name,
@@ -138,13 +132,6 @@ export async function getStatus(
         (runningContainer as unknown as Record<string, string>)["Status"] ||
         "unknown"
       : "not started";
-
-    const isRunning = rawStatus !== "not started";
-    const hasProfiles =
-      Array.isArray(container.profiles) && container.profiles.length > 0;
-
-    // Filter out stopped containers that are in profiles (disabled by default)
-    if (!isRunning && hasProfiles) continue;
 
     docker.push({
       service: container.name,

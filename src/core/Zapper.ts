@@ -27,7 +27,7 @@ export class Zapper {
     try {
       const resolvedPath = resolveConfigPath(configPath) ?? configPath;
       const projectRoot = path.dirname(path.resolve(resolvedPath));
-      const config = parseYamlFile(resolvedPath, projectRoot);
+      const config = parseYamlFile(resolvedPath);
 
       // Apply CLI overrides to config
       const configWithOverrides = this.applyCliOverrides(config, cliOptions);
