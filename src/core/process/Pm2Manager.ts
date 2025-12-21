@@ -374,48 +374,28 @@ export class Pm2Manager {
     follow: boolean = false,
     configDir?: string,
   ): Promise<void> {
-    // Try different naming patterns to find the process
-    let prefixedName = name;
-    let processInfo = null;
+    const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
+    const processInfo = await this.getProcessInfo(prefixedName);
 
-    // First try the name as-is (for non-Zapper PM2 processes)
-    processInfo = await this.getProcessInfo(name);
-    if (processInfo) {
-      prefixedName = name;
-    } else if (projectName) {
-      // If not found, try with Zapper prefix
-      prefixedName = `zap.${projectName}.${name}`;
-      processInfo = await this.getProcessInfo(prefixedName);
+    if (!processInfo) {
+      throw new Error(`PM2 process not running: ${name} (${prefixedName})`);
     }
 
-    try {
-      if (!processInfo) {
-        logger.warn(
-          `Process not found. Tried: ${name}${projectName ? ` and zap.${projectName}.${name}` : ""}`,
-        );
-        return;
-      }
+    logger.debug(
+      `Showing logs for ${prefixedName}${follow ? " (following)" : ""}`,
+    );
 
-      logger.debug(
-        `Showing logs for ${prefixedName}${follow ? " (following)" : ""}`,
-      );
+    const logFiles = await this.getLogFilePaths(
+      prefixedName,
+      projectName,
+      configDir,
+    );
 
-      // Get log file paths from PM2
-      const logFiles = await this.getLogFilePaths(
-        prefixedName,
-        projectName,
-        configDir,
-      );
-      if (!logFiles) {
-        logger.warn(`Could not find log files for ${prefixedName}`);
-        return;
-      }
-
-      // Show logs directly from files
-      await this.showLogsFromFiles(logFiles, follow);
-    } catch (error) {
-      logger.warn(`Error showing logs: ${error}`);
+    if (!logFiles) {
+      throw new Error(`Could not find log files for ${prefixedName}`);
     }
+
+    await this.showLogsFromFiles(logFiles, follow);
   }
 
   static async getProcessInfo(name: string): Promise<ProcessInfo | null> {

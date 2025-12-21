@@ -2,6 +2,7 @@
 import { parseYamlFile } from "../config/yamlParser";
 import { EnvResolver } from "../config/EnvResolver";
 import { Pm2Executor } from "./process/Pm2Executor";
+import { DockerManager } from "./docker";
 import { ZapperConfig } from "../config/schemas";
 import { Context, Process, Container } from "../types/Context";
 import { createContext } from "./createContext";
@@ -261,15 +262,33 @@ export class Zapper {
   }
 
   async showLogs(processName: string, follow: boolean = false): Promise<void> {
-    const projectName = this.context?.projectName || "default";
-    const projectRoot = this.context?.projectRoot || ".";
-    const pm2Executor = new Pm2Executor(projectName, projectRoot);
+    if (!this.context) throw new Error("Context not loaded");
 
-    const name = this.context
-      ? this.resolveServiceName(processName)
-      : processName;
+    const projectName = this.context.projectName;
+    const projectRoot = this.context.projectRoot;
+    const resolvedName = this.resolveServiceName(processName);
 
-    await pm2Executor.showLogs(name, follow);
+    const isContainer = this.context.containers.some(
+      (c) => c.name === resolvedName,
+    );
+    const isProcess = this.context.processes.some(
+      (p) => p.name === resolvedName,
+    );
+
+    if (isContainer) {
+      const dockerName = `zap.${projectName}.${resolvedName}`;
+      const exists = await DockerManager.containerExists(dockerName);
+      if (!exists)
+        throw new Error(`Container not running: ${resolvedName} (${dockerName})`);
+      await DockerManager.showLogs(dockerName, follow);
+    } else if (isProcess) {
+      const pm2Executor = new Pm2Executor(projectName, projectRoot);
+      await pm2Executor.showLogs(resolvedName, follow);
+    } else {
+      throw new Error(
+        `Service not found: ${processName}. Check service names or aliases`,
+      );
+    }
   }
 
   async reset(force = false): Promise<void> {

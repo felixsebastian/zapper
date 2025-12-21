@@ -1,2 +1,0 @@
-- need tests for everything
-- fix tasks proper, currently the cli parsing is hacked in

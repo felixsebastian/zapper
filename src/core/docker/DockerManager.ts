@@ -1,3 +1,4 @@
+import { spawn } from "child_process";
 import { runDocker } from "./runDocker";
 
 interface DockerConfig {
@@ -143,5 +144,22 @@ export class DockerManager {
     } catch (error) {
       // ignore if exists
     }
+  }
+
+  static async showLogs(name: string, follow: boolean = false): Promise<void> {
+    const args = ["logs"];
+    if (follow) args.push("-f");
+    args.push(name);
+
+    return new Promise((resolve, reject) => {
+      const child = spawn("docker", args, { stdio: "inherit" });
+      child.on("close", () => resolve());
+      child.on("error", (err) => reject(err));
+    });
+  }
+
+  static async containerExists(name: string): Promise<boolean> {
+    const info = await this.getContainerInfo(name);
+    return info !== null;
   }
 }
