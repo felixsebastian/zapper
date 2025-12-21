@@ -16,7 +16,7 @@ In your project root:
 project: myapp
 env_files: [.env]
 
-bare_metal:
+native:
   backend:
     cmd: pnpm dev
     env:
