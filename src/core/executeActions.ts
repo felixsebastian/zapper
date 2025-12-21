@@ -14,7 +14,7 @@ async function executeAction(
   projectName: string,
   pm2: Pm2Executor,
 ): Promise<void> {
-  if (action.serviceType === "bare_metal") {
+  if (action.serviceType === "native") {
     const proc = findProcess(config, action.name);
     if (!proc) throw new Error(`Process not found: ${action.name}`);
 

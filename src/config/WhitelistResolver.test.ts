@@ -7,7 +7,7 @@ describe("WhitelistResolver", () => {
     it("should pass when no whitelists are defined and no string env references exist", () => {
       const config: ZapperConfig = {
         project: "test",
-        bare_metal: {
+        native: {
           app: {
             cmd: "npm start",
             env: ["PORT", "API_URL"],
@@ -21,7 +21,7 @@ describe("WhitelistResolver", () => {
     it("should throw when string env reference exists but no whitelists are defined", () => {
       const config: ZapperConfig = {
         project: "test",
-        bare_metal: {
+        native: {
           app: {
             cmd: "npm start",
             env: "common-vars",
@@ -41,7 +41,7 @@ describe("WhitelistResolver", () => {
           "frontend-vars": ["PORT", "API_URL"],
           "backend-vars": ["DATABASE_URL", "JWT_SECRET"],
         },
-        bare_metal: {
+        native: {
           frontend: {
             cmd: "npm start",
             env: "frontend-vars",
@@ -62,7 +62,7 @@ describe("WhitelistResolver", () => {
         whitelists: {
           "frontend-vars": ["PORT", "API_URL"],
         },
-        bare_metal: {
+        native: {
           app: {
             cmd: "npm start",
             env: "non-existent-whitelist",
@@ -82,7 +82,7 @@ describe("WhitelistResolver", () => {
           "app-vars": ["PORT", "API_URL"],
           "db-vars": ["POSTGRES_DB", "POSTGRES_USER"],
         },
-        bare_metal: {
+        native: {
           app: {
             cmd: "npm start",
             env: "app-vars",
@@ -129,7 +129,7 @@ describe("WhitelistResolver", () => {
     it("should return config unchanged when no whitelists exist", () => {
       const config: ZapperConfig = {
         project: "test",
-        bare_metal: {
+        native: {
           app: {
             cmd: "npm start",
             env: ["PORT", "API_URL"],
@@ -148,7 +148,7 @@ describe("WhitelistResolver", () => {
           "frontend-vars": ["PORT", "API_URL"],
           "backend-vars": ["DATABASE_URL", "JWT_SECRET"],
         },
-        bare_metal: {
+        native: {
           frontend: {
             cmd: "npm start",
             env: "frontend-vars",
@@ -162,8 +162,8 @@ describe("WhitelistResolver", () => {
 
       const result = WhitelistResolver.resolve(config);
 
-      expect(result.bare_metal?.frontend.env).toEqual(["PORT", "API_URL"]);
-      expect(result.bare_metal?.backend.env).toEqual([
+      expect(result.native?.frontend.env).toEqual(["PORT", "API_URL"]);
+      expect(result.native?.backend.env).toEqual([
         "DATABASE_URL",
         "JWT_SECRET",
       ]);
@@ -175,7 +175,7 @@ describe("WhitelistResolver", () => {
         whitelists: {
           "frontend-vars": ["PORT", "API_URL"],
         },
-        bare_metal: {
+        native: {
           frontend: {
             cmd: "npm start",
             env: "frontend-vars",
@@ -189,8 +189,8 @@ describe("WhitelistResolver", () => {
 
       const result = WhitelistResolver.resolve(config);
 
-      expect(result.bare_metal?.frontend.env).toEqual(["PORT", "API_URL"]);
-      expect(result.bare_metal?.backend.env).toEqual([
+      expect(result.native?.frontend.env).toEqual(["PORT", "API_URL"]);
+      expect(result.native?.backend.env).toEqual([
         "DATABASE_URL",
         "JWT_SECRET",
       ]);
@@ -203,7 +203,7 @@ describe("WhitelistResolver", () => {
           "app-vars": ["PORT", "API_URL"],
           "db-vars": ["POSTGRES_DB", "POSTGRES_USER"],
         },
-        bare_metal: {
+        native: {
           app: {
             cmd: "npm start",
             env: "app-vars",
@@ -225,7 +225,7 @@ describe("WhitelistResolver", () => {
 
       const result = WhitelistResolver.resolve(config);
 
-      expect(result.bare_metal?.app.env).toEqual(["PORT", "API_URL"]);
+      expect(result.native?.app.env).toEqual(["PORT", "API_URL"]);
       expect(result.docker?.database.env).toEqual([
         "POSTGRES_DB",
         "POSTGRES_USER",
@@ -239,7 +239,7 @@ describe("WhitelistResolver", () => {
         whitelists: {
           "app-vars": ["PORT", "API_URL"],
         },
-        bare_metal: {
+        native: {
           app: {
             cmd: "npm start",
             env: "app-vars",
@@ -250,9 +250,9 @@ describe("WhitelistResolver", () => {
       const result = WhitelistResolver.resolve(config);
 
       expect(result).not.toBe(config);
-      expect(result.bare_metal?.app).not.toBe(config.bare_metal?.app);
-      expect(config.bare_metal?.app.env).toBe("app-vars");
-      expect(result.bare_metal?.app.env).toEqual(["PORT", "API_URL"]);
+      expect(result.native?.app).not.toBe(config.native?.app);
+      expect(config.native?.app.env).toBe("app-vars");
+      expect(result.native?.app.env).toEqual(["PORT", "API_URL"]);
     });
 
     it("should throw for invalid whitelist reference during resolution", () => {
@@ -261,7 +261,7 @@ describe("WhitelistResolver", () => {
         whitelists: {
           "valid-vars": ["PORT"],
         },
-        bare_metal: {
+        native: {
           app: {
             cmd: "npm start",
             env: "invalid-whitelist",
@@ -292,7 +292,7 @@ describe("WhitelistResolver", () => {
       expect(result.containers?.database.env).toEqual(["POSTGRES_DB"]);
     });
 
-    it("should handle processes array in addition to bare_metal", () => {
+    it("should handle processes array in addition to native", () => {
       const config: ZapperConfig = {
         project: "test",
         whitelists: {

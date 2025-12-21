@@ -1,6 +1,6 @@
 project: example-one
 env_files: [.env.base]
-bare_metal:
+native:
   myservice:
     aliases: [s]
     cmd: echo $APP_ENV

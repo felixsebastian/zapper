@@ -36,8 +36,8 @@ export class ZodConfigValidator {
   }
 
   private static autoPopulateNames(config: ZapperConfig): void {
-    if (config.bare_metal) {
-      for (const [name, proc] of Object.entries(config.bare_metal)) {
+    if (config.native) {
+      for (const [name, proc] of Object.entries(config.native)) {
         if (!proc.name) {
           proc.name = name;
         }

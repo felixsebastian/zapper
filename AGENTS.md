@@ -1,19 +1,30 @@
 # Zapper
 
-Zapper is a lightweight dev environment runner that uses a single YAML file to define and launch your local development setup. It manages app processes, containers, and environment variables by delegating to tools you already use—like PM2 for process management, Docker for containers, and asdf for runtime versioning. With a simple zap.yaml file, you can define multiple services (e.g. frontend, backend, database), selectively pass env vars to each, and boot everything up with a single command: zap up. Under the hood, Zapper is implemented in Node.js for tight integration with PM2, and it shells out to Docker and other CLI tools to orchestrate the rest of the stack with minimal overhead.
+A lightweight dev environment runner. Define your local dev setup in a single `zap.yaml` file and boot everything with `zap up`. Delegates to PM2 for processes, Docker for containers, and asdf for runtime versioning.
 
-A central idea for this tool is that you shouldn't really need to care if a process is bare metal or a container. Processes are processes.
+**Core philosophy:** Processes are processes—you shouldn't need to care if something is native or containerized.
 
-Currently a WIP, we have basic start/stop of pm2 processes.
+**Status:** WIP, basic start/stop of PM2 processes working.
 
-For running the program for testing purposes, create example projects like:
+## Documentation
 
+- **[Usage](docs/usage.md)** — Comprehensive docs, keep this up to date
+- **[Local Development](docs/local-dev.md)** — To see how we run/test/build the app
+
+## Development
+
+Create example projects for testing:
+
+```
 ./examples/myproj/zap.yaml
+```
 
-Remember to `pnpm build` and link (its ususally already linked). Then cd into the example project and zap away.
+Remember to `pnpm build` and link (usually already linked). Then cd into the example project and zap away.
 
-Make sure to clean up after, stopping processes and deleting the relevant .zap folders.
+**Cleanup:** Stop processes and delete `.zap` folders when done.
 
-## Test & build
+## Commands
 
-Test with `pnpm test`, build with `pnpm build` and fix linting issues with `pnpm lint:fix`.
+- `pnpm test` — run tests
+- `pnpm build` — build the project
+- `pnpm lint:fix` — fix linting issues

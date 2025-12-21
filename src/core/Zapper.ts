@@ -9,13 +9,12 @@ import { createContext } from "./createContext";
 import path from "path";
 import { logger } from "../utils/logger";
 import * as fs from "fs";
-import { execSync } from "child_process";
 import { resolveConfigPath } from "../utils/findUp";
 import { Planner } from "./Planner";
 import { executeActions } from "./executeActions";
 import { confirm } from "../utils/confirm";
 import { GitManager, cloneRepos as cloneRepositories } from "./git";
-import { getBareMetalTargets } from "../utils";
+import { getNativeTargets } from "../utils";
 
 export class Zapper {
   private context: Context | null = null;
@@ -138,10 +137,10 @@ export class Zapper {
   private createLegacyConfig(): ZapperConfig {
     if (!this.context) throw new Error("Context not loaded");
 
-    // Convert processes back to bare_metal format
-    const bare_metal: Record<string, any> = {};
+    // Convert processes to native format
+    const native: Record<string, any> = {};
     for (const process of this.context.processes) {
-      bare_metal[process.name] = {
+      native[process.name] = {
         ...process,
         name: process.name, // Keep the name field for compatibility
       };
@@ -169,7 +168,7 @@ export class Zapper {
       project: this.context.projectName,
       env_files: this.context.envFiles,
       git_method: this.context.gitMethod,
-      bare_metal,
+      native,
       docker,
       tasks,
     };
@@ -330,7 +329,10 @@ export class Zapper {
     );
   }
 
-  async runTask(taskName: string): Promise<void> {
+  async runTask(
+    taskName: string,
+    params?: { named: Record<string, string>; rest: string[] },
+  ): Promise<void> {
     if (!this.context) throw new Error("Context not loaded");
 
     if (!this.context.tasks || this.context.tasks.length === 0) {
@@ -347,74 +349,37 @@ export class Zapper {
       );
     }
 
-    // Convert tasks array back to object format for compatibility
+    // Convert tasks array back to object format for TaskRunner
     const tasks: Record<string, any> = {};
     for (const task of this.context.tasks) {
       tasks[task.name] = task;
     }
 
-    const baseCwd = this.context.projectRoot;
-
-    const resolveCwd = (tCwd?: string) => {
-      if (!tCwd || tCwd.trim().length === 0) return baseCwd;
-      return path.isAbsolute(tCwd) ? tCwd : path.join(baseCwd, tCwd);
-    };
-
-    const execTask = (name: string, stack: string[] = []) => {
-      // Resolve aliases for nested task calls too
-      const resolvedName = taskAliasMap[name] || name;
-      if (!tasks[resolvedName]) throw new Error(`Task not found: ${name}`);
-
-      if (stack.includes(resolvedName)) {
-        throw new Error(
-          `Circular task reference detected: ${[...stack, resolvedName].join(" -> ")}`,
-        );
-      }
-
-      const task = tasks[resolvedName];
-
-      const env = {
-        ...process.env,
-        ...(task.resolvedEnv || {}),
-      } as NodeJS.ProcessEnv;
-
-      const cwd = resolveCwd(task.cwd);
-      logger.info(
-        `Running task: ${resolvedName}${task.desc ? ` — ${task.desc}` : ""}`,
-      );
-
-      for (const cmd of task.cmds) {
-        if (typeof cmd === "string") {
-          logger.debug(`$ ${cmd}`);
-          execSync(cmd, { stdio: "inherit", cwd, env });
-        } else if (cmd && typeof cmd === "object" && "task" in cmd) {
-          execTask(cmd.task, [...stack, resolvedName]);
-        } else {
-          throw new Error(`Invalid command in task ${resolvedName}`);
-        }
-      }
-    };
-
-    execTask(resolvedTaskName);
+    // Use TaskRunner for execution with interpolation support
+    const { TaskRunner } = await import("./tasks/TaskRunner");
+    TaskRunner.runTask(tasks, this.context.projectRoot, resolvedTaskName, {
+      delimiters: this.context.taskDelimiters,
+      params,
+    });
   }
 
-  private getBareMetalTargets(): Array<{ name: string; cwd: string }> {
+  private getNativeTargets(): Array<{ name: string; cwd: string }> {
     const legacyConfig = this.createLegacyConfig();
-    return getBareMetalTargets(legacyConfig, this.context?.projectRoot || null);
+    return getNativeTargets(legacyConfig, this.context?.projectRoot || null);
   }
 
   async gitCheckoutAll(branch: string): Promise<void> {
-    const targets = this.getBareMetalTargets();
+    const targets = this.getNativeTargets();
     await GitManager.checkoutAll(targets, branch);
   }
 
   async gitPullAll(): Promise<void> {
-    const targets = this.getBareMetalTargets();
+    const targets = this.getNativeTargets();
     await GitManager.pullAll(targets);
   }
 
   async gitStatusAll(): Promise<void> {
-    const targets = this.getBareMetalTargets();
+    const targets = this.getNativeTargets();
     await GitManager.statusAll(targets);
   }
 }

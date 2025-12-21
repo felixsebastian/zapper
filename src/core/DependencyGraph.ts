@@ -15,7 +15,7 @@ export class DependencyGraph {
   addProcess(name: string, process: Process): void {
     this.nodes.set(name, {
       name,
-      serviceType: "bare_metal",
+      serviceType: "native",
       healthCheck: process.healthCheck ?? 5,
       depends_on: process.depends_on ?? [],
     });

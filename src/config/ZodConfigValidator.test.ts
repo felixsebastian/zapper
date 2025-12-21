@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { ZodConfigValidator } from "./ZodConfigValidator";
 
 describe("ZodConfigValidator", () => {
-  it("should validate correct config with bare_metal", () => {
+  it("should validate correct config with native", () => {
     const config = {
       project: "myproj",
-      bare_metal: {
+      native: {
         test: {
           cmd: "echo 'hello world'",
         },
@@ -40,10 +40,10 @@ describe("ZodConfigValidator", () => {
     }).not.toThrow();
   });
 
-  it("should validate correct config with both bare_metal and docker", () => {
+  it("should validate correct config with both native and docker", () => {
     const config = {
       project: "myproj",
-      bare_metal: {
+      native: {
         frontend: {
           cmd: "npm run dev",
           cwd: "./frontend",
@@ -81,7 +81,7 @@ describe("ZodConfigValidator", () => {
 
   it("should reject config without project", () => {
     const config = {
-      bare_metal: {
+      native: {
         test: {
           cmd: "echo 'hello world'",
         },
@@ -98,7 +98,7 @@ describe("ZodConfigValidator", () => {
   it("should reject config with invalid project name", () => {
     const config = {
       project: "invalid name!",
-      bare_metal: {
+      native: {
         test: {
           cmd: "echo 'hello world'",
         },
@@ -120,14 +120,14 @@ describe("ZodConfigValidator", () => {
     expect(() => {
       ZodConfigValidator.validate(config);
     }).toThrow(
-      "Configuration validation failed: No processes defined. Define at least one in bare_metal, docker, or processes",
+      "Configuration validation failed: No processes defined. Define at least one in native, docker, or processes",
     );
   });
 
   it("should reject config with duplicate service names", () => {
     const config = {
       project: "myproj",
-      bare_metal: {
+      native: {
         test: {
           cmd: "echo 'hello world'",
         },
@@ -142,14 +142,14 @@ describe("ZodConfigValidator", () => {
     expect(() => {
       ZodConfigValidator.validate(config);
     }).toThrow(
-      "Configuration validation failed: Duplicate service identifier. Names and aliases must be globally unique across bare_metal and docker",
+      "Configuration validation failed: Duplicate service identifier. Names and aliases must be globally unique across native and docker",
     );
   });
 
   it("should reject config with invalid process command", () => {
     const config = {
       project: "myproj",
-      bare_metal: {
+      native: {
         test: {
           cmd: "",
         },
@@ -159,7 +159,7 @@ describe("ZodConfigValidator", () => {
     expect(() => {
       ZodConfigValidator.validate(config);
     }).toThrow(
-      "Configuration validation failed: bare_metal.test.cmd: Command cannot be empty",
+      "Configuration validation failed: native.test.cmd: Command cannot be empty",
     );
   });
 
@@ -216,14 +216,14 @@ describe("ZodConfigValidator", () => {
     expect(() => {
       ZodConfigValidator.validate(config);
     }).toThrow(
-      "Configuration validation failed: tasks.test.cmds: Task must have at least one command, No processes defined. Define at least one in bare_metal, docker, or processes",
+      "Configuration validation failed: tasks.test.cmds: Task must have at least one command, No processes defined. Define at least one in native, docker, or processes",
     );
   });
 
   it("should validate config with tasks and processes", () => {
     const config = {
       project: "myproj",
-      bare_metal: {
+      native: {
         test: {
           cmd: "echo hello",
         },
@@ -248,7 +248,7 @@ describe("ZodConfigValidator", () => {
           "frontend-vars": ["PORT", "API_URL"],
           "backend-vars": ["DATABASE_URL", "JWT_SECRET"],
         },
-        bare_metal: {
+        native: {
           frontend: {
             cmd: "npm start",
             env: "frontend-vars",
@@ -274,15 +274,15 @@ describe("ZodConfigValidator", () => {
 
       const result = ZodConfigValidator.validate(config);
 
-      expect(result.bare_metal?.frontend.env).toEqual(["PORT", "API_URL"]);
-      expect(result.bare_metal?.backend.env).toEqual([
+      expect(result.native?.frontend.env).toEqual(["PORT", "API_URL"]);
+      expect(result.native?.backend.env).toEqual([
         "DATABASE_URL",
         "JWT_SECRET",
       ]);
       expect(result.docker?.database.env).toEqual(["PORT", "API_URL"]);
       expect(result.tasks?.build.env).toEqual(["DATABASE_URL", "JWT_SECRET"]);
-      expect(result.bare_metal?.frontend.name).toBe("frontend");
-      expect(result.bare_metal?.backend.name).toBe("backend");
+      expect(result.native?.frontend.name).toBe("frontend");
+      expect(result.native?.backend.name).toBe("backend");
     });
 
     it("should throw error for invalid whitelist reference", () => {
@@ -291,7 +291,7 @@ describe("ZodConfigValidator", () => {
         whitelists: {
           "valid-vars": ["PORT"],
         },
-        bare_metal: {
+        native: {
           app: {
             cmd: "npm start",
             env: "invalid-whitelist",
@@ -309,7 +309,7 @@ describe("ZodConfigValidator", () => {
     it("should throw error when string env reference exists but no whitelists defined", () => {
       const config = {
         project: "test-no-whitelists",
-        bare_metal: {
+        native: {
           app: {
             cmd: "npm start",
             env: "some-whitelist",
@@ -330,7 +330,7 @@ describe("ZodConfigValidator", () => {
         whitelists: {
           "common-vars": ["PORT", "NODE_ENV"],
         },
-        bare_metal: {
+        native: {
           app1: {
             cmd: "npm start",
             env: "common-vars",
@@ -344,8 +344,8 @@ describe("ZodConfigValidator", () => {
 
       const result = ZodConfigValidator.validate(config);
 
-      expect(result.bare_metal?.app1.env).toEqual(["PORT", "NODE_ENV"]);
-      expect(result.bare_metal?.app2.env).toEqual(["DATABASE_URL", "API_KEY"]);
+      expect(result.native?.app1.env).toEqual(["PORT", "NODE_ENV"]);
+      expect(result.native?.app2.env).toEqual(["DATABASE_URL", "API_KEY"]);
     });
 
     it("should validate whitelist names follow naming rules", () => {
@@ -354,7 +354,7 @@ describe("ZodConfigValidator", () => {
         whitelists: {
           "invalid name with spaces": ["PORT"],
         },
-        bare_metal: {
+        native: {
           app: {
             cmd: "npm start",
           },

@@ -20,8 +20,47 @@ import {
   EnvCommand,
   CommandContext,
   CommandHandler,
+  TaskParams,
 } from "../commands";
 import packageJson from "../../package.json";
+
+function parseTaskArgs(rawArgv: string[], taskName: string): TaskParams {
+  const named: Record<string, string> = {};
+  const rest: string[] = [];
+
+  // Find the position of the task command and task name in raw argv
+  const taskIdx = rawArgv.findIndex((arg) => arg === "task" || arg === "t");
+  if (taskIdx === -1) return { named, rest };
+
+  // Get everything after the task name
+  const taskNameIdx = rawArgv.indexOf(taskName, taskIdx);
+  if (taskNameIdx === -1) return { named, rest };
+
+  const argsAfterTask = rawArgv.slice(taskNameIdx + 1);
+
+  // Find the -- separator in raw args
+  const separatorIdx = argsAfterTask.indexOf("--");
+  const namedArgs = separatorIdx >= 0 ? argsAfterTask.slice(0, separatorIdx) : argsAfterTask;
+  const restArgs = separatorIdx >= 0 ? argsAfterTask.slice(separatorIdx + 1) : [];
+
+  // Parse named args
+  for (const arg of namedArgs) {
+    if (arg.startsWith("--")) {
+      const eqIdx = arg.indexOf("=");
+      if (eqIdx !== -1) {
+        const key = arg.slice(2, eqIdx);
+        const value = arg.slice(eqIdx + 1);
+        named[key] = value;
+      } else {
+        const key = arg.slice(2);
+        named[key] = "true";
+      }
+    }
+  }
+
+  rest.push(...restArgs);
+  return { named, rest };
+}
 
 export class CommanderCli {
   private program: Command;
@@ -129,7 +168,7 @@ export class CommanderCli {
     this.program
       .command("clone")
       .description(
-        "Clone all repos defined in bare_metal services (respects git_method)",
+        "Clone all repos defined in native services (respects git_method)",
       )
       .argument("[service]", "Service to clone")
       .option(
@@ -149,6 +188,9 @@ export class CommanderCli {
       )
       .argument("[task]", "Task name to run")
       .option("-j, --json", "Output task list as minified JSON")
+      .option("--list-params", "List parameters for the specified task")
+      .allowUnknownOption()
+      .allowExcessArguments()
       .action(async (task, options, command) => {
         await this.executeCommand("task", task, command);
       });
@@ -180,7 +222,7 @@ export class CommanderCli {
     this.program
       .command("checkout")
       .alias("co")
-      .description("Switch all bare_metal repos to the given branch")
+      .description("Switch all native repos to the given branch")
       .requiredOption("--service <branch>", "Branch name")
       .action(async (options, command) => {
         await this.executeCommand("checkout", options.service, command);
@@ -188,7 +230,7 @@ export class CommanderCli {
 
     this.program
       .command("pull")
-      .description("Pull latest for all bare_metal repos")
+      .description("Pull latest for all native repos")
       .action(async (options, command) => {
         await this.executeCommand("pull", undefined, command);
       });
@@ -196,7 +238,7 @@ export class CommanderCli {
     this.program
       .command("gitstatus")
       .alias("gs")
-      .description("List branch and dirty/clean for all bare_metal repos")
+      .description("List branch and dirty/clean for all native repos")
       .action(async (options, command) => {
         await this.executeCommand("gitstatus", undefined, command);
       });
@@ -253,10 +295,17 @@ export class CommanderCli {
       throw new Error(`No handler found for command: ${command}`);
     }
 
+    // Parse task parameters for the task command
+    let taskParams: TaskParams | undefined;
+    if (command === "task" && service) {
+      taskParams = parseTaskArgs(process.argv, service);
+    }
+
     const context: CommandContext = {
       zapper,
       service: resolvedService,
       options: allOptions,
+      taskParams,
     };
 
     await handler.execute(context);

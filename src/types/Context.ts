@@ -2,8 +2,11 @@ import {
   Process as ConfigProcess,
   Container as ConfigContainer,
   Task as ConfigTask,
+  TaskParam,
   ZapperState,
 } from "../config/schemas";
+
+export type { TaskParam };
 
 // Enhanced types that include name field and other context-specific data
 export interface Process extends Omit<ConfigProcess, "name"> {
@@ -24,9 +27,10 @@ export interface Context {
   projectRoot: string; // Absolute path to directory containing zap.yaml
   envFiles?: string[]; // Already resolved to absolute paths
   gitMethod?: "http" | "ssh" | "cli";
+  taskDelimiters?: [string, string]; // Custom delimiters for task interpolation
 
   // Services organized by type with names included
-  processes: Process[]; // Combines bare_metal and processes from config
+  processes: Process[]; // Combines native and processes from config
   containers: Container[]; // Combines docker and containers from config
   tasks: Task[]; // Tasks from config
   profiles: string[]; // All unique profiles from processes and containers

@@ -1,0 +1,45 @@
+project: parameterized-tasks-demo
+
+native:
+  app:
+    cmd: echo "App running"
+
+tasks:
+  build:
+    desc: Build the project for a target environment
+    params:
+      - name: target
+        default: development
+        desc: Build target environment
+      - name: verbose
+        desc: Enable verbose output
+    cmds:
+      - 'echo "Building for {{target}}"'
+      - 'echo "Verbose mode: {{verbose}}"'
+
+  test:
+    desc: Run tests with optional extra arguments
+    cmds:
+      - 'echo "Running tests with args: {{REST}}"'
+
+  deploy:
+    desc: Deploy to an environment (required param)
+    params:
+      - name: env
+        required: true
+        desc: Deployment environment (staging, production)
+    cmds:
+      - 'echo "Deploying to {{env}}"'
+
+  greet:
+    desc: Greet someone with a custom message
+    params:
+      - name: name
+        default: World
+        desc: Name to greet
+      - name: greeting
+        default: Hello
+        desc: Greeting phrase
+    cmds:
+      - 'echo "{{greeting}}, {{name}}!"'
+

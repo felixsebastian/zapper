@@ -1,18 +1,18 @@
 import { ZapperConfig } from "../config/schemas";
 import * as path from "path";
 
-export interface BareMetalTarget {
+export interface NativeTarget {
   name: string;
   cwd: string;
 }
 
-export function getBareMetalTargets(
+export function getNativeTargets(
   config: ZapperConfig | null,
   configDir: string | null,
-): BareMetalTarget[] {
+): NativeTarget[] {
   if (!config || !configDir) return [];
 
-  const entries = config.bare_metal ? Object.entries(config.bare_metal) : [];
+  const entries = config.native ? Object.entries(config.native) : [];
 
   return entries
     .filter(([, p]) => !!p.repo)

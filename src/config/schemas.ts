@@ -77,6 +77,13 @@ export const TaskCmdSchema = z.union([
   }),
 ]);
 
+export const TaskParamSchema = z.object({
+  name: validNameSchema,
+  desc: z.string().optional(),
+  default: z.string().optional(),
+  required: z.boolean().optional(),
+});
+
 export const TaskSchema = z.object({
   name: z.string().optional(),
   desc: z.string().optional(),
@@ -86,7 +93,12 @@ export const TaskSchema = z.object({
   aliases: z.array(validNameSchema).optional(),
   resolvedEnv: z.record(z.string(), z.string()).optional(),
   env_files: z.array(z.string()).optional(),
+  params: z.array(TaskParamSchema).optional(),
 });
+
+export const TaskDelimitersSchema = z
+  .tuple([z.string().min(1), z.string().min(1)])
+  .optional();
 
 export const ZapperConfigSchema = processValidation(
   duplicateValidation(
@@ -96,13 +108,14 @@ export const ZapperConfigSchema = processValidation(
         .array(z.string().min(1, "Environment file path cannot be empty"))
         .optional(),
       git_method: z.enum(["http", "ssh", "cli"]).optional(),
+      task_delimiters: TaskDelimitersSchema,
       whitelists: z
         .record(
           validNameSchema,
           z.array(z.string().min(1, "Environment variable cannot be empty")),
         )
         .optional(),
-      bare_metal: z.record(validNameSchema, ProcessSchema).optional(),
+      native: z.record(validNameSchema, ProcessSchema).optional(),
       docker: z.record(validNameSchema, ContainerSchema).optional(),
       containers: z.record(validNameSchema, ContainerSchema).optional(),
       processes: z.array(ProcessSchema).optional(),
@@ -120,6 +133,7 @@ export type Process = z.infer<typeof ProcessSchema>;
 export type Container = z.infer<typeof ContainerSchema>;
 export type Volume = z.infer<typeof VolumeSchema>;
 export type Task = z.infer<typeof TaskSchema>;
+export type TaskParam = z.infer<typeof TaskParamSchema>;
 export type ZapperConfig = z.infer<typeof ZapperConfigSchema>;
 export type ZapperState = z.infer<typeof ZapperStateSchema>;
 
@@ -138,9 +152,9 @@ export type ResolvedTask = Omit<Task, "env"> & {
 
 export type ResolvedZapperConfig = Omit<
   ZapperConfig,
-  "bare_metal" | "docker" | "containers" | "processes" | "tasks"
+  "native" | "docker" | "containers" | "processes" | "tasks"
 > & {
-  bare_metal?: Record<string, ResolvedProcess>;
+  native?: Record<string, ResolvedProcess>;
   docker?: Record<string, ResolvedContainer>;
   containers?: Record<string, ResolvedContainer>;
   processes?: ResolvedProcess[];

@@ -2,13 +2,10 @@ import { Pm2Manager } from "./process";
 import { DockerManager } from "./docker";
 import { Context } from "../types/Context";
 
-function normalizeStatus(
-  status: string,
-  type: "bare_metal" | "docker",
-): string {
+function normalizeStatus(status: string, type: "native" | "docker"): string {
   const s = status.toLowerCase();
 
-  if (type === "bare_metal") {
+  if (type === "native") {
     if (s === "online") return "up";
     if (
       s === "stopped" ||
@@ -37,11 +34,11 @@ export interface ServiceStatus {
   service: string;
   rawName: string;
   status: string;
-  type: "bare_metal" | "docker";
+  type: "native" | "docker";
 }
 
 export interface StatusResult {
-  bareMetal: ServiceStatus[];
+  native: ServiceStatus[];
   docker: ServiceStatus[];
 }
 
@@ -60,12 +57,12 @@ export async function getStatus(
       return true; // Show all since we don't have project context
     });
 
-    const bareMetal = filtered
+    const native = filtered
       .map((p) => ({
         rawName: p.name,
         service: p.name.split(".").pop() || p.name,
-        status: normalizeStatus(p.status, "bare_metal"),
-        type: "bare_metal" as const,
+        status: normalizeStatus(p.status, "native"),
+        type: "native" as const,
       }))
       .filter((p) => (!service ? true : p.service === service));
 
@@ -89,14 +86,14 @@ export async function getStatus(
       .filter((c) => !!c.rawName)
       .filter((c) => (!service ? true : c.service === service));
 
-    return { bareMetal, docker };
+    return { native, docker };
   }
 
   // With context, show all defined services
   const projectName = context.projectName;
 
-  // Create status for all processes defined in config
-  const bareMetal: ServiceStatus[] = [];
+  // Create status for all native processes defined in config
+  const native: ServiceStatus[] = [];
   for (const process of context.processes) {
     if (service && process.name !== service) continue;
 
@@ -105,11 +102,11 @@ export async function getStatus(
 
     const rawStatus = runningProcess ? runningProcess.status : "not started";
 
-    bareMetal.push({
+    native.push({
       service: process.name,
       rawName: expectedPm2Name,
-      status: normalizeStatus(rawStatus, "bare_metal"),
-      type: "bare_metal" as const,
+      status: normalizeStatus(rawStatus, "native"),
+      type: "native" as const,
     });
   }
 
@@ -141,5 +138,5 @@ export async function getStatus(
     });
   }
 
-  return { bareMetal, docker };
+  return { native, docker };
 }

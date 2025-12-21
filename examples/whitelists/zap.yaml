@@ -24,7 +24,7 @@ whitelists:
     - POSTGRES_PASSWORD
 
 # Use whitelists by referencing their names
-bare_metal:
+native:
   frontend:
     cmd: npm run dev
     env: frontend-vars  # Reference to whitelist

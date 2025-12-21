@@ -2,7 +2,7 @@ project: test-env-resolution
 env_files:
   - "test.env"
 
-bare_metal:
+native:
   test-service:
     cmd: "echo 'Testing env resolution'"
     env: ["TEST_VAR"]

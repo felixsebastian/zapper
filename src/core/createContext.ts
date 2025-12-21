@@ -18,9 +18,9 @@ export function createContext(
   // Transform processes from config format to context format
   const processes: Process[] = [];
 
-  // Add bare_metal processes (key-value pairs)
-  if (config.bare_metal) {
-    for (const [name, proc] of Object.entries(config.bare_metal)) {
+  // Add native processes (key-value pairs)
+  if (config.native) {
+    for (const [name, proc] of Object.entries(config.native)) {
       processes.push({
         ...proc,
         name,
@@ -101,6 +101,7 @@ export function createContext(
     projectRoot,
     envFiles,
     gitMethod: config.git_method,
+    taskDelimiters: config.task_delimiters,
     processes,
     containers,
     tasks,

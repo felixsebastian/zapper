@@ -1,4 +1,4 @@
 project: myproj
-bare_metal:
+native:
   hello:
     cmd: echo "Hello world"

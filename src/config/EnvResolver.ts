@@ -28,8 +28,8 @@ export class EnvResolver {
 
     logger.debug("Merged env files:", { data: mergedEnvFromFiles });
 
-    if (resolvedConfig.bare_metal) {
-      for (const [name, proc] of Object.entries(resolvedConfig.bare_metal)) {
+    if (resolvedConfig.native) {
+      for (const [name, proc] of Object.entries(resolvedConfig.native)) {
         if (!proc.name) proc.name = name;
         this.resolveConfigProcessEnv(proc, mergedEnvFromFiles);
       }
@@ -345,7 +345,7 @@ export class EnvResolver {
     processName: string,
     resolvedConfig: ZapperConfig,
   ): Record<string, string> {
-    const proc = resolvedConfig.bare_metal?.[processName];
+    const proc = resolvedConfig.native?.[processName];
     if (!proc) throw new Error(`Process ${processName} not found`);
     return (proc.resolvedEnv as Record<string, string>) || {};
   }

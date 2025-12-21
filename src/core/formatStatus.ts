@@ -16,15 +16,15 @@ function formatServiceStatus(status: string): string {
 export function formatStatus(statusResult: StatusResult): string {
   const sections: string[] = [];
 
-  if (statusResult.bareMetal.length > 0) {
-    const bareMetalSection = ["💾 Bare metal"]
+  if (statusResult.native.length > 0) {
+    const nativeSection = ["💾 Native"]
       .concat(
-        statusResult.bareMetal.map(
+        statusResult.native.map(
           (p) => `${p.service} ${formatServiceStatus(p.status)}`,
         ),
       )
       .join("\n");
-    sections.push(bareMetalSection);
+    sections.push(nativeSection);
   }
 
   if (statusResult.docker.length > 0) {

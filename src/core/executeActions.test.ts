@@ -39,7 +39,7 @@ describe("executeActions", () => {
 
     mockConfig = {
       project: "test-project",
-      bare_metal: {
+      native: {
         api: {
           name: "api",
           cmd: "npm start",
@@ -104,7 +104,7 @@ describe("executeActions", () => {
             actions: [
               {
                 type: "start",
-                serviceType: "bare_metal",
+                serviceType: "native",
                 name: "api",
                 healthCheck: 0,
               },
@@ -136,7 +136,7 @@ describe("executeActions", () => {
             actions: [
               {
                 type: "stop",
-                serviceType: "bare_metal",
+                serviceType: "native",
                 name: "worker",
                 healthCheck: 5,
               },
@@ -160,7 +160,7 @@ describe("executeActions", () => {
             actions: [
               {
                 type: "start",
-                serviceType: "bare_metal",
+                serviceType: "native",
                 name: "nonexistent",
                 healthCheck: 5,
               },
@@ -378,7 +378,7 @@ describe("executeActions", () => {
             actions: [
               {
                 type: "start",
-                serviceType: "bare_metal",
+                serviceType: "native",
                 name: "api",
                 healthCheck: 0,
               },
@@ -421,7 +421,7 @@ describe("executeActions", () => {
             actions: [
               {
                 type: "start",
-                serviceType: "bare_metal",
+                serviceType: "native",
                 name: "api",
                 healthCheck: 0,
               },
@@ -449,7 +449,7 @@ describe("executeActions", () => {
             actions: [
               {
                 type: "start",
-                serviceType: "bare_metal",
+                serviceType: "native",
                 name: "api",
                 healthCheck: 0,
               },

@@ -8,10 +8,10 @@ export class Planner {
   constructor(private readonly config: ZapperConfig) {}
 
   private getProcesses(): Process[] {
-    const { bare_metal, processes } = this.config;
+    const { native, processes } = this.config;
 
-    if (bare_metal && Object.keys(bare_metal).length > 0) {
-      return Object.entries(bare_metal).map(([name, process]) => ({
+    if (native && Object.keys(native).length > 0) {
+      return Object.entries(native).map(([name, process]) => ({
         ...process,
         name: process.name || name,
       }));
@@ -208,7 +208,7 @@ export class Planner {
           actions: [
             {
               type: "stop",
-              serviceType: "bare_metal",
+              serviceType: "native",
               name: process.name as string,
               healthCheck: process.healthCheck ?? 5,
             },

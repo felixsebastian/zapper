@@ -213,7 +213,7 @@ DATABASE_URL=postgresql://localhost:5432/myapp
       const config: ZapperConfig = {
         project: "test",
         env_files: [envFile],
-        bare_metal: {
+        native: {
           test: {
             name: "test",
             cmd: "echo $MYENV",
@@ -229,14 +229,14 @@ DATABASE_URL=postgresql://localhost:5432/myapp
 
       const result = EnvResolver.resolve(config);
 
-      expect(result.bare_metal!.test.env).toEqual(["MYENV", "APP_ENV"]);
-      expect(result.bare_metal!.test.resolvedEnv).toEqual({
+      expect(result.native!.test.env).toEqual(["MYENV", "APP_ENV"]);
+      expect(result.native!.test.resolvedEnv).toEqual({
         MYENV: "foo",
         APP_ENV: "development",
       });
 
-      expect(result.bare_metal!.server.env).toEqual(["NODE_ENV", "PORT"]);
-      expect(result.bare_metal!.server.resolvedEnv).toEqual({
+      expect(result.native!.server.env).toEqual(["NODE_ENV", "PORT"]);
+      expect(result.native!.server.resolvedEnv).toEqual({
         NODE_ENV: "development",
         // PORT is not in the env file, so it won't be included
       });
@@ -252,7 +252,7 @@ NODE_ENV=development
       const config: ZapperConfig = {
         project: "test",
         env_files: [envFile],
-        bare_metal: {
+        native: {
           test: {
             name: "test",
             cmd: "echo hello",
@@ -263,8 +263,8 @@ NODE_ENV=development
 
       const result = EnvResolver.resolve(config);
 
-      expect(result.bare_metal!.test.env).toEqual([]);
-      expect(result.bare_metal!.test.resolvedEnv).toEqual({});
+      expect(result.native!.test.env).toEqual([]);
+      expect(result.native!.test.resolvedEnv).toEqual({});
     });
 
     it("should handle processes with empty envs array", () => {
@@ -277,7 +277,7 @@ NODE_ENV=development
       const config: ZapperConfig = {
         project: "test",
         env_files: [envFile],
-        bare_metal: {
+        native: {
           test: {
             name: "test",
             cmd: "echo hello",
@@ -288,8 +288,8 @@ NODE_ENV=development
 
       const result = EnvResolver.resolve(config);
 
-      expect(result.bare_metal!.test.env).toEqual([]);
-      expect(result.bare_metal!.test.resolvedEnv).toEqual({});
+      expect(result.native!.test.env).toEqual([]);
+      expect(result.native!.test.resolvedEnv).toEqual({});
     });
 
     it("should handle processes with existing env whitelist", () => {
@@ -301,7 +301,7 @@ CUSTOM_VAR=custom_value
       const config: ZapperConfig = {
         project: "test",
         env_files: [envFile],
-        bare_metal: {
+        native: {
           test: {
             name: "test",
             cmd: "echo hello",
@@ -312,8 +312,8 @@ CUSTOM_VAR=custom_value
 
       const result = EnvResolver.resolve(config);
 
-      expect(result.bare_metal!.test.env).toEqual(["CUSTOM_VAR"]);
-      expect(result.bare_metal!.test.resolvedEnv).toEqual({
+      expect(result.native!.test.env).toEqual(["CUSTOM_VAR"]);
+      expect(result.native!.test.resolvedEnv).toEqual({
         CUSTOM_VAR: "custom_value",
       });
     });
@@ -327,7 +327,7 @@ LEGACY_VAR=legacy_value
       const config: ZapperConfig = {
         project: "test",
         env_files: [envFile],
-        bare_metal: {
+        native: {
           test: {
             name: "test",
             cmd: "echo hello",
@@ -338,8 +338,8 @@ LEGACY_VAR=legacy_value
 
       const result = EnvResolver.resolve(config);
 
-      expect(result.bare_metal!.test.env).toEqual(["LEGACY_VAR"]);
-      expect(result.bare_metal!.test.resolvedEnv).toEqual({
+      expect(result.native!.test.env).toEqual(["LEGACY_VAR"]);
+      expect(result.native!.test.resolvedEnv).toEqual({
         LEGACY_VAR: "legacy_value",
       });
     });
@@ -347,7 +347,7 @@ LEGACY_VAR=legacy_value
     it("should handle processes with no env files", () => {
       const config: ZapperConfig = {
         project: "test",
-        bare_metal: {
+        native: {
           test: {
             name: "test",
             cmd: "echo hello",
@@ -358,8 +358,8 @@ LEGACY_VAR=legacy_value
 
       const result = EnvResolver.resolve(config);
 
-      expect(result.bare_metal!.test.env).toEqual(["SOME_VAR"]);
-      expect(result.bare_metal!.test.resolvedEnv).toEqual({});
+      expect(result.native!.test.env).toEqual(["SOME_VAR"]);
+      expect(result.native!.test.resolvedEnv).toEqual({});
     });
   });
 
@@ -373,7 +373,7 @@ TEST_VAR=test_value
       const config: ZapperConfig = {
         project: "test",
         env_files: [envFile],
-        bare_metal: {
+        native: {
           test: {
             name: "test",
             cmd: "echo hello",
@@ -395,7 +395,7 @@ TEST_VAR=test_value
     it("should return empty object when process has no env", () => {
       const config: ZapperConfig = {
         project: "test",
-        bare_metal: {
+        native: {
           test: {
             name: "test",
             cmd: "echo hello",
@@ -414,7 +414,7 @@ TEST_VAR=test_value
     it("should throw error when process not found", () => {
       const config: ZapperConfig = {
         project: "test",
-        bare_metal: {
+        native: {
           test: {
             name: "test",
             cmd: "echo hello",

@@ -1,7 +1,7 @@
 project: myproj
 env_files: [.env]
 git_method: ssh
-bare_metal:
+native:
   frontend:
     aliases: [f]
     repo: myorg/frontend

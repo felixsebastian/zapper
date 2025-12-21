@@ -1,4 +1,4 @@
-export { CommandHandler, CommandContext } from "./CommandHandler";
+export { CommandHandler, CommandContext, TaskParams } from "./CommandHandler";
 export { UpCommand } from "./UpCommand";
 export { DownCommand } from "./DownCommand";
 export { RestartCommand } from "./RestartCommand";

@@ -2,10 +2,16 @@
 import { Zapper } from "../core/Zapper";
 import { logger, LogLevel } from "../utils/logger";
 
+export interface TaskParams {
+  named: Record<string, string>;
+  rest: string[];
+}
+
 export interface CommandContext {
   zapper: Zapper;
   service?: string;
   options: Record<string, any>;
+  taskParams?: TaskParams;
 }
 
 export abstract class CommandHandler {

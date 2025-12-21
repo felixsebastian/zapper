@@ -14,14 +14,14 @@ export const duplicateValidation = <T extends z.ZodTypeAny>(schema: T) =>
         return true;
       };
 
-      if (config.bare_metal) {
-        for (const [name, proc] of Object.entries(config.bare_metal)) {
-          if (!add(name, `bare_metal['${name}']`)) {
+      if (config.native) {
+        for (const [name, proc] of Object.entries(config.native)) {
+          if (!add(name, `native['${name}']`)) {
             return false;
           }
           if ((proc as any).aliases) {
             for (const alias of (proc as any).aliases) {
-              if (!add(alias, `bare_metal['${name}'].aliases`)) {
+              if (!add(alias, `native['${name}'].aliases`)) {
                 return false;
               }
             }
@@ -49,6 +49,6 @@ export const duplicateValidation = <T extends z.ZodTypeAny>(schema: T) =>
     },
     {
       message:
-        "Duplicate service identifier. Names and aliases must be globally unique across bare_metal and docker",
+        "Duplicate service identifier. Names and aliases must be globally unique across native and docker",
     },
   );

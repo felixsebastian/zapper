@@ -11,15 +11,15 @@ export async function cloneRepos(
 ): Promise<void> {
   const method = (config.git_method || "ssh") as GitMethod;
 
-  const allBareMetal = config.bare_metal
-    ? Object.entries(config.bare_metal).map(([name, p]) => ({
+  const allNative = config.native
+    ? Object.entries(config.native).map(([name, p]) => ({
         ...p,
         name: (p.name as string) || name,
       }))
     : [];
 
   // Build alias map for resolution
-  const processes = allBareMetal;
+  const processes = allNative;
   const containers =
     config.docker || config.containers
       ? Object.entries(config.docker || config.containers || {})
@@ -28,11 +28,11 @@ export async function cloneRepos(
   const canonical = resolveAliasesToCanonical(processNames, aliasMap);
 
   const targets = canonical
-    ? allBareMetal.filter((p) => canonical.includes(p.name as string))
-    : allBareMetal;
+    ? allNative.filter((p) => canonical.includes(p.name as string))
+    : allNative;
 
   if (targets.length === 0) {
-    logger.info("No bare_metal services to clone");
+    logger.info("No native services to clone");
     return;
   }
 

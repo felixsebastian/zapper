@@ -1,4 +1,23 @@
-# Zapper Usage
+# Zapper Reference
+
+Complete reference for `zap.yaml` syntax and all CLI commands.
+
+---
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Project Configuration](#project-configuration)
+- [CLI Commands](#cli-commands)
+- [Native Processes](#native-processes)
+- [Docker Services](#docker-services)
+- [Environment Variables](#environment-variables)
+- [Tasks](#tasks)
+- [Dependencies](#dependencies)
+- [Profiles](#profiles)
+- [Git Cloning](#git-cloning)
+
+---
 
 ## Installation
 
@@ -8,84 +27,246 @@ npm install -g pm2 zapper-cli
 
 For VS Code/Cursor, install the extension: `felixsebastian.zapper-vscode`
 
-## Quick Start
+---
 
-Create a `zap.yaml` in your project root:
+## Project Configuration
+
+### Minimal config
 
 ```yaml
 project: myapp
-env_files: [.env]
 
-bare_metal:
-  backend:
+native:
+  api:
     cmd: pnpm dev
-    env:
-      - APP_ENV
+```
+
+### Full config structure
+
+```yaml
+project: myapp                    # Required. Used as PM2/Docker namespace
+env_files: [.env.base, .env]      # Load env vars from these files
+git_method: ssh                   # ssh | http | cli (for repo cloning)
+
+native:
+  # ... process definitions
+
+docker:
+  # ... container definitions
+
+tasks:
+  # ... task definitions
+```
+
+---
+
+## CLI Commands
+
+### Starting and stopping
+
+```bash
+zap up                      # Start all services
+zap up --service backend    # Start specific service (and its dependencies)
+zap down                    # Stop all services
+zap down --service backend  # Stop specific service
+zap restart                 # Restart all services
+zap restart --service api   # Restart specific service
+```
+
+### Status and logs
+
+```bash
+zap status                  # Show status of all services
+zap logs                    # Follow logs for all services
+zap logs --service api      # Follow logs for specific service
+```
+
+### Tasks
+
+```bash
+zap task                           # List all tasks
+zap task <name>                    # Run a task
+zap task seed
+zap task build --target=prod       # Run with named parameters
+zap task test -- --coverage        # Run with pass-through args
+zap task build --list-params       # Show task parameters as JSON
+```
+
+### Utilities
+
+```bash
+zap reset                   # Stop all services and delete .zap folder
+zap clone                   # Clone all repos defined in config
+zap clone --service api     # Clone specific repo
+```
+
+### Profiles
+
+```bash
+zap up --profile test       # Start only services matching profile
+```
+
+---
+
+## Native Processes
+
+Native processes run via PM2 on your local machine.
+
+### Basic process
+
+```yaml
+native:
+  api:
+    cmd: pnpm dev
+```
+
+### All options
+
+```yaml
+native:
+  api:
+    cmd: pnpm dev              # Required. Command to run
+    cwd: ./backend             # Working directory (relative to zap.yaml)
+    env:                       # Env vars to pass (whitelist)
       - PORT
       - DATABASE_URL
+      - DEBUG=true             # Inline override
+    depends_on: [postgres]     # Start these first
+    profiles: [dev, test]      # Only start when profile matches
+    repo: myorg/api-repo       # Git repo (for zap clone)
+```
+
+### Working directory
+
+```yaml
+native:
+  frontend:
+    cmd: pnpm dev
+    cwd: ./packages/frontend   # Relative to project root
+```
+
+### Multiple processes
+
+```yaml
+native:
+  api:
+    cmd: pnpm dev
+    cwd: ./api
+
+  worker:
+    cmd: pnpm worker
+    cwd: ./api
 
   frontend:
     cmd: pnpm dev
-    cwd: ./frontend
-    env:
-      - APP_ENV
-      - VITE_API_URL
+    cwd: ./web
+```
 
+---
+
+## Docker Services
+
+Containers managed via Docker CLI.
+
+### Basic container
+
+```yaml
 docker:
-  mongodb:
-    image: mongo:latest
-    ports:
-      - 27017:27017
-    volumes:
-      - mongodb-data:/data/db
-
   redis:
     image: redis:latest
     ports:
       - 6379:6379
-
-tasks:
-  seed:
-    env: [DATABASE_URL]
-    cmds:
-      - pnpm db:seed
-
-  lint:
-    cmds:
-      - pnpm eslint . --fix
-      - pnpm tsc --noEmit
 ```
 
-Then run:
+### All options
 
-```bash
-zap up        # start everything
-zap status    # check what's running
-zap down      # stop everything
-zap task seed # run a task
+```yaml
+docker:
+  postgres:
+    image: postgres:15         # Required. Docker image
+    ports:                     # Port mappings (host:container)
+      - 5432:5432
+    env:                       # Env vars for container
+      - POSTGRES_DB=myapp
+      - POSTGRES_PASSWORD=dev
+    volumes:                   # Volume mounts
+      - postgres-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    depends_on: [other]        # Start dependencies first
+    profiles: [dev]            # Profile filtering
 ```
 
-## CLI Commands
+### Common database setups
 
-```bash
-zap up                    # Start all services
-zap up --service backend  # Start specific service
-zap down                  # Stop all services
-zap restart               # Restart all services
-zap status                # Show service status
-zap logs --service api    # Follow logs for a service
-zap task <name>           # Run a task
-zap reset                 # Stop all and delete .zap folder
-zap clone                 # Clone repos defined in config
+#### PostgreSQL
+
+```yaml
+docker:
+  postgres:
+    image: postgres:15
+    ports:
+      - 5432:5432
+    env:
+      - POSTGRES_DB=myapp
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
 ```
+
+#### MongoDB
+
+```yaml
+docker:
+  mongodb:
+    image: mongo:7
+    ports:
+      - 27017:27017
+    volumes:
+      - mongodb-data:/data/db
+```
+
+#### Redis
+
+```yaml
+docker:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - 6379:6379
+```
+
+#### MySQL
+
+```yaml
+docker:
+  mysql:
+    image: mysql:8
+    ports:
+      - 3306:3306
+    env:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=myapp
+    volumes:
+      - mysql-data:/var/lib/mysql
+```
+
+---
 
 ## Environment Variables
 
-Zapper uses a whitelist approach: you define where env vars live, then each service declares which ones it needs.
+Zapper uses a **whitelist approach**: define where vars come from, then each service declares which ones it needs.
+
+### Loading from files
+
+```yaml
+env_files: [.env]                    # Single file
+env_files: [.env.base, .env]         # Multiple files (later files override)
+```
 
 ### Recommended pattern
 
-Create two files in your project root:
+Split into two files:
 
 - `.env.base` — non-secrets (ports, URLs), **committed** to git
 - `.env` — secrets (API keys, passwords), **gitignored**
@@ -96,10 +277,10 @@ env_files: [.env.base, .env]
 
 ### Whitelisting per service
 
-Each service gets only the vars it explicitly lists:
+Each service only receives the vars it explicitly lists:
 
 ```yaml
-bare_metal:
+native:
   backend:
     cmd: pnpm dev
     env:
@@ -113,50 +294,238 @@ bare_metal:
       - VITE_API_URL
 ```
 
-The backend sees `PORT`, `DATABASE_URL`, and `JWT_SECRET`. The frontend only sees `VITE_API_URL`. No leakage.
+Backend sees `PORT`, `DATABASE_URL`, `JWT_SECRET`. Frontend only sees `VITE_API_URL`. No leakage.
 
-### Inline overrides
+### Inline values
 
-You can override values inline for specific scenarios (e.g., test profiles):
+Override or hardcode values inline:
 
 ```yaml
-bare_metal:
-  backend-test:
-    profiles: [test]
+native:
+  api:
     cmd: pnpm dev
     env:
-      - PORT=8422
-      - DATABASE_URL=mongodb://localhost:27017/test
+      - PORT=3000                    # Hardcoded value
+      - DATABASE_URL                  # From env_files
+      - DEBUG=true                    # Override
 ```
+
+### Docker env vars
+
+Docker services can use env vars too:
+
+```yaml
+docker:
+  postgres:
+    image: postgres:15
+    env:
+      - POSTGRES_PASSWORD=dev        # Hardcoded
+      - POSTGRES_DB                   # From env_files
+```
+
+---
 
 ## Tasks
 
-Define common operations alongside your services:
+One-off commands that can use your env vars and accept parameters.
+
+### Basic task
 
 ```yaml
 tasks:
   seed:
+    cmds:
+      - pnpm db:seed
+```
+
+### All options
+
+```yaml
+tasks:
+  seed:
+    desc: Seed the database          # Description (shown in help)
+    cwd: ./backend                   # Working directory
+    env:                             # Env vars to pass
+      - DATABASE_URL
+    params:                          # Named parameters
+      - name: count
+        default: "10"
+        desc: Number of records
+      - name: env
+        required: true
+        desc: Target environment
+    cmds:                            # Commands to run (in order)
+      - pnpm db:migrate
+      - 'pnpm db:seed --count={{count}}'
+```
+
+### Running tasks
+
+```bash
+zap task seed
+zap task lint
+```
+
+### Parameters
+
+Tasks can accept named parameters and pass-through arguments.
+
+#### Named parameters
+
+Define parameters with defaults and validation:
+
+```yaml
+tasks:
+  build:
+    desc: Build for target environment
+    params:
+      - name: target
+        default: development
+        desc: Build target
+      - name: minify
+        desc: Enable minification
+    cmds:
+      - 'echo "Building for {{target}}"'
+      - 'npm run build -- --env={{target}}'
+```
+
+Run with parameters:
+
+```bash
+zap task build --target=production --minify=true
+```
+
+#### Required parameters
+
+Mark parameters as required (task fails if not provided):
+
+```yaml
+tasks:
+  deploy:
+    params:
+      - name: env
+        required: true
+        desc: Deployment environment
+    cmds:
+      - 'deploy.sh {{env}}'
+```
+
+```bash
+zap task deploy --env=staging    # Works
+zap task deploy                  # Error: Required parameter 'env' not provided
+```
+
+#### Pass-through arguments (REST)
+
+Use `{{REST}}` to forward extra CLI arguments:
+
+```yaml
+tasks:
+  test:
+    desc: Run tests with optional args
+    cmds:
+      - 'pnpm vitest {{REST}}'
+```
+
+Everything after `--` is passed through:
+
+```bash
+zap task test -- --coverage src/
+# Runs: pnpm vitest --coverage src/
+```
+
+#### Custom delimiters
+
+If your commands contain `{{` and `}}`, use custom delimiters:
+
+```yaml
+project: myapp
+task_delimiters: ["<<", ">>"]
+
+tasks:
+  build:
+    cmds:
+      - 'echo "Building <<target>>"'
+```
+
+### Listing task parameters
+
+For tooling integration (VS Code extension), get parameter info as JSON:
+
+```bash
+zap task build --list-params
+```
+
+Output:
+
+```json
+{
+  "name": "build",
+  "params": [
+    { "name": "target", "default": "development", "required": false, "desc": "Build target" }
+  ],
+  "acceptsRest": false
+}
+```
+
+### Common task patterns
+
+#### Database operations
+
+```yaml
+tasks:
+  db:migrate:
+    desc: Run database migrations
+    env: [DATABASE_URL]
+    cmds:
+      - pnpm prisma migrate dev
+
+  db:seed:
     desc: Seed the database
     env: [DATABASE_URL]
     cmds:
-      - pnpm db:seed
+      - pnpm prisma db seed
+
+  db:reset:
+    desc: Reset and reseed database
+    env: [DATABASE_URL]
+    cmds:
+      - pnpm prisma migrate reset --force
+```
+
+#### Code quality
+
+```yaml
+tasks:
+  lint:
+    cmds:
+      - pnpm eslint . --fix
+      - pnpm prettier --write .
+
+  typecheck:
+    cmds:
+      - pnpm tsc --noEmit
+
+  test:
+    env: [DATABASE_URL]
+    cmds:
+      - pnpm vitest run
 
   checks:
     desc: Run all checks before committing
     cmds:
-      - pnpm eslint . --fix
+      - pnpm eslint .
       - pnpm tsc --noEmit
-      - pnpm test
+      - pnpm vitest run
 ```
 
-```bash
-zap task seed
-zap task checks
-```
+---
 
-Tasks can access whitelisted env vars just like services.
+## Dependencies
 
-## Docker Services
+Control startup order with `depends_on`.
+
+### Basic dependency
 
 ```yaml
 docker:
@@ -164,22 +533,98 @@ docker:
     image: postgres:15
     ports:
       - 5432:5432
-    env:
-      - POSTGRES_DB=myapp
-      - POSTGRES_PASSWORD=dev
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
+
+native:
+  api:
+    cmd: pnpm dev
+    depends_on: [postgres]     # Postgres starts first
 ```
+
+### Dependency chain
+
+```yaml
+docker:
+  postgres:
+    image: postgres:15
+
+  redis:
+    image: redis:7
+
+native:
+  api:
+    cmd: pnpm dev
+    depends_on: [postgres, redis]
+
+  worker:
+    cmd: pnpm worker
+    depends_on: [api]          # API (and its deps) start first
+
+  frontend:
+    cmd: pnpm dev
+    depends_on: [api]
+```
+
+When you run `zap up --service frontend`, Zapper starts: postgres → redis → api → frontend.
+
+---
+
+## Profiles
+
+Run different subsets of services.
+
+### Defining profiles
+
+```yaml
+native:
+  api:
+    cmd: pnpm dev
+    profiles: [dev, test]
+
+  api-prod:
+    cmd: pnpm start
+    profiles: [prod]
+
+  frontend:
+    cmd: pnpm dev
+    profiles: [dev]
+
+docker:
+  postgres:
+    image: postgres:15
+    profiles: [dev, test]
+
+  postgres-test:
+    image: postgres:15
+    env:
+      - POSTGRES_DB=test
+    profiles: [test]
+```
+
+### Using profiles
+
+```bash
+zap up                     # Starts services with no profile defined
+zap up --profile dev       # Starts services with 'dev' profile
+zap up --profile test      # Starts services with 'test' profile
+```
+
+### Default behavior
+
+Services without a `profiles` field run in all profiles (including when no profile is specified).
+
+---
 
 ## Git Cloning
 
-For multi-repo setups, zapper can clone repos into your workspace:
+For multi-repo setups, Zapper can clone repositories.
+
+### Configuration
 
 ```yaml
 project: myapp
-git_method: ssh  # or http, cli (GitHub CLI)
+git_method: ssh              # ssh | http | cli
 
-bare_metal:
+native:
   api:
     cmd: pnpm dev
     cwd: ./api
@@ -191,7 +636,112 @@ bare_metal:
     repo: myorg/web-app
 ```
 
+### Git methods
+
+| Method | URL Format | Notes |
+|--------|-----------|-------|
+| `ssh` | `git@github.com:myorg/repo.git` | Requires SSH key |
+| `http` | `https://github.com/myorg/repo.git` | May prompt for auth |
+| `cli` | Uses `gh repo clone` | Requires GitHub CLI |
+
+### Cloning
+
 ```bash
-zap clone              # clone all repos
-zap clone --service api  # clone just one
+zap clone                  # Clone all repos
+zap clone --service api    # Clone specific repo
+```
+
+Repos are cloned to the path specified in `cwd`.
+
+---
+
+## Full Example
+
+A complete example for a typical full-stack app:
+
+```yaml
+project: myapp
+env_files: [.env.base, .env]
+git_method: ssh
+
+native:
+  api:
+    cmd: pnpm dev
+    cwd: ./api
+    repo: myorg/api
+    env:
+      - PORT
+      - DATABASE_URL
+      - REDIS_URL
+      - JWT_SECRET
+    depends_on: [postgres, redis]
+
+  worker:
+    cmd: pnpm worker
+    cwd: ./api
+    env:
+      - DATABASE_URL
+      - REDIS_URL
+    depends_on: [api]
+
+  frontend:
+    cmd: pnpm dev
+    cwd: ./web
+    repo: myorg/web
+    env:
+      - VITE_API_URL
+    depends_on: [api]
+
+docker:
+  postgres:
+    image: postgres:15
+    ports:
+      - 5432:5432
+    env:
+      - POSTGRES_DB=myapp
+      - POSTGRES_PASSWORD=dev
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - 6379:6379
+
+tasks:
+  db:migrate:
+    desc: Run migrations
+    env: [DATABASE_URL]
+    cmds:
+      - pnpm --filter api prisma migrate dev
+
+  db:seed:
+    desc: Seed database
+    env: [DATABASE_URL]
+    params:
+      - name: count
+        default: "10"
+        desc: Number of seed records
+    cmds:
+      - 'pnpm --filter api prisma db seed --count={{count}}'
+
+  test:
+    desc: Run tests with optional args
+    env: [DATABASE_URL]
+    cmds:
+      - 'pnpm vitest {{REST}}'
+
+  deploy:
+    desc: Deploy to environment
+    params:
+      - name: env
+        required: true
+        desc: Target environment (staging, production)
+    cmds:
+      - 'deploy.sh {{env}}'
+
+  lint:
+    cmds:
+      - pnpm eslint . --fix
+      - pnpm tsc --noEmit
 ```

@@ -58,7 +58,7 @@ describe("Planner - Profile-based StartAll", () => {
 
     config = {
       project: "test-project",
-      bare_metal: {
+      native: {
         api: { cmd: "npm start" },
         frontend: { cmd: "npm run dev", profiles: ["dev"] },
         worker: { cmd: "npm run worker", profiles: ["prod"] },
@@ -101,22 +101,22 @@ describe("Planner - Profile-based StartAll", () => {
 
       expect(actions).toContainEqual({
         type: "start",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "api",
       });
       expect(actions).toContainEqual({
         type: "start",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "frontend",
       });
       expect(actions).toContainEqual({
         type: "stop",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "worker",
       });
       expect(actions).toContainEqual({
         type: "stop",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "monitor",
       });
       expect(actions).toContainEqual({
@@ -163,12 +163,12 @@ describe("Planner - Profile-based StartAll", () => {
 
       expect(actions).toContainEqual({
         type: "start",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "api",
       });
       expect(actions).toContainEqual({
         type: "start",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "frontend",
       });
       expect(actions).toContainEqual({
@@ -204,12 +204,12 @@ describe("Planner - Profile-based StartAll", () => {
 
       expect(actions).toContainEqual({
         type: "start",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "api",
       });
       expect(actions).toContainEqual({
         type: "start",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "frontend",
       });
       expect(actions).toContainEqual({
@@ -248,22 +248,22 @@ describe("Planner - Profile-based StartAll", () => {
 
       expect(actions).toContainEqual({
         type: "start",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "api",
       });
       expect(actions).toContainEqual({
         type: "stop",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "frontend",
       });
       expect(actions).toContainEqual({
         type: "stop",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "worker",
       });
       expect(actions).toContainEqual({
         type: "stop",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "monitor",
       });
       expect(actions).toContainEqual({
@@ -302,7 +302,7 @@ describe("Planner - Profile-based StartAll", () => {
 
       expect(actions).toContainEqual({
         type: "start",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "frontend",
       });
     });
@@ -324,7 +324,7 @@ describe("Planner - Profile-based StartAll", () => {
 
       expect(actions).toContainEqual({
         type: "stop",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "frontend",
       });
     });
@@ -381,17 +381,17 @@ describe("Planner - Profile-based StartAll", () => {
 
       expect(actions).toContainEqual({
         type: "start",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "api",
       });
       expect(actions).toContainEqual({
         type: "stop",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "frontend",
       });
       expect(actions).toContainEqual({
         type: "start",
-        serviceType: "bare_metal",
+        serviceType: "native",
         name: "monitor",
       });
       expect(actions).toContainEqual({
@@ -417,7 +417,7 @@ describe("Planner - Dependency-aware waves", () => {
   it("should order services based on depends_on", async () => {
     const config: ZapperConfig = {
       project: "test-project",
-      bare_metal: {
+      native: {
         api: { cmd: "npm start", depends_on: ["database"] },
         frontend: { cmd: "npm run dev", depends_on: ["api"] },
       },
@@ -446,7 +446,7 @@ describe("Planner - Dependency-aware waves", () => {
   it("should run independent services in parallel", async () => {
     const config: ZapperConfig = {
       project: "test-project",
-      bare_metal: {
+      native: {
         api: { cmd: "npm start", depends_on: ["database", "redis"] },
       },
       docker: {
@@ -474,7 +474,7 @@ describe("Planner - Dependency-aware waves", () => {
   it("should include healthCheck in actions", async () => {
     const config: ZapperConfig = {
       project: "test-project",
-      bare_metal: {
+      native: {
         api: { cmd: "npm start", healthCheck: 10 },
       },
       docker: {
@@ -499,7 +499,7 @@ describe("Planner - Dependency-aware waves", () => {
   it("should use default healthCheck of 5", async () => {
     const config: ZapperConfig = {
       project: "test-project",
-      bare_metal: {
+      native: {
         api: { cmd: "npm start" },
       },
     };
@@ -515,7 +515,7 @@ describe("Planner - Dependency-aware waves", () => {
   it("should throw on circular dependencies", async () => {
     const config: ZapperConfig = {
       project: "test-project",
-      bare_metal: {
+      native: {
         a: { cmd: "npm start", depends_on: ["b"] },
         b: { cmd: "npm start", depends_on: ["a"] },
       },
@@ -532,7 +532,7 @@ describe("Planner - Dependency-aware waves", () => {
   it("should stop dependents before dependencies", async () => {
     const config: ZapperConfig = {
       project: "test-project",
-      bare_metal: {
+      native: {
         api: { cmd: "npm start", depends_on: ["database"] },
         frontend: { cmd: "npm run dev", depends_on: ["api"] },
       },

@@ -4,7 +4,7 @@ export const findProcess = (
   config: ZapperConfig,
   name: string,
 ): Process | undefined => {
-  const bareMetal = config.bare_metal?.[name];
-  if (bareMetal) return bareMetal;
+  const native = config.native?.[name];
+  if (native) return native;
   return undefined;
 };

@@ -13,9 +13,9 @@ export class WhitelistResolver {
     const resolvedConfig = structuredClone(config);
     const whitelists = config.whitelists;
 
-    // Resolve bare_metal processes
-    if (resolvedConfig.bare_metal) {
-      for (const [name, process] of Object.entries(resolvedConfig.bare_metal)) {
+    // Resolve native processes
+    if (resolvedConfig.native) {
+      for (const [name, process] of Object.entries(resolvedConfig.native)) {
         if (process.env && typeof process.env === "string") {
           const whitelistName = process.env;
           if (!(whitelistName in whitelists)) {
@@ -120,9 +120,9 @@ export class WhitelistResolver {
       }
     };
 
-    // Check bare_metal processes
-    if (config.bare_metal) {
-      for (const [name, process] of Object.entries(config.bare_metal)) {
+    // Check native processes
+    if (config.native) {
+      for (const [name, process] of Object.entries(config.native)) {
         if (process.env && typeof process.env === "string") {
           validateEnvReference(process.env, "Process", name);
         }
@@ -173,9 +173,9 @@ export class WhitelistResolver {
   private static checkForStringEnvReferences(config: ZapperConfig): void {
     const foundReferences: string[] = [];
 
-    // Check bare_metal processes
-    if (config.bare_metal) {
-      for (const [name, process] of Object.entries(config.bare_metal)) {
+    // Check native processes
+    if (config.native) {
+      for (const [name, process] of Object.entries(config.native)) {
         if (process.env && typeof process.env === "string") {
           foundReferences.push(`Process '${name}' references '${process.env}'`);
         }
