@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.10.0
+
+### Minor Changes
+
+- eec7116: Heaps of new features
+
 ## 0.9.2
 
 ### Patch Changes
