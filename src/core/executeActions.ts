@@ -5,14 +5,14 @@ import { Pm2Executor } from "./process/Pm2Executor";
 import { Action, ActionPlan } from "../types";
 import { findProcess } from "./findProcess";
 import { findContainer } from "./findContainer";
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+import { updateServiceState, clearServiceState } from "../config/stateLoader";
 
 async function executeAction(
   action: Action,
   config: ZapperConfig,
   projectName: string,
   pm2: Pm2Executor,
+  configDir: string,
 ): Promise<void> {
   if (action.serviceType === "native") {
     const proc = findProcess(config, action.name);
@@ -62,7 +62,7 @@ async function executeAction(
         "com.zapper.service": name,
       } as Record<string, string>;
 
-      await DockerManager.startContainer(dockerName, {
+      const pid = await DockerManager.startContainerAsync(dockerName, {
         image: c.image,
         ports,
         volumes: volumeBindings,
@@ -72,9 +72,15 @@ async function executeAction(
         labels,
       });
 
-      logger.info(`Started ${name}`);
+      updateServiceState(configDir, dockerName, {
+        startPid: pid,
+        startRequestedAt: new Date().toISOString(),
+      });
+
+      logger.info(`Starting ${name}`);
     } else {
       await DockerManager.stopContainer(dockerName);
+      clearServiceState(configDir, dockerName);
       logger.info(`Stopped ${name}`);
     }
   }
@@ -90,12 +96,9 @@ export async function executeActions(
 
   for (const wave of plan.waves) {
     await Promise.all(
-      wave.actions.map(async (action) => {
-        await executeAction(action, config, projectName, pm2);
-        if (action.type === "start" && action.healthCheck > 0) {
-          await sleep(action.healthCheck * 1000);
-        }
-      }),
+      wave.actions.map((action) =>
+        executeAction(action, config, projectName, pm2, configDir || process.cwd()),
+      ),
     );
   }
 }

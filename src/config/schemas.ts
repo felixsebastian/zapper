@@ -124,9 +124,15 @@ export const ZapperConfigSchema = processValidation(
   ),
 );
 
+export const ServiceStateSchema = z.object({
+  startPid: z.number().optional(),
+  startRequestedAt: z.string().optional(),
+});
+
 export const ZapperStateSchema = z.object({
   activeProfile: z.string().optional(),
   lastUpdated: z.string().optional(),
+  services: z.record(z.string(), ServiceStateSchema).optional(),
 });
 
 export type Process = z.infer<typeof ProcessSchema>;
@@ -135,6 +141,7 @@ export type Volume = z.infer<typeof VolumeSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type TaskParam = z.infer<typeof TaskParamSchema>;
 export type ZapperConfig = z.infer<typeof ZapperConfigSchema>;
+export type ServiceState = z.infer<typeof ServiceStateSchema>;
 export type ZapperState = z.infer<typeof ZapperStateSchema>;
 
 // Resolved types after whitelist resolution - env fields are guaranteed to be arrays

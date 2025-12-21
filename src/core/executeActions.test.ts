@@ -11,6 +11,10 @@ import { findContainer } from "./findContainer";
 vi.mock("./docker");
 vi.mock("./findProcess");
 vi.mock("./findContainer");
+vi.mock("../config/stateLoader", () => ({
+  updateServiceState: vi.fn(),
+  clearServiceState: vi.fn(),
+}));
 vi.mock("../utils/logger", () => ({
   logger: {
     info: vi.fn(),
@@ -84,7 +88,7 @@ describe("executeActions", () => {
     vi.mocked(Pm2Executor).mockImplementation(() => mockPm2Executor as any);
 
     vi.mocked(DockerManager.createVolume).mockResolvedValue(undefined);
-    vi.mocked(DockerManager.startContainer).mockResolvedValue(undefined);
+    vi.mocked(DockerManager.startContainerAsync).mockResolvedValue(12345);
     vi.mocked(DockerManager.stopContainer).mockResolvedValue(undefined);
   });
 
@@ -203,7 +207,7 @@ describe("executeActions", () => {
         "postgres_config",
       );
 
-      expect(DockerManager.startContainer).toHaveBeenCalledWith(
+      expect(DockerManager.startContainerAsync).toHaveBeenCalledWith(
         "zap.test-project.database",
         {
           image: "postgres:15",
@@ -249,7 +253,7 @@ describe("executeActions", () => {
 
       await executeActions(mockConfig, "test-project", "/config/dir", plan);
 
-      expect(DockerManager.startContainer).toHaveBeenCalledWith(
+      expect(DockerManager.startContainerAsync).toHaveBeenCalledWith(
         "zap.test-project.redis",
         {
           image: "redis:7",
@@ -352,7 +356,7 @@ describe("executeActions", () => {
       expect(DockerManager.createVolume).toHaveBeenCalledWith("simple_volume");
       expect(DockerManager.createVolume).toHaveBeenCalledWith("complex_volume");
 
-      expect(DockerManager.startContainer).toHaveBeenCalledWith(
+      expect(DockerManager.startContainerAsync).toHaveBeenCalledWith(
         "zap.test-project.test",
         expect.objectContaining({
           volumes: ["simple_volume:/data", "complex_volume:/app/data"],
@@ -399,7 +403,7 @@ describe("executeActions", () => {
         mockProcess,
         "test-project",
       );
-      expect(DockerManager.startContainer).toHaveBeenCalledWith(
+      expect(DockerManager.startContainerAsync).toHaveBeenCalledWith(
         "zap.test-project.redis",
         expect.any(Object),
       );

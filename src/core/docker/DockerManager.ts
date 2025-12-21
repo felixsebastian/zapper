@@ -11,28 +11,19 @@ interface DockerConfig {
   labels?: Record<string, string>;
 }
 
-interface DockerContainer {
+export interface DockerContainer {
   id: string;
   name: string;
   status: string;
   ports: string[];
   networks: string[];
   created: string;
+  startedAt?: string;
 }
 
 export class DockerManager {
-  static async startContainer(
-    name: string,
-    config: DockerConfig,
-  ): Promise<void> {
-    // Ensure a clean slate: remove any existing container with this name
-    try {
-      await runDocker(["rm", "-f", name]);
-    } catch (e) {
-      // ignore if container doesn't exist
-    }
+  private static buildRunArgs(name: string, config: DockerConfig): string[] {
     const args = ["run", "-d", "--name", name];
-
     if (config.labels)
       for (const [k, v] of Object.entries(config.labels))
         args.push("--label", `${k}=${v}`);
@@ -43,11 +34,40 @@ export class DockerManager {
     if (config.environment)
       for (const [k, v] of Object.entries(config.environment))
         args.push("-e", `${k}=${v}`);
-
     args.push(config.image);
     if (config.command) args.push(config.command);
+    return args;
+  }
 
+  static async startContainer(
+    name: string,
+    config: DockerConfig,
+  ): Promise<void> {
+    try {
+      await runDocker(["rm", "-f", name]);
+    } catch (e) {
+      // ignore if container doesn't exist
+    }
+    const args = this.buildRunArgs(name, config);
     await runDocker(args);
+  }
+
+  static async startContainerAsync(
+    name: string,
+    config: DockerConfig,
+  ): Promise<number> {
+    try {
+      await runDocker(["rm", "-f", name]);
+    } catch (e) {
+      // ignore if container doesn't exist
+    }
+    const args = this.buildRunArgs(name, config);
+    const child = spawn("docker", args, {
+      detached: true,
+      stdio: "ignore",
+    });
+    child.unref();
+    return child.pid!;
   }
 
   static async stopContainer(name: string): Promise<void> {
@@ -84,6 +104,7 @@ export class DockerManager {
         ports: [],
         networks: Object.keys(networks),
         created: (raw["Created"] as string) || "",
+        startedAt: (state?.["StartedAt"] as string) || undefined,
       };
     } catch (error) {
       return null;

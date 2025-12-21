@@ -5,10 +5,12 @@ const color = {
   reset: "\u001B[0m",
   red: "\u001B[31m",
   green: "\u001B[32m",
+  yellow: "\u001B[33m",
 } as const;
 
 function formatServiceStatus(status: string): string {
   if (status === "up") return `${color.green}${status}${color.reset}`;
+  if (status === "pending") return `${color.yellow}${status}${color.reset}`;
   if (status === "down") return `${color.red}${status}${color.reset}`;
   return status;
 }

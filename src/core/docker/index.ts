@@ -1,1 +1,1 @@
-export { DockerManager } from "./DockerManager";
+export { DockerManager, type DockerContainer } from "./DockerManager";

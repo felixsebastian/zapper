@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { ZapperStateSchema, ZapperState } from "./schemas";
+import { ZapperStateSchema, ZapperState, ServiceState } from "./schemas";
 import { logger } from "../utils/logger";
 
 export function loadState(projectRoot: string): ZapperState {
@@ -61,4 +61,32 @@ export function saveState(
     logger.warn(`Failed to save state to ${statePath}: ${error}`);
     throw error;
   }
+}
+
+export function updateServiceState(
+  projectRoot: string,
+  serviceName: string,
+  serviceState: Partial<ServiceState>,
+): void {
+  const existingState = loadState(projectRoot);
+  const services = existingState.services || {};
+  const existing = services[serviceName] || {};
+
+  saveState(projectRoot, {
+    services: {
+      ...services,
+      [serviceName]: { ...existing, ...serviceState },
+    },
+  });
+}
+
+export function clearServiceState(
+  projectRoot: string,
+  serviceName: string,
+): void {
+  const existingState = loadState(projectRoot);
+  const services = existingState.services || {};
+  delete services[serviceName];
+
+  saveState(projectRoot, { services });
 }
