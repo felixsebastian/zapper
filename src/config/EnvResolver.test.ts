@@ -155,6 +155,49 @@ envs:
 
       expect(result).toEqual({});
     });
+
+    it("should expand variable interpolation in .env files", () => {
+      const envContent = `
+HOST=localhost
+PORT=5432
+DATABASE_URL=\${HOST}:\${PORT}/mydb
+SIMPLE_REF=$HOST
+WITH_DEFAULT=\${MISSING:-fallback}
+      `;
+
+      const envFile = createTempFile(envContent, ".env");
+      const result = EnvResolver["loadAndMergeEnvFiles"]([envFile]);
+
+      expect(result).toEqual({
+        HOST: "localhost",
+        PORT: "5432",
+        DATABASE_URL: "localhost:5432/mydb",
+        SIMPLE_REF: "localhost",
+        WITH_DEFAULT: "fallback",
+      });
+    });
+
+    it("should expand variables across multiple .env files", () => {
+      const env1Content = `
+HOST=localhost
+PORT=3000
+      `;
+
+      const env2Content = `
+API_URL=http://\${HOST}:\${PORT}/api
+      `;
+
+      const env1File = createTempFile(env1Content, ".env");
+      const env2File = createTempFile(env2Content, ".env");
+
+      const result = EnvResolver["loadAndMergeEnvFiles"]([env1File, env2File]);
+
+      expect(result).toEqual({
+        HOST: "localhost",
+        PORT: "3000",
+        API_URL: "http://localhost:3000/api",
+      });
+    });
   });
 
   describe("resolve", () => {

@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from "fs";
 import path from "path";
 import { parse } from "yaml";
 import { parse as dotenvParse } from "dotenv";
+import { expand } from "dotenv-expand";
 import {
   ZapperConfig,
   Process as ConfigProcess,
@@ -325,7 +326,8 @@ export class EnvResolver {
 
         if (isDotenv) {
           const parsed = dotenvParse(content);
-          Object.assign(merged, parsed);
+          const expanded = expand({ parsed, processEnv: merged });
+          Object.assign(merged, expanded.parsed);
         } else if (ext === ".yaml" || ext === ".yml") {
           const data = parse(content) as RawEnvFile | undefined;
           const envs = Array.isArray(data?.envs) ? data?.envs : [];

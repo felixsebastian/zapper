@@ -17,6 +17,7 @@ import {
   PullCommand,
   GitStatusCommand,
   ConfigCommand,
+  EnvCommand,
   CommandContext,
   CommandHandler,
 } from "../commands";
@@ -47,6 +48,7 @@ export class CommanderCli {
     this.commandHandlers.set("pull", new PullCommand());
     this.commandHandlers.set("gitstatus", new GitStatusCommand());
     this.commandHandlers.set("config", new ConfigCommand());
+    this.commandHandlers.set("env", new EnvCommand());
   }
 
   private setupProgram(): void {
@@ -209,6 +211,15 @@ export class CommanderCli {
       .option("--pretty", "Format JSON output with indentation")
       .action(async (options, command) => {
         await this.executeCommand("config", undefined, command);
+      });
+
+    this.program
+      .command("env")
+      .description("Show resolved environment variables for a service")
+      .argument("<service>", "Service to show environment variables for")
+      .option("-j, --json", "Output as minified JSON")
+      .action(async (service, options, command) => {
+        await this.executeCommand("env", service, command);
       });
   }
 

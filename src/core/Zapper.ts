@@ -198,7 +198,8 @@ export class Zapper {
       this.context.state.activeProfile,
     );
 
-    if (canonical && plan.actions.length === 0) {
+    const hasActions = plan.waves.some((w) => w.actions.length > 0);
+    if (canonical && !hasActions) {
       throw new Error(
         `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
       );
@@ -226,7 +227,8 @@ export class Zapper {
       this.context.state.activeProfile,
     );
 
-    if (canonical && plan.actions.length === 0) {
+    const hasActions = plan.waves.some((w) => w.actions.length > 0);
+    if (canonical && !hasActions) {
       throw new Error(
         `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
       );
@@ -279,7 +281,9 @@ export class Zapper {
       const dockerName = `zap.${projectName}.${resolvedName}`;
       const exists = await DockerManager.containerExists(dockerName);
       if (!exists)
-        throw new Error(`Container not running: ${resolvedName} (${dockerName})`);
+        throw new Error(
+          `Container not running: ${resolvedName} (${dockerName})`,
+        );
       await DockerManager.showLogs(dockerName, follow);
     } else if (isProcess) {
       const pm2Executor = new Pm2Executor(projectName, projectRoot);

@@ -8,7 +8,6 @@ import { ActionPlan } from "../types";
 import { findProcess } from "./findProcess";
 import { findContainer } from "./findContainer";
 
-// Mock all dependencies
 vi.mock("./docker");
 vi.mock("./findProcess");
 vi.mock("./findContainer");
@@ -20,7 +19,6 @@ vi.mock("../utils/logger", () => ({
   },
 }));
 
-// Mock Pm2Executor constructor
 vi.mock("./process/Pm2Executor", () => {
   return {
     Pm2Executor: vi.fn(),
@@ -77,7 +75,6 @@ describe("executeActions", () => {
       },
     };
 
-    // Mock Pm2Executor
     mockPm2Executor = {
       startProcess: vi.fn().mockResolvedValue(undefined),
       stopProcess: vi.fn().mockResolvedValue(undefined),
@@ -86,7 +83,6 @@ describe("executeActions", () => {
     };
     vi.mocked(Pm2Executor).mockImplementation(() => mockPm2Executor as any);
 
-    // Mock DockerManager static methods
     vi.mocked(DockerManager.createVolume).mockResolvedValue(undefined);
     vi.mocked(DockerManager.startContainer).mockResolvedValue(undefined);
     vi.mocked(DockerManager.stopContainer).mockResolvedValue(undefined);
@@ -103,11 +99,16 @@ describe("executeActions", () => {
       vi.mocked(findProcess).mockReturnValue(mockProcess);
 
       const plan: ActionPlan = {
-        actions: [
+        waves: [
           {
-            type: "start",
-            serviceType: "bare_metal",
-            name: "api",
+            actions: [
+              {
+                type: "start",
+                serviceType: "bare_metal",
+                name: "api",
+                healthCheck: 0,
+              },
+            ],
           },
         ],
       };
@@ -130,11 +131,16 @@ describe("executeActions", () => {
       vi.mocked(findProcess).mockReturnValue(mockProcess);
 
       const plan: ActionPlan = {
-        actions: [
+        waves: [
           {
-            type: "stop",
-            serviceType: "bare_metal",
-            name: "worker",
+            actions: [
+              {
+                type: "stop",
+                serviceType: "bare_metal",
+                name: "worker",
+                healthCheck: 5,
+              },
+            ],
           },
         ],
       };
@@ -149,11 +155,16 @@ describe("executeActions", () => {
       vi.mocked(findProcess).mockReturnValue(undefined);
 
       const plan: ActionPlan = {
-        actions: [
+        waves: [
           {
-            type: "start",
-            serviceType: "bare_metal",
-            name: "nonexistent",
+            actions: [
+              {
+                type: "start",
+                serviceType: "bare_metal",
+                name: "nonexistent",
+                healthCheck: 5,
+              },
+            ],
           },
         ],
       };
@@ -170,11 +181,16 @@ describe("executeActions", () => {
       vi.mocked(findContainer).mockReturnValue(["database", mockContainer]);
 
       const plan: ActionPlan = {
-        actions: [
+        waves: [
           {
-            type: "start",
-            serviceType: "docker",
-            name: "database",
+            actions: [
+              {
+                type: "start",
+                serviceType: "docker",
+                name: "database",
+                healthCheck: 0,
+              },
+            ],
           },
         ],
       };
@@ -182,14 +198,11 @@ describe("executeActions", () => {
       await executeActions(mockConfig, "test-project", "/config/dir", plan);
 
       expect(findContainer).toHaveBeenCalledWith(mockConfig, "database");
-
-      // Should create volumes
       expect(DockerManager.createVolume).toHaveBeenCalledWith("postgres_data");
       expect(DockerManager.createVolume).toHaveBeenCalledWith(
         "postgres_config",
       );
 
-      // Should start container with correct configuration
       expect(DockerManager.startContainer).toHaveBeenCalledWith(
         "zap.test-project.database",
         {
@@ -220,11 +233,16 @@ describe("executeActions", () => {
       vi.mocked(findContainer).mockReturnValue(["redis", mockContainer]);
 
       const plan: ActionPlan = {
-        actions: [
+        waves: [
           {
-            type: "start",
-            serviceType: "docker",
-            name: "redis",
+            actions: [
+              {
+                type: "start",
+                serviceType: "docker",
+                name: "redis",
+                healthCheck: 0,
+              },
+            ],
           },
         ],
       };
@@ -255,11 +273,16 @@ describe("executeActions", () => {
       vi.mocked(findContainer).mockReturnValue(["redis", mockContainer]);
 
       const plan: ActionPlan = {
-        actions: [
+        waves: [
           {
-            type: "stop",
-            serviceType: "docker",
-            name: "redis",
+            actions: [
+              {
+                type: "stop",
+                serviceType: "docker",
+                name: "redis",
+                healthCheck: 5,
+              },
+            ],
           },
         ],
       };
@@ -276,11 +299,16 @@ describe("executeActions", () => {
       vi.mocked(findContainer).mockReturnValue(undefined);
 
       const plan: ActionPlan = {
-        actions: [
+        waves: [
           {
-            type: "start",
-            serviceType: "docker",
-            name: "nonexistent",
+            actions: [
+              {
+                type: "start",
+                serviceType: "docker",
+                name: "nonexistent",
+                healthCheck: 5,
+              },
+            ],
           },
         ],
       };
@@ -305,11 +333,16 @@ describe("executeActions", () => {
       vi.mocked(findContainer).mockReturnValue(["test", mockContainer]);
 
       const plan: ActionPlan = {
-        actions: [
+        waves: [
           {
-            type: "start",
-            serviceType: "docker",
-            name: "test",
+            actions: [
+              {
+                type: "start",
+                serviceType: "docker",
+                name: "test",
+                healthCheck: 0,
+              },
+            ],
           },
         ],
       };
@@ -329,7 +362,7 @@ describe("executeActions", () => {
   });
 
   describe("multiple actions", () => {
-    it("should execute multiple actions in sequence", async () => {
+    it("should execute actions within a wave in parallel", async () => {
       const mockProcess = {
         name: "api",
         cmd: "npm start",
@@ -340,16 +373,22 @@ describe("executeActions", () => {
       vi.mocked(findContainer).mockReturnValue(["redis", mockContainer]);
 
       const plan: ActionPlan = {
-        actions: [
+        waves: [
           {
-            type: "start",
-            serviceType: "bare_metal",
-            name: "api",
-          },
-          {
-            type: "start",
-            serviceType: "docker",
-            name: "redis",
+            actions: [
+              {
+                type: "start",
+                serviceType: "bare_metal",
+                name: "api",
+                healthCheck: 0,
+              },
+              {
+                type: "start",
+                serviceType: "docker",
+                name: "redis",
+                healthCheck: 0,
+              },
+            ],
           },
         ],
       };
@@ -377,11 +416,16 @@ describe("executeActions", () => {
       vi.mocked(findProcess).mockReturnValue(mockProcess);
 
       const plan: ActionPlan = {
-        actions: [
+        waves: [
           {
-            type: "start",
-            serviceType: "bare_metal",
-            name: "api",
+            actions: [
+              {
+                type: "start",
+                serviceType: "bare_metal",
+                name: "api",
+                healthCheck: 0,
+              },
+            ],
           },
         ],
       };
@@ -400,11 +444,16 @@ describe("executeActions", () => {
       vi.mocked(findProcess).mockReturnValue(mockProcess);
 
       const plan: ActionPlan = {
-        actions: [
+        waves: [
           {
-            type: "start",
-            serviceType: "bare_metal",
-            name: "api",
+            actions: [
+              {
+                type: "start",
+                serviceType: "bare_metal",
+                name: "api",
+                healthCheck: 0,
+              },
+            ],
           },
         ],
       };

@@ -12,8 +12,8 @@ Guide for contributing to zapper.
 ## Getting Started
 
 ```bash
-git clone <repository>
-cd zapper
+npm uninstall --global zapper-cli  # Start fresh
+pnpm add --global zapper-cli  # Make sure its installed with pnpm
 pnpm install
 pnpm build
 pnpm link --global
@@ -24,13 +24,12 @@ After linking, your global `zap` command points to your local build. Make change
 ## Linking & Unlinking
 
 ```bash
-# Check it's linked correctly
 which zap                 # Should show pnpm global path
 ls -la $(which zap)       # Should symlink to your dist/index.js
 
 # Unlink when done
 pnpm unlink --global
-npm install -g zapper-cli  # Reinstall from npm
+npm install --global zapper-cli  # Reinstall from npm
 ```
 
 ## Testing

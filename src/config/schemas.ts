@@ -47,6 +47,8 @@ export const ProcessSchema = z.object({
   profiles: z
     .array(z.string().min(1, "Profile name cannot be empty"))
     .optional(),
+  healthCheck: z.number().optional(),
+  depends_on: z.array(validNameSchema).optional(),
 });
 
 export const ContainerSchema = z.object({
@@ -64,6 +66,8 @@ export const ContainerSchema = z.object({
   profiles: z
     .array(z.string().min(1, "Profile name cannot be empty"))
     .optional(),
+  healthCheck: z.number().optional(),
+  depends_on: z.array(validNameSchema).optional(),
 });
 
 export const TaskCmdSchema = z.union([

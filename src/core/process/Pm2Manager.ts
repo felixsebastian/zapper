@@ -1,20 +1,11 @@
 import { spawn } from "child_process";
-import {
-  mkdirSync,
-  writeFileSync,
-  unlinkSync,
-  readdirSync,
-  existsSync,
-} from "fs";
+import { mkdirSync, writeFileSync, unlinkSync, existsSync } from "fs";
 import path from "path";
 import { Process } from "../../config/schemas";
 import { ProcessInfo } from "../../types/index";
 import { logger } from "../../utils/logger";
 
 export class Pm2Manager {
-  // Track wrapper scripts by process name for cleanup
-  private static wrapperScripts = new Map<string, string>();
-
   static async startProcess(
     processConfig: Process,
     projectName: string,
@@ -83,13 +74,9 @@ export class Pm2Manager {
             return resolved;
           })(),
           env: { ...(process.env || {}), ...(processConfig.resolvedEnv || {}) },
-          error_file: path.join(
+          log: path.join(
             logsDir,
-            `${projectName}.${processConfig.name as string}-error.log`,
-          ),
-          out_file: path.join(
-            logsDir,
-            `${projectName}.${processConfig.name as string}-out.log`,
+            `${projectName}.${processConfig.name as string}.log`,
           ),
           merge_logs: true,
         },
@@ -111,11 +98,12 @@ export class Pm2Manager {
 
     try {
       await this.runPm2Command(["start", tempFile]);
-
-      // Store wrapper script path for cleanup when stopping
-      const processKey = `${projectName}.${processConfig.name as string}`;
-      this.wrapperScripts.set(processKey, wrapperScript);
     } finally {
+      try {
+        unlinkSync(wrapperScript);
+      } catch (e) {
+        void e;
+      }
       try {
         unlinkSync(tempFile);
       } catch (e) {
@@ -137,27 +125,8 @@ export class Pm2Manager {
     const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
     await this.runPm2Command(["stop", prefixedName]);
 
-    // Clean up wrapper script if it exists
     if (projectName) {
-      const processKey = `${projectName}.${name}`;
-      const wrapperScript = this.wrapperScripts.get(processKey);
-      if (wrapperScript) {
-        try {
-          unlinkSync(wrapperScript);
-          this.wrapperScripts.delete(processKey);
-          logger.debug(`Cleaned up wrapper script for ${processKey}`);
-        } catch (e) {
-          logger.warn(
-            `Failed to clean up wrapper script for ${processKey}: ${e}`,
-          );
-        }
-      }
-
-      // Clean up log files
       await this.cleanupLogs(projectName, name, configDir);
-
-      // Best-effort cleanup of any matching wrapper scripts left from previous runs
-      this.cleanupWrapperScripts(projectName, name, configDir);
     }
   }
 
@@ -166,36 +135,7 @@ export class Pm2Manager {
     projectName?: string,
   ): Promise<void> {
     const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
-
-    // Clean up old wrapper script before restarting
-    if (projectName) {
-      const processKey = `${projectName}.${name}`;
-      const oldWrapperScript = this.wrapperScripts.get(processKey);
-      if (oldWrapperScript) {
-        try {
-          unlinkSync(oldWrapperScript);
-          logger.debug(`Cleaned up old wrapper script for ${processKey}`);
-        } catch (e) {
-          logger.warn(
-            `Failed to clean up old wrapper script for ${processKey}: ${e}`,
-          );
-        }
-      }
-    }
-
-    try {
-      await this.runPm2Command(["restart", prefixedName]);
-    } catch (error) {
-      // If restart fails, the process might not exist, so we should clean up the wrapper script entry
-      if (projectName) {
-        const processKey = `${projectName}.${name}`;
-        this.wrapperScripts.delete(processKey);
-        logger.debug(
-          `Cleaned up wrapper script entry for ${processKey} after restart failure`,
-        );
-      }
-      throw error;
-    }
+    await this.runPm2Command(["restart", prefixedName]);
   }
 
   static async deleteProcess(
@@ -206,27 +146,8 @@ export class Pm2Manager {
     const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
     await this.runPm2Command(["delete", prefixedName]);
 
-    // Clean up wrapper script if it exists
     if (projectName) {
-      const processKey = `${projectName}.${name}`;
-      const wrapperScript = this.wrapperScripts.get(processKey);
-      if (wrapperScript) {
-        try {
-          unlinkSync(wrapperScript);
-          this.wrapperScripts.delete(processKey);
-          logger.debug(`Cleaned up wrapper script for ${processKey}`);
-        } catch (e) {
-          logger.warn(
-            `Failed to clean up wrapper script for ${processKey}: ${e}`,
-          );
-        }
-      }
-
-      // Clean up log files
       await this.cleanupLogs(projectName, name, configDir);
-
-      // Best-effort cleanup of any matching wrapper scripts left from previous runs
-      this.cleanupWrapperScripts(projectName, name, configDir);
     }
   }
 
@@ -238,7 +159,6 @@ export class Pm2Manager {
     const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
 
     try {
-      // Get all processes and find matching ones
       const processes = await this.listProcesses();
       const matchingProcesses = processes.filter(
         (p) => p.name === prefixedName,
@@ -253,32 +173,12 @@ export class Pm2Manager {
         `Deleting ${matchingProcesses.length} process(es) matching ${prefixedName}`,
       );
 
-      // Delete each matching process
       for (const process of matchingProcesses) {
         await this.runPm2Command(["delete", process.name]);
       }
 
-      // Clean up wrapper script
       if (projectName) {
-        const processKey = `${projectName}.${name}`;
-        const wrapperScript = this.wrapperScripts.get(processKey);
-        if (wrapperScript) {
-          try {
-            unlinkSync(wrapperScript);
-            this.wrapperScripts.delete(processKey);
-            logger.debug(`Cleaned up wrapper script for ${processKey}`);
-          } catch (e) {
-            logger.warn(
-              `Failed to clean up wrapper script for ${processKey}: ${e}`,
-            );
-          }
-        }
-
-        // Clean up log files
         await this.cleanupLogs(projectName, name, configDir);
-
-        // Best-effort cleanup of any matching wrapper scripts left from previous runs
-        this.cleanupWrapperScripts(projectName, name, configDir);
       }
     } catch (error) {
       logger.warn(`Error deleting processes: ${error}`);
@@ -294,24 +194,12 @@ export class Pm2Manager {
       const { rmSync, unlinkSync, existsSync } = await import("fs");
       const logsDir = path.join(configDir || ".", ".zap", "logs");
 
-      // Remove the specific log files
-      const outLogPath = path.join(
-        logsDir,
-        `${projectName}.${processName}-out.log`,
-      );
-      const errorLogPath = path.join(
-        logsDir,
-        `${projectName}.${processName}-error.log`,
-      );
+      // Remove the combined log file
+      const logPath = path.join(logsDir, `${projectName}.${processName}.log`);
 
-      if (existsSync(outLogPath)) {
-        unlinkSync(outLogPath);
-        logger.debug(`Cleaned up stdout log: ${outLogPath}`);
-      }
-
-      if (existsSync(errorLogPath)) {
-        unlinkSync(errorLogPath);
-        logger.debug(`Cleaned up stderr log: ${errorLogPath}`);
+      if (existsSync(logPath)) {
+        unlinkSync(logPath);
+        logger.debug(`Cleaned up log: ${logPath}`);
       }
 
       // Try to remove the logs directory if it's empty
@@ -328,32 +216,6 @@ export class Pm2Manager {
     } catch (error) {
       // Log cleanup errors but don't fail the operation
       logger.warn(`Failed to clean up logs: ${error}`);
-    }
-  }
-
-  private static cleanupWrapperScripts(
-    projectName: string,
-    processName: string,
-    configDir?: string,
-  ): void {
-    try {
-      const zapDir = path.join(configDir || ".", ".zap");
-      if (!existsSync(zapDir)) return;
-      const files = readdirSync(zapDir);
-      const prefix = `${projectName}.${processName}.`;
-      for (const file of files) {
-        if (file.startsWith(prefix) && file.endsWith(".sh")) {
-          const fullPath = path.join(zapDir, file);
-          try {
-            unlinkSync(fullPath);
-            logger.debug(`Cleaned up wrapper script: ${fullPath}`);
-          } catch (e) {
-            logger.warn(`Failed to remove wrapper script ${fullPath}: ${e}`);
-          }
-        }
-      }
-    } catch (e) {
-      // ignore
     }
   }
 
@@ -385,17 +247,17 @@ export class Pm2Manager {
       `Showing logs for ${prefixedName}${follow ? " (following)" : ""}`,
     );
 
-    const logFiles = await this.getLogFilePaths(
+    const logFile = await this.getLogFilePath(
       prefixedName,
       projectName,
       configDir,
     );
 
-    if (!logFiles) {
-      throw new Error(`Could not find log files for ${prefixedName}`);
+    if (!logFile) {
+      throw new Error(`Could not find log file for ${prefixedName}`);
     }
 
-    await this.showLogsFromFiles(logFiles, follow);
+    await this.showLogsFromFile(logFile, follow);
   }
 
   static async getProcessInfo(name: string): Promise<ProcessInfo | null> {
@@ -442,26 +304,17 @@ export class Pm2Manager {
     }
   }
 
-  private static async getLogFilePaths(
+  private static async getLogFilePath(
     processName: string,
     projectName?: string,
     configDir?: string,
-  ): Promise<{ stdout: string; stderr: string } | null> {
+  ): Promise<string | null> {
     try {
-      // For Zapper-managed processes, use our custom log paths
+      // For Zapper-managed processes, use our custom log path
       if (projectName && processName.startsWith(`zap.${projectName}.`)) {
         const logsDir = path.join(configDir || ".", ".zap", "logs");
         const baseName = processName.replace(`zap.${projectName}.`, "");
-        const stdoutPath = path.join(
-          logsDir,
-          `${projectName}.${baseName}-out.log`,
-        );
-        const stderrPath = path.join(
-          logsDir,
-          `${projectName}.${baseName}-error.log`,
-        );
-
-        return { stdout: stdoutPath, stderr: stderrPath };
+        return path.join(logsDir, `${projectName}.${baseName}.log`);
       }
 
       // For non-Zapper processes, fall back to PM2's default paths
@@ -470,121 +323,72 @@ export class Pm2Manager {
         Record<string, unknown>
       >;
 
-      const process = processes.find((p) => p.name === processName);
+      const proc = processes.find((p) => p.name === processName);
 
-      if (!process) {
+      if (!proc) {
         logger.warn(`Process not found: ${processName}`);
         return null;
       }
 
-      const pm2Env = process.pm2_env as Record<string, unknown>;
-      const stdoutPath = String(pm2Env.pm_out_log_path || "");
-      const stderrPath = String(pm2Env.pm_err_log_path || "");
-
-      if (!stdoutPath && !stderrPath) {
-        logger.warn(`No log paths found for process ${processName}`);
-        return null;
-      }
-
-      return { stdout: stdoutPath, stderr: stderrPath };
+      const pm2Env = proc.pm2_env as Record<string, unknown>;
+      return String(pm2Env.pm_log_path || pm2Env.pm_out_log_path || "");
     } catch (error) {
-      logger.warn(`Error getting log file paths: ${error}`);
+      logger.warn(`Error getting log file path: ${error}`);
       return null;
     }
   }
 
-  private static async showLogsFromFiles(
-    logFiles: { stdout: string; stderr: string },
+  private static async showLogsFromFile(
+    logFile: string,
     follow: boolean,
   ): Promise<void> {
     try {
       const { spawn } = await import("child_process");
       const { existsSync } = await import("fs");
 
-      // Check if log files exist
-      if (!existsSync(logFiles.stdout) && !existsSync(logFiles.stderr)) {
-        logger.warn(`No log files found for this process`);
+      if (!existsSync(logFile)) {
+        logger.warn(`No log file found for this process`);
         return;
       }
 
       if (follow) {
-        const tails: Array<ReturnType<typeof spawn>> = [];
-        const RED = "\x1b[31m";
-        const RESET = "\x1b[0m";
+        const child = spawn("tail", ["-n", "50", "-f", logFile], {
+          stdio: ["ignore", "pipe", "inherit"],
+        });
 
-        const startTail = (
-          filePath: string,
-          isError: boolean,
-        ): ReturnType<typeof spawn> => {
-          const child = spawn("tail", ["-n", "10", "-f", filePath], {
-            stdio: ["ignore", "pipe", "inherit"],
-          });
+        let buffer = "";
+        child.stdout.on("data", (data) => {
+          buffer += data.toString();
+          const parts = buffer.split(/\r?\n/);
+          buffer = parts.pop() || "";
+          for (const line of parts) {
+            if (line) globalThis.process?.stdout?.write(line + "\n");
+          }
+        });
 
-          let buffer = "";
-          child.stdout.on("data", (data) => {
-            buffer += data.toString();
-            const parts = buffer.split(/\r?\n/);
-            buffer = parts.pop() || "";
-            for (const line of parts) {
-              if (!line) continue;
-              if (isError)
-                globalThis.process?.stdout?.write(`${RED}${line}${RESET}\n`);
-              else globalThis.process?.stdout?.write(line + "\n");
-            }
-          });
-
-          child.on("error", (err) => {
-            logger.warn(`tail error for ${filePath}: ${err}`);
-          });
-
-          return child;
-        };
-
-        if (existsSync(logFiles.stdout))
-          tails.push(startTail(logFiles.stdout, false));
-        if (existsSync(logFiles.stderr))
-          tails.push(startTail(logFiles.stderr, true));
+        child.on("error", (err) => {
+          logger.warn(`tail error for ${logFile}: ${err}`);
+        });
 
         await new Promise<void>((resolve) => {
-          let exiting = false;
           const cleanup = () => {
-            if (exiting) return;
-            exiting = true;
-            for (const t of tails) {
-              try {
-                t.kill("SIGINT");
-              } catch (e) {
-                void e;
-              }
+            try {
+              child.kill("SIGINT");
+            } catch (e) {
+              void e;
             }
             resolve();
           };
 
-          for (const t of tails) t.on("close", cleanup);
+          child.on("close", cleanup);
           globalThis.process?.on("SIGINT", cleanup);
         });
       } else {
-        // Static logs - show last few lines from each file
-        if (existsSync(logFiles.stdout)) {
-          logger.debug(`STDOUT logs:`);
-          const result = await this.runCommand("tail", [
-            "-20",
-            logFiles.stdout,
-          ]);
-          logger.info(result);
-        }
-
-        if (existsSync(logFiles.stderr)) {
-          logger.debug(`STDERR logs:`);
-          const result = await this.runCommand("tail", [
-            "-20",
-            logFiles.stderr,
-          ]);
-          logger.info(result);
-        }
+        const result = await this.runCommand("tail", ["-50", logFile]);
+        globalThis.process?.stdout?.write(result);
       }
     } catch (error) {
-      logger.warn(`Error showing logs from files: ${error}`);
+      logger.warn(`Error showing logs from file: ${error}`);
     }
   }
 
@@ -760,6 +564,8 @@ export class Pm2Manager {
     const filePath = path.join(zapDir, fileName);
 
     let content = "#!/bin/bash\n";
+    // Redirect stderr through a colorizer so it appears red in combined logs
+    content += `exec 2> >(while IFS= read -r line; do printf '\\033[31m%s\\033[0m\\n' "$line"; done)\n`;
     if (processConfig.source) {
       content += `source ${processConfig.source}\n`;
     }

@@ -5,8 +5,13 @@ export interface Action {
   type: ActionType;
   serviceType: ServiceType;
   name: string;
+  healthCheck: number;
+}
+
+export interface ExecutionWave {
+  actions: Action[];
 }
 
 export interface ActionPlan {
-  actions: Action[];
+  waves: ExecutionWave[];
 }

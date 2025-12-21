@@ -2,9 +2,83 @@ import { ZapperConfig } from "../utils";
 import { DockerManager } from "./docker";
 import { logger } from "../utils/logger";
 import { Pm2Executor } from "./process/Pm2Executor";
-import { ActionPlan } from "../types";
+import { Action, ActionPlan } from "../types";
 import { findProcess } from "./findProcess";
 import { findContainer } from "./findContainer";
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function executeAction(
+  action: Action,
+  config: ZapperConfig,
+  projectName: string,
+  pm2: Pm2Executor,
+): Promise<void> {
+  if (action.serviceType === "bare_metal") {
+    const proc = findProcess(config, action.name);
+    if (!proc) throw new Error(`Process not found: ${action.name}`);
+
+    if (action.type === "start") {
+      await pm2.startProcess(proc, projectName);
+      logger.info(`Started ${proc.name as string}`);
+    } else {
+      await pm2.stopProcess(proc.name as string);
+      logger.info(`Stopped ${proc.name as string}`);
+    }
+  } else {
+    const pair = findContainer(config, action.name);
+    if (!pair) throw new Error(`Docker service not found: ${action.name}`);
+    const [name, c] = pair;
+    const dockerName = `zap.${projectName}.${name}`;
+
+    if (action.type === "start") {
+      const ports = Array.isArray(c.ports) ? c.ports : [];
+      const volumeBindings: string[] = [];
+      const ensureVolumeNames: string[] = [];
+
+      if (Array.isArray(c.volumes)) {
+        for (const v of c.volumes) {
+          if (typeof v === "string") {
+            const [volName, internal] = v.split(":");
+            ensureVolumeNames.push(volName);
+            volumeBindings.push(`${volName}:${internal}`);
+          } else {
+            ensureVolumeNames.push(v.name);
+            volumeBindings.push(`${v.name}:${v.internal_dir}`);
+          }
+        }
+      }
+
+      for (const vol of ensureVolumeNames) {
+        await DockerManager.createVolume(vol);
+      }
+
+      const envMap = c.resolvedEnv || {};
+
+      const labels = {
+        "com.docker.compose.project": projectName,
+        "com.docker.compose.service": name,
+        "com.zapper.project": projectName,
+        "com.zapper.service": name,
+      } as Record<string, string>;
+
+      await DockerManager.startContainer(dockerName, {
+        image: c.image,
+        ports,
+        volumes: volumeBindings,
+        networks: c.networks,
+        environment: envMap,
+        command: c.command,
+        labels,
+      });
+
+      logger.info(`Started ${name}`);
+    } else {
+      await DockerManager.stopContainer(dockerName);
+      logger.info(`Stopped ${name}`);
+    }
+  }
+}
 
 export async function executeActions(
   config: ZapperConfig,
@@ -14,70 +88,14 @@ export async function executeActions(
 ): Promise<void> {
   const pm2 = new Pm2Executor(projectName, configDir || undefined);
 
-  for (const action of plan.actions) {
-    if (action.serviceType === "bare_metal") {
-      const proc = findProcess(config, action.name);
-      if (!proc) throw new Error(`Process not found: ${action.name}`);
-
-      if (action.type === "start") {
-        await pm2.startProcess(proc, projectName);
-        logger.info(`Started ${proc.name as string}`);
-      } else {
-        await pm2.stopProcess(proc.name as string);
-        logger.info(`Stopped ${proc.name as string}`);
-      }
-    } else {
-      const pair = findContainer(config, action.name);
-      if (!pair) throw new Error(`Docker service not found: ${action.name}`);
-      const [name, c] = pair;
-      const dockerName = `zap.${projectName}.${name}`;
-
-      if (action.type === "start") {
-        const ports = Array.isArray(c.ports) ? c.ports : [];
-        const volumeBindings: string[] = [];
-        const ensureVolumeNames: string[] = [];
-
-        if (Array.isArray(c.volumes)) {
-          for (const v of c.volumes) {
-            if (typeof v === "string") {
-              const [volName, internal] = v.split(":");
-              ensureVolumeNames.push(volName);
-              volumeBindings.push(`${volName}:${internal}`);
-            } else {
-              ensureVolumeNames.push(v.name);
-              volumeBindings.push(`${v.name}:${v.internal_dir}`);
-            }
-          }
+  for (const wave of plan.waves) {
+    await Promise.all(
+      wave.actions.map(async (action) => {
+        await executeAction(action, config, projectName, pm2);
+        if (action.type === "start" && action.healthCheck > 0) {
+          await sleep(action.healthCheck * 1000);
         }
-
-        for (const vol of ensureVolumeNames) {
-          await DockerManager.createVolume(vol);
-        }
-
-        const envMap = c.resolvedEnv || {};
-
-        const labels = {
-          "com.docker.compose.project": projectName,
-          "com.docker.compose.service": name,
-          "com.zapper.project": projectName,
-          "com.zapper.service": name,
-        } as Record<string, string>;
-
-        await DockerManager.startContainer(dockerName, {
-          image: c.image,
-          ports,
-          volumes: volumeBindings,
-          networks: c.networks,
-          environment: envMap,
-          command: c.command,
-          labels,
-        });
-
-        logger.info(`Started ${name}`);
-      } else {
-        await DockerManager.stopContainer(dockerName);
-        logger.info(`Stopped ${name}`);
-      }
-    }
+      }),
+    );
   }
 }
