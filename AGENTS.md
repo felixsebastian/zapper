@@ -9,7 +9,7 @@ A lightweight dev environment runner. Define your local dev setup in a single `z
 ## Documentation
 
 - **[Usage](docs/usage.md)** — Comprehensive docs, keep this up to date
-- **[Local Development](docs/local-dev.md)** — To see how we run/test/build the app
+- **[Development](docs/development.md)** — To see how we run/test/build the app
 
 ## Development
 

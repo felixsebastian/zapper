@@ -19,4 +19,4 @@ Infrastructure as code for your local development environment.
 ## Documentation
 
 - **[Usage](docs/usage.md)** — Installation, configuration, CLI reference
-- **[Local Development](docs/local-dev.md)** — Contributing, testing, releases
+- **[Development](docs/development.md)** — Contributing, testing, releases
