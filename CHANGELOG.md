@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.10.1
+
+### Patch Changes
+
+- d057a59: stuff
+
 ## 0.10.0
 
 ### Minor Changes
