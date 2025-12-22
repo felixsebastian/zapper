@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.11.0
+
+### Minor Changes
+
+- 3eff379: fixes
+
 ## 0.10.1
 
 ### Patch Changes
