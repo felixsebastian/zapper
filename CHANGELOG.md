@@ -4,7 +4,7 @@
 
 ### Patch Changes
 
-- d057a59: stuff
+- Fix wrapper script lifecycle: Scripts are now kept for PM2 restarts and cleaned up when processes are stopped/deleted
 
 ## 0.10.0
 

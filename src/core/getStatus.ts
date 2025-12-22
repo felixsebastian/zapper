@@ -93,7 +93,9 @@ export async function getStatus(
     let status: Status = "down";
     if (runningProcess) {
       const running = isRunning(runningProcess.status, "native");
-      const startedAtMs = running ? Date.now() - runningProcess.uptime : undefined;
+      const startedAtMs = running
+        ? Date.now() - runningProcess.uptime
+        : undefined;
       status = computeStatus(running, startedAtMs, healthCheck);
     }
 
@@ -110,7 +112,8 @@ export async function getStatus(
     if (service && container.name !== service) continue;
 
     const expectedDockerName = `zap.${projectName}.${container.name}`;
-    const containerInfo = await DockerManager.getContainerInfo(expectedDockerName);
+    const containerInfo =
+      await DockerManager.getContainerInfo(expectedDockerName);
     const healthCheck = container.healthCheck ?? 5;
     const serviceState = serviceStates[expectedDockerName];
 

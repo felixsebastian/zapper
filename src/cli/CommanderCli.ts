@@ -40,8 +40,10 @@ function parseTaskArgs(rawArgv: string[], taskName: string): TaskParams {
 
   // Find the -- separator in raw args
   const separatorIdx = argsAfterTask.indexOf("--");
-  const namedArgs = separatorIdx >= 0 ? argsAfterTask.slice(0, separatorIdx) : argsAfterTask;
-  const restArgs = separatorIdx >= 0 ? argsAfterTask.slice(separatorIdx + 1) : [];
+  const namedArgs =
+    separatorIdx >= 0 ? argsAfterTask.slice(0, separatorIdx) : argsAfterTask;
+  const restArgs =
+    separatorIdx >= 0 ? argsAfterTask.slice(separatorIdx + 1) : [];
 
   // Parse named args
   for (const arg of namedArgs) {
@@ -311,8 +313,8 @@ export class CommanderCli {
     await handler.execute(context);
   }
 
-  parse(args: string[]): void {
-    this.program.parse(args);
+  async parse(args: string[]): Promise<void> {
+    await this.program.parseAsync(args);
   }
 
   getHelp(): string {

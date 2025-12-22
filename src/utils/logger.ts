@@ -125,6 +125,10 @@ export class Logger {
   setTimestamp(timestamp: boolean): void {
     this.timestamp = timestamp;
   }
+
+  getLevel(): LogLevel {
+    return this.level;
+  }
 }
 
 // Default logger instance

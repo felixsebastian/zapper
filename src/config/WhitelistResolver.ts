@@ -1,4 +1,5 @@
 import { ZapperConfig } from "./schemas";
+import { WhitelistReferenceError } from "../errors";
 
 /**
  * Resolves whitelist references in environment configurations.
@@ -19,8 +20,11 @@ export class WhitelistResolver {
         if (process.env && typeof process.env === "string") {
           const whitelistName = process.env;
           if (!(whitelistName in whitelists)) {
-            throw new Error(
-              `Process '${name}' references unknown whitelist '${whitelistName}'`,
+            throw new WhitelistReferenceError(
+              whitelistName,
+              "Process",
+              name,
+              Object.keys(whitelists),
             );
           }
           process.env = [...whitelists[whitelistName]];
@@ -34,8 +38,11 @@ export class WhitelistResolver {
         if (process.env && typeof process.env === "string") {
           const whitelistName = process.env;
           if (!(whitelistName in whitelists)) {
-            throw new Error(
-              `Process '${process.name || "unnamed"}' references unknown whitelist '${whitelistName}'`,
+            throw new WhitelistReferenceError(
+              whitelistName,
+              "Process",
+              process.name || "unnamed",
+              Object.keys(whitelists),
             );
           }
           process.env = [...whitelists[whitelistName]];
@@ -49,8 +56,11 @@ export class WhitelistResolver {
         if (container.env && typeof container.env === "string") {
           const whitelistName = container.env;
           if (!(whitelistName in whitelists)) {
-            throw new Error(
-              `Container '${name}' references unknown whitelist '${whitelistName}'`,
+            throw new WhitelistReferenceError(
+              whitelistName,
+              "Container",
+              name,
+              Object.keys(whitelists),
             );
           }
           container.env = [...whitelists[whitelistName]];
@@ -66,8 +76,11 @@ export class WhitelistResolver {
         if (container.env && typeof container.env === "string") {
           const whitelistName = container.env;
           if (!(whitelistName in whitelists)) {
-            throw new Error(
-              `Container '${name}' references unknown whitelist '${whitelistName}'`,
+            throw new WhitelistReferenceError(
+              whitelistName,
+              "Container",
+              name,
+              Object.keys(whitelists),
             );
           }
           container.env = [...whitelists[whitelistName]];
@@ -81,8 +94,11 @@ export class WhitelistResolver {
         if (task.env && typeof task.env === "string") {
           const whitelistName = task.env;
           if (!(whitelistName in whitelists)) {
-            throw new Error(
-              `Task '${name}' references unknown whitelist '${whitelistName}'`,
+            throw new WhitelistReferenceError(
+              whitelistName,
+              "Task",
+              name,
+              Object.keys(whitelists),
             );
           }
           task.env = [...whitelists[whitelistName]];
@@ -114,8 +130,11 @@ export class WhitelistResolver {
       entityName: string,
     ) => {
       if (!(envValue in whitelists)) {
-        throw new Error(
-          `${entityType} '${entityName}' references unknown whitelist '${envValue}'. Available whitelists: ${whitelistNames.join(", ")}`,
+        throw new WhitelistReferenceError(
+          envValue,
+          entityType,
+          entityName,
+          whitelistNames,
         );
       }
     };
@@ -225,7 +244,11 @@ export class WhitelistResolver {
     }
 
     if (foundReferences.length > 0) {
-      throw new Error(
+      throw new WhitelistReferenceError(
+        "undefined",
+        "Config",
+        "multiple entities",
+        [],
         `Environment whitelist references found but no whitelists defined. Either define whitelists or use arrays for env. Found: ${foundReferences.join(", ")}`,
       );
     }

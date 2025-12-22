@@ -1,5 +1,11 @@
 import { spawn } from "child_process";
-import { mkdirSync, writeFileSync, unlinkSync, existsSync } from "fs";
+import {
+  mkdirSync,
+  writeFileSync,
+  unlinkSync,
+  existsSync,
+  readdirSync,
+} from "fs";
 import path from "path";
 import { Process } from "../../config/schemas";
 import { ProcessInfo } from "../../types/index";
@@ -37,6 +43,13 @@ export class Pm2Manager {
     const zapDir = path.join(configDir, ".zap");
     const logsDir = path.join(zapDir, "logs");
     mkdirSync(logsDir, { recursive: true });
+
+    // Clean up old wrapper scripts before creating a new one
+    this.cleanupWrapperScripts(
+      projectName,
+      processConfig.name as string,
+      configDir,
+    );
 
     // Create a minimal wrapper script for PM2 to execute
     const wrapperScript = this.createWrapperScript(
@@ -100,11 +113,6 @@ export class Pm2Manager {
       await this.runPm2Command(["start", tempFile]);
     } finally {
       try {
-        unlinkSync(wrapperScript);
-      } catch (e) {
-        void e;
-      }
-      try {
         unlinkSync(tempFile);
       } catch (e) {
         void e;
@@ -127,6 +135,7 @@ export class Pm2Manager {
 
     if (projectName) {
       await this.cleanupLogs(projectName, name, configDir);
+      this.cleanupWrapperScripts(projectName, name, configDir);
     }
   }
 
@@ -148,6 +157,7 @@ export class Pm2Manager {
 
     if (projectName) {
       await this.cleanupLogs(projectName, name, configDir);
+      this.cleanupWrapperScripts(projectName, name, configDir);
     }
   }
 
@@ -179,6 +189,7 @@ export class Pm2Manager {
 
       if (projectName) {
         await this.cleanupLogs(projectName, name, configDir);
+        this.cleanupWrapperScripts(projectName, name, configDir);
       }
     } catch (error) {
       logger.warn(`Error deleting processes: ${error}`);
@@ -216,6 +227,34 @@ export class Pm2Manager {
     } catch (error) {
       // Log cleanup errors but don't fail the operation
       logger.warn(`Failed to clean up logs: ${error}`);
+    }
+  }
+
+  private static cleanupWrapperScripts(
+    projectName: string,
+    processName: string,
+    configDir?: string,
+  ): void {
+    try {
+      const zapDir = path.join(configDir || ".", ".zap");
+      if (!existsSync(zapDir)) return;
+
+      const scriptPattern = `${projectName}.${processName}.`;
+      const files = readdirSync(zapDir);
+
+      for (const file of files) {
+        if (file.startsWith(scriptPattern) && file.endsWith(".sh")) {
+          const scriptPath = path.join(zapDir, file);
+          try {
+            unlinkSync(scriptPath);
+            logger.debug(`Cleaned up wrapper script: ${scriptPath}`);
+          } catch (e) {
+            logger.warn(`Failed to delete wrapper script ${scriptPath}: ${e}`);
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn(`Failed to clean up wrapper scripts: ${error}`);
     }
   }
 
@@ -517,7 +556,10 @@ export class Pm2Manager {
     });
   }
 
-  private static runPm2Command(args: string[]): Promise<string> {
+  private static runPm2Command(
+    args: string[],
+    retryCount = 0,
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       logger.debug(`Running: pm2 ${args.join(" ")}`);
       const child = spawn("pm2", args, {
@@ -535,10 +577,41 @@ export class Pm2Manager {
         error += data.toString();
       });
 
-      child.on("close", (code) => {
+      child.on("close", async (code) => {
         if (code === 0) {
           resolve(output.trim());
         } else {
+          // Check if this is a PM2 state corruption issue
+          const isStateCorruption =
+            error.includes("Process") &&
+            error.includes("not found") &&
+            error.includes("Cannot read properties of undefined");
+
+          const isVersionMismatch =
+            output.includes("In-memory PM2 is out-of-date") ||
+            error.includes("In-memory PM2 is out-of-date");
+
+          // Only retry once on state corruption or version mismatch
+          if ((isStateCorruption || isVersionMismatch) && retryCount === 0) {
+            logger.warn(
+              `PM2 state corruption detected, resetting PM2 and retrying...`,
+            );
+
+            try {
+              // Kill PM2 daemon to reset state
+              await this.runPm2Command(["kill"], 1);
+              // Wait a bit for PM2 to fully stop
+              await new Promise((r) => setTimeout(r, 500));
+              // Retry the original command
+              const result = await this.runPm2Command(args, 1);
+              resolve(result);
+              return;
+            } catch (resetError) {
+              logger.warn(`PM2 reset failed: ${resetError}`);
+              // Fall through to original error
+            }
+          }
+
           reject(
             new Error(
               `PM2 command failed (args: ${args.join(" ")}, code: ${code})\nstdout: ${output}\nstderr: ${error}`,

@@ -97,7 +97,13 @@ export async function executeActions(
   for (const wave of plan.waves) {
     await Promise.all(
       wave.actions.map((action) =>
-        executeAction(action, config, projectName, pm2, configDir || process.cwd()),
+        executeAction(
+          action,
+          config,
+          projectName,
+          pm2,
+          configDir || process.cwd(),
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import { ZapperConfigSchema, ZapperConfig } from "./schemas";
 import { ZodError } from "zod";
 import { WhitelistResolver } from "./WhitelistResolver";
+import { ConfigValidationError } from "../errors";
 
 export class ZodConfigValidator {
   static validate(config: unknown): ZapperConfig {
@@ -22,16 +23,10 @@ export class ZodConfigValidator {
           return `${path}${err.message}`;
         });
 
-        throw new Error(
-          `Configuration validation failed: ${errorMessages.join(", ")}`,
-        );
+        throw new ConfigValidationError(errorMessages);
       }
 
-      if (error instanceof Error) {
-        throw new Error(`Configuration validation failed: ${error.message}`);
-      }
-
-      throw new Error(`Configuration validation failed: ${String(error)}`);
+      throw error;
     }
   }
 

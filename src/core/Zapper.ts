@@ -15,6 +15,11 @@ import { executeActions } from "./executeActions";
 import { confirm } from "../utils/confirm";
 import { GitManager, cloneRepos as cloneRepositories } from "./git";
 import { getNativeTargets } from "../utils";
+import {
+  ContextNotLoadedError,
+  ServiceNotFoundError,
+  ContainerNotRunningError,
+} from "../errors";
 
 export class Zapper {
   private context: Context | null = null;
@@ -24,22 +29,18 @@ export class Zapper {
     configPath: string = "zap.yaml",
     cliOptions?: Record<string, any>,
   ): Promise<void> {
-    try {
-      const resolvedPath = resolveConfigPath(configPath) ?? configPath;
-      const projectRoot = path.dirname(path.resolve(resolvedPath));
-      const config = parseYamlFile(resolvedPath);
+    const resolvedPath = resolveConfigPath(configPath) ?? configPath;
+    const projectRoot = path.dirname(path.resolve(resolvedPath));
+    const config = parseYamlFile(resolvedPath);
 
-      // Apply CLI overrides to config
-      const configWithOverrides = this.applyCliOverrides(config, cliOptions);
+    // Apply CLI overrides to config
+    const configWithOverrides = this.applyCliOverrides(config, cliOptions);
 
-      // Create context from config
-      this.context = createContext(configWithOverrides, projectRoot);
+    // Create context from config
+    this.context = createContext(configWithOverrides, projectRoot);
 
-      // Resolve environment variables with proper path resolution
-      this.context = EnvResolver.resolveContext(this.context);
-    } catch (error) {
-      throw new Error(`Failed to load config: ${error}`);
-    }
+    // Resolve environment variables with proper path resolution
+    this.context = EnvResolver.resolveContext(this.context);
   }
 
   private applyCliOverrides(
@@ -77,13 +78,13 @@ export class Zapper {
 
   private getProcesses(): Process[] {
     if (!this.context) {
-      throw new Error("Context not loaded");
+      throw new ContextNotLoadedError();
     }
     return this.context.processes;
   }
 
   private getContainers(): Array<[string, Container]> {
-    if (!this.context) throw new Error("Context not loaded");
+    if (!this.context) throw new ContextNotLoadedError();
     return this.context.containers.map((c) => [c.name, c]);
   }
 
@@ -135,7 +136,7 @@ export class Zapper {
   // Helper method to create a legacy config for backwards compatibility
   // TODO: Remove this once all components are updated to use Context
   private createLegacyConfig(): ZapperConfig {
-    if (!this.context) throw new Error("Context not loaded");
+    if (!this.context) throw new ContextNotLoadedError();
 
     // Convert processes to native format
     const native: Record<string, any> = {};
@@ -175,13 +176,13 @@ export class Zapper {
   }
 
   async startProcesses(processNames?: string[]): Promise<void> {
-    if (!this.context) throw new Error("Context not loaded");
+    if (!this.context) throw new ContextNotLoadedError();
 
     const allProcesses = this.getProcesses();
     const allContainers = this.getContainers();
 
     if (allProcesses.length === 0 && allContainers.length === 0) {
-      throw new Error("No processes defined in config");
+      throw new ServiceNotFoundError("any", "No processes defined in config");
     }
 
     // TODO: Update Planner to work with Context
@@ -199,9 +200,7 @@ export class Zapper {
 
     const hasActions = plan.waves.some((w) => w.actions.length > 0);
     if (canonical && !hasActions) {
-      throw new Error(
-        `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
-      );
+      throw new ServiceNotFoundError(processNames?.join(", ") || "unknown");
     }
 
     await executeActions(
@@ -213,7 +212,7 @@ export class Zapper {
   }
 
   async stopProcesses(processNames?: string[]): Promise<void> {
-    if (!this.context) throw new Error("Context not loaded");
+    if (!this.context) throw new ContextNotLoadedError();
 
     const legacyConfig = this.createLegacyConfig();
     const planner = new Planner(legacyConfig);
@@ -228,9 +227,7 @@ export class Zapper {
 
     const hasActions = plan.waves.some((w) => w.actions.length > 0);
     if (canonical && !hasActions) {
-      throw new Error(
-        `Service not found: ${processNames?.join(", ")}. Check names or aliases`,
-      );
+      throw new ServiceNotFoundError(processNames?.join(", ") || "unknown");
     }
 
     await executeActions(
@@ -242,7 +239,7 @@ export class Zapper {
   }
 
   async restartProcesses(processNames?: string[]): Promise<void> {
-    if (!this.context) throw new Error("Context not loaded");
+    if (!this.context) throw new ContextNotLoadedError();
     const legacyConfig = this.createLegacyConfig();
     const planner = new Planner(legacyConfig);
     const canonical = this.resolveAliasesToCanonical(processNames);
@@ -263,7 +260,7 @@ export class Zapper {
   }
 
   async showLogs(processName: string, follow: boolean = false): Promise<void> {
-    if (!this.context) throw new Error("Context not loaded");
+    if (!this.context) throw new ContextNotLoadedError();
 
     const projectName = this.context.projectName;
     const projectRoot = this.context.projectRoot;
@@ -279,23 +276,18 @@ export class Zapper {
     if (isContainer) {
       const dockerName = `zap.${projectName}.${resolvedName}`;
       const exists = await DockerManager.containerExists(dockerName);
-      if (!exists)
-        throw new Error(
-          `Container not running: ${resolvedName} (${dockerName})`,
-        );
+      if (!exists) throw new ContainerNotRunningError(resolvedName, dockerName);
       await DockerManager.showLogs(dockerName, follow);
     } else if (isProcess) {
       const pm2Executor = new Pm2Executor(projectName, projectRoot);
       await pm2Executor.showLogs(resolvedName, follow);
     } else {
-      throw new Error(
-        `Service not found: ${processName}. Check service names or aliases`,
-      );
+      throw new ServiceNotFoundError(processName);
     }
   }
 
   async reset(force = false): Promise<void> {
-    if (!this.context) throw new Error("Context not loaded");
+    if (!this.context) throw new ContextNotLoadedError();
 
     const proceed = force
       ? true
@@ -320,7 +312,7 @@ export class Zapper {
   }
 
   async cloneRepos(processNames?: string[]): Promise<void> {
-    if (!this.context) throw new Error("Context not loaded");
+    if (!this.context) throw new ContextNotLoadedError();
     const legacyConfig = this.createLegacyConfig();
     await cloneRepositories(
       legacyConfig,
@@ -333,10 +325,10 @@ export class Zapper {
     taskName: string,
     params?: { named: Record<string, string>; rest: string[] },
   ): Promise<void> {
-    if (!this.context) throw new Error("Context not loaded");
+    if (!this.context) throw new ContextNotLoadedError();
 
     if (!this.context.tasks || this.context.tasks.length === 0) {
-      throw new Error("No tasks defined in config");
+      throw new ServiceNotFoundError(taskName, "No tasks defined in config");
     }
 
     // Build task alias map for resolution
@@ -344,9 +336,7 @@ export class Zapper {
     const resolvedTaskName = taskAliasMap[taskName];
 
     if (!resolvedTaskName) {
-      throw new Error(
-        `Task not found: ${taskName}. Check task names or aliases`,
-      );
+      throw new ServiceNotFoundError(taskName);
     }
 
     // Convert tasks array back to object format for TaskRunner
