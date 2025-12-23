@@ -637,6 +637,10 @@ export class Pm2Manager {
     const filePath = path.join(zapDir, fileName);
 
     let content = "#!/bin/bash\n";
+    // Export PATH from the shell that ran `zap up` to ensure consistent tool versions
+    if (process.env.PATH) {
+      content += `export PATH="${process.env.PATH}"\n`;
+    }
     // Redirect stderr through a colorizer so it appears red in combined logs
     content += `exec 2> >(while IFS= read -r line; do printf '\\033[31m%s\\033[0m\\n' "$line"; done)\n`;
     if (processConfig.source) {
