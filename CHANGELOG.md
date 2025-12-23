@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.11.1
+
+### Patch Changes
+
+- d6dfe5b: path freezing
+
 ## 0.11.0
 
 ### Minor Changes
