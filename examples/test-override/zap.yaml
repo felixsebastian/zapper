@@ -1,0 +1,14 @@
+project: test-override
+env_files:
+  - .env.base
+  - .env.e2e
+
+native:
+  test-service:
+    cmd: "env | grep -E '(DATABASE_URL|PORT|API_KEY|NODE_ENV)' | sort"
+    env:
+      - DATABASE_URL
+      - PORT
+      - API_KEY
+      - NODE_ENV
+

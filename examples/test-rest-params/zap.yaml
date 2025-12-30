@@ -1,0 +1,23 @@
+project: test-rest-params
+
+native:
+  dummy:
+    cmd: echo "dummy service"
+
+tasks:
+  test-rest:
+    desc: Test REST parameter functionality
+    cmds:
+      - 'echo "REST args: {{REST}}"'
+      - 'echo "Args were: {{REST}}"'
+  
+  test-combined:
+    desc: Test named params + REST
+    params:
+      - name: env
+        default: dev
+        desc: Environment
+    cmds:
+      - 'echo "Environment: {{env}}"'
+      - 'echo "Extra args: {{REST}}"'
+

@@ -326,7 +326,10 @@ export class EnvResolver {
 
         if (isDotenv) {
           const parsed = dotenvParse(content);
-          const expanded = expand({ parsed, processEnv: merged });
+          // Merge previous values with new parsed values, with parsed taking precedence
+          // This allows variable expansion to reference previously loaded vars
+          const combined = { ...merged, ...parsed };
+          const expanded = expand({ parsed: combined, processEnv: {} });
           Object.assign(merged, expanded.parsed);
         } else if (ext === ".yaml" || ext === ".yml") {
           const data = parse(content) as RawEnvFile | undefined;

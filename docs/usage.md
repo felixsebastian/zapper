@@ -62,6 +62,26 @@ tasks:
 
 ## CLI Commands
 
+### Global Options
+
+Available with any command:
+
+```bash
+--config <file>    # Use a specific config file (default: zap.yaml)
+-v, --verbose      # Increase logging verbosity
+-q, --quiet        # Reduce logging output
+-d, --debug        # Enable debug logging
+```
+
+Examples:
+
+```bash
+zap --config prod.yaml up
+zap --config staging.yaml status
+zap --debug restart
+zap --verbose --config custom.yaml task build
+```
+
 ### Starting and stopping
 
 ```bash

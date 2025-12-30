@@ -104,6 +104,35 @@ DATABASE_URL=postgresql://localhost:5432/myapp
       });
     });
 
+    it("should override variables when later files define the same key", () => {
+      const env1Content = `
+APP_ENV=development
+DATABASE_URL=postgresql://localhost:5432/devdb
+PORT=3000
+      `;
+
+      const env2Content = `
+DATABASE_URL=postgresql://localhost:5432/testdb
+PORT=4000
+      `;
+
+      const tempDir = ".";
+      const env1File = `${tempDir}/.env.base.${Date.now()}`;
+      const env2File = `${tempDir}/.env.e2e.${Date.now()}`;
+      
+      writeFileSync(env1File, env1Content);
+      writeFileSync(env2File, env2Content);
+      tempFiles.push(env1File, env2File);
+
+      const result = EnvResolver["loadAndMergeEnvFiles"]([env1File, env2File]);
+
+      expect(result).toEqual({
+        APP_ENV: "development",
+        DATABASE_URL: "postgresql://localhost:5432/testdb",
+        PORT: "4000",
+      });
+    });
+
     it("should handle mixed file types", () => {
       const envContent = `
 APP_ENV=development
