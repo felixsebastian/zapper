@@ -1,5 +1,12 @@
 # zapper-cli
 
+## 0.12.0
+
+### Minor Changes
+
+- 9492067: links section
+- a6f7964: link field and healthchecks
+
 ## 0.11.1
 
 ### Patch Changes
