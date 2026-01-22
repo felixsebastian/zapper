@@ -1,0 +1,11 @@
+project: git-test
+native:
+  test-service:
+    cmd: echo "test"
+    cwd: ./test-repo
+    repo: example/repo
+  bad-service:
+    cmd: echo "bad"
+    cwd: ./bad-repo
+    repo: example/bad
+

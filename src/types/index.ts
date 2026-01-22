@@ -22,11 +22,13 @@ export type Command =
   | "task"
   | "profile"
   | "state"
-  | "checkout"
-  | "pull"
-  | "gitstatus"
+  | "git:checkout"
+  | "git:pull"
+  | "git:status"
+  | "git:stash"
   | "config"
-  | "env";
+  | "env"
+  | "launch";
 
 export interface CliOptions {
   command: Command;

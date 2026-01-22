@@ -20,15 +20,39 @@ function isRunning(rawStatus: string, type: "native" | "docker"): boolean {
   return s === "running";
 }
 
-function computeStatus(
+async function checkHealthUrl(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      signal: AbortSignal.timeout(2000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function computeStatus(
   running: boolean,
   startedAtMs: number | undefined,
-  healthCheckSecs: number,
-): Status {
+  healthcheck: number | string,
+): Promise<Status> {
   if (!running) return "down";
+  if (typeof healthcheck === "string") {
+    const healthy = await checkHealthUrl(healthcheck);
+    return healthy ? "up" : "pending";
+  }
   if (!startedAtMs) return "up";
   const elapsed = (Date.now() - startedAtMs) / 1000;
-  return elapsed < healthCheckSecs ? "pending" : "up";
+  return elapsed < healthcheck ? "pending" : "up";
+}
+
+function isServiceEnabled(
+  serviceProfiles: string[] | undefined,
+  activeProfile: string | undefined,
+): boolean {
+  if (!serviceProfiles || serviceProfiles.length === 0) return true;
+  return !!activeProfile && serviceProfiles.includes(activeProfile);
 }
 
 export interface ServiceStatus {
@@ -36,6 +60,7 @@ export interface ServiceStatus {
   rawName: string;
   status: Status;
   type: "native" | "docker";
+  enabled: boolean;
 }
 
 export interface StatusResult {
@@ -62,6 +87,7 @@ export async function getStatus(
         service: p.name.split(".").pop() || p.name,
         status: (isRunning(p.status, "native") ? "up" : "down") as Status,
         type: "native" as const,
+        enabled: true,
       }))
       .filter((p) => (!service ? true : p.service === service));
 
@@ -72,6 +98,7 @@ export async function getStatus(
         service: c.name.split(".").pop() || c.name,
         status: (isRunning(c.status, "docker") ? "up" : "down") as Status,
         type: "docker" as const,
+        enabled: true,
       }))
       .filter((c) => !!c.rawName)
       .filter((c) => (!service ? true : c.service === service));
@@ -81,6 +108,7 @@ export async function getStatus(
 
   const projectName = context.projectName;
   const serviceStates = context.state.services || {};
+  const activeProfile = context.state.activeProfile;
 
   const native: ServiceStatus[] = [];
   for (const proc of context.processes) {
@@ -88,7 +116,8 @@ export async function getStatus(
 
     const expectedPm2Name = `zap.${projectName}.${proc.name}`;
     const runningProcess = pm2List.find((p) => p.name === expectedPm2Name);
-    const healthCheck = proc.healthCheck ?? 5;
+    const healthcheck = proc.healthcheck ?? 5;
+    const enabled = isServiceEnabled(proc.profiles, activeProfile);
 
     let status: Status = "down";
     if (runningProcess) {
@@ -96,7 +125,7 @@ export async function getStatus(
       const startedAtMs = running
         ? Date.now() - runningProcess.uptime
         : undefined;
-      status = computeStatus(running, startedAtMs, healthCheck);
+      status = await computeStatus(running, startedAtMs, healthcheck);
     }
 
     native.push({
@@ -104,6 +133,7 @@ export async function getStatus(
       rawName: expectedPm2Name,
       status,
       type: "native" as const,
+      enabled,
     });
   }
 
@@ -114,8 +144,9 @@ export async function getStatus(
     const expectedDockerName = `zap.${projectName}.${container.name}`;
     const containerInfo =
       await DockerManager.getContainerInfo(expectedDockerName);
-    const healthCheck = container.healthCheck ?? 5;
+    const healthcheck = container.healthcheck ?? 5;
     const serviceState = serviceStates[expectedDockerName];
+    const enabled = isServiceEnabled(container.profiles, activeProfile);
 
     let status: Status = "down";
 
@@ -130,7 +161,7 @@ export async function getStatus(
         const startedAtMs = containerInfo.startedAt
           ? new Date(containerInfo.startedAt).getTime()
           : undefined;
-        status = computeStatus(running, startedAtMs, healthCheck);
+        status = await computeStatus(running, startedAtMs, healthcheck);
       }
     }
 
@@ -139,6 +170,7 @@ export async function getStatus(
       rawName: expectedDockerName,
       status,
       type: "docker" as const,
+      enabled,
     });
   }
 

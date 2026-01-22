@@ -24,8 +24,3 @@ export function getNativeTargets(
       return { name, cwd: resolved };
     });
 }
-
-
-
-
-

@@ -210,7 +210,7 @@ export class Planner {
               type: "stop",
               serviceType: "native",
               name: process.name as string,
-              healthCheck: process.healthCheck ?? 5,
+              healthcheck: process.healthcheck ?? 5,
             },
           ],
         });
@@ -233,7 +233,7 @@ export class Planner {
               type: "stop",
               serviceType: "docker",
               name,
-              healthCheck: container.healthCheck ?? 5,
+              healthcheck: container.healthcheck ?? 5,
             },
           ],
         });

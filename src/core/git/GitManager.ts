@@ -21,6 +21,8 @@ export class GitManager {
     targets: GitTarget[],
     branch: string,
   ): Promise<void> {
+    const failed: string[] = [];
+
     for (const target of targets) {
       if (!this.isGitRepo(target.cwd)) continue;
 
@@ -47,11 +49,18 @@ export class GitManager {
         });
       } catch (e) {
         logger.warn(`Failed to checkout in ${target.name}: ${e}`);
+        failed.push(target.name);
       }
+    }
+
+    if (failed.length > 0) {
+      logger.warn(`Failed for repos: ${failed.join(", ")}`);
     }
   }
 
   static async pullAll(targets: GitTarget[]): Promise<void> {
+    const failed: string[] = [];
+
     for (const target of targets) {
       if (!this.isGitRepo(target.cwd)) continue;
 
@@ -59,7 +68,12 @@ export class GitManager {
         execSync(`git pull --ff-only`, { cwd: target.cwd, stdio: "inherit" });
       } catch (e) {
         logger.warn(`Failed to pull in ${target.name}: ${e}`);
+        failed.push(target.name);
       }
+    }
+
+    if (failed.length > 0) {
+      logger.warn(`Failed for repos: ${failed.join(", ")}`);
     }
   }
 
@@ -83,6 +97,34 @@ export class GitManager {
       } catch (e) {
         logger.warn(`Failed to get status in ${target.name}: ${e}`);
       }
+    }
+  }
+
+  static async stashAll(targets: GitTarget[]): Promise<void> {
+    const failed: string[] = [];
+
+    for (const target of targets) {
+      if (!this.isGitRepo(target.cwd)) continue;
+
+      try {
+        const status = execSync("git status --porcelain", { cwd: target.cwd })
+          .toString()
+          .trim();
+
+        if (status.length > 0) {
+          execSync(`git stash`, { cwd: target.cwd, stdio: "inherit" });
+          logger.info(`Stashed changes in ${target.name}`);
+        } else {
+          logger.debug(`No changes to stash in ${target.name}`);
+        }
+      } catch (e) {
+        logger.warn(`Failed to stash in ${target.name}: ${e}`);
+        failed.push(target.name);
+      }
+    }
+
+    if (failed.length > 0) {
+      logger.warn(`Failed for repos: ${failed.join(", ")}`);
     }
   }
 }

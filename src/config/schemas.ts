@@ -33,6 +33,10 @@ const EnvSchema = z.union([
   z.string().min(1, "Environment whitelist reference cannot be empty"),
 ]);
 
+const HealthcheckSchema = z
+  .union([z.number(), z.string().url("Healthcheck must be a valid URL")])
+  .optional();
+
 export const ProcessSchema = z.object({
   name: z.string().optional(),
   cmd: z.string().min(1, "Command cannot be empty"),
@@ -47,8 +51,9 @@ export const ProcessSchema = z.object({
   profiles: z
     .array(z.string().min(1, "Profile name cannot be empty"))
     .optional(),
-  healthCheck: z.number().optional(),
+  healthcheck: HealthcheckSchema,
   depends_on: z.array(validNameSchema).optional(),
+  link: z.string().url("Link must be a valid URL").optional(),
 });
 
 export const ContainerSchema = z.object({
@@ -66,8 +71,9 @@ export const ContainerSchema = z.object({
   profiles: z
     .array(z.string().min(1, "Profile name cannot be empty"))
     .optional(),
-  healthCheck: z.number().optional(),
+  healthcheck: HealthcheckSchema,
   depends_on: z.array(validNameSchema).optional(),
+  link: z.url().optional(),
 });
 
 export const TaskCmdSchema = z.union([

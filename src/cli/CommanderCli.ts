@@ -16,8 +16,10 @@ import {
   CheckoutCommand,
   PullCommand,
   GitStatusCommand,
+  GitStashCommand,
   ConfigCommand,
   EnvCommand,
+  LaunchCommand,
   CommandContext,
   CommandHandler,
   TaskParams,
@@ -85,11 +87,13 @@ export class CommanderCli {
     this.commandHandlers.set("task", new TaskCommand());
     this.commandHandlers.set("profile", new ProfilesCommand());
     this.commandHandlers.set("state", new StateCommand());
-    this.commandHandlers.set("checkout", new CheckoutCommand());
-    this.commandHandlers.set("pull", new PullCommand());
-    this.commandHandlers.set("gitstatus", new GitStatusCommand());
+    this.commandHandlers.set("git:checkout", new CheckoutCommand());
+    this.commandHandlers.set("git:pull", new PullCommand());
+    this.commandHandlers.set("git:status", new GitStatusCommand());
+    this.commandHandlers.set("git:stash", new GitStashCommand());
     this.commandHandlers.set("config", new ConfigCommand());
     this.commandHandlers.set("env", new EnvCommand());
+    this.commandHandlers.set("launch", new LaunchCommand());
   }
 
   private setupProgram(): void {
@@ -99,7 +103,7 @@ export class CommanderCli {
       .version(packageJson.version);
 
     this.program
-      .option("--config <file>", "Use a specific config file", "zap.yaml")
+      .option("--config <file>", "Use a specific config file")
       .option("-v, --verbose", "Increase logging verbosity")
       .option("-q, --quiet", "Reduce logging output")
       .option("-d, --debug", "Enable debug logging");
@@ -221,28 +225,69 @@ export class CommanderCli {
         await this.executeCommand("state", undefined, command);
       });
 
-    this.program
-      .command("checkout")
-      .alias("co")
-      .description("Switch all native repos to the given branch")
-      .requiredOption("--service <branch>", "Branch name")
-      .action(async (options, command) => {
-        await this.executeCommand("checkout", options.service, command);
-      });
+    const gitCmd = this.program
+      .command("git")
+      .description("Git operations across all native repos");
 
-    this.program
-      .command("pull")
-      .description("Pull latest for all native repos")
-      .action(async (options, command) => {
-        await this.executeCommand("pull", undefined, command);
-      });
-
-    this.program
-      .command("gitstatus")
-      .alias("gs")
+    gitCmd
+      .command("status")
+      .alias("gst")
       .description("List branch and dirty/clean for all native repos")
       .action(async (options, command) => {
-        await this.executeCommand("gitstatus", undefined, command);
+        await this.executeCommand("git:status", undefined, command);
+      });
+
+    gitCmd
+      .command("pull")
+      .alias("ggpur")
+      .description("Pull latest for all native repos")
+      .action(async (options, command) => {
+        await this.executeCommand("git:pull", undefined, command);
+      });
+
+    gitCmd
+      .command("checkout <branch>")
+      .alias("gco")
+      .description("Checkout a branch across all native repos")
+      .action(async (branch, options, command) => {
+        await this.executeCommand("git:checkout", branch, command);
+      });
+
+    gitCmd
+      .command("stash")
+      .alias("gsta")
+      .description("Stash any dirty changes across all native repos")
+      .action(async (options, command) => {
+        await this.executeCommand("git:stash", undefined, command);
+      });
+
+    // Top-level aliases for convenience
+    this.program
+      .command("gst")
+      .description("Alias for: git status")
+      .action(async (options, command) => {
+        await this.executeCommand("git:status", undefined, command);
+      });
+
+    this.program
+      .command("ggpur")
+      .description("Alias for: git pull")
+      .action(async (options, command) => {
+        await this.executeCommand("git:pull", undefined, command);
+      });
+
+    this.program
+      .command("gsta")
+      .description("Alias for: git stash")
+      .action(async (options, command) => {
+        await this.executeCommand("git:stash", undefined, command);
+      });
+
+    this.program
+      .command("gco <branch>")
+      .description("Alias for: git checkout")
+      .action(async (branch, options, command) => {
+        await this.executeCommand("git:checkout", branch, command);
       });
 
     this.program
@@ -264,6 +309,16 @@ export class CommanderCli {
       .option("-j, --json", "Output as minified JSON")
       .action(async (service, options, command) => {
         await this.executeCommand("env", service, command);
+      });
+
+    this.program
+      .command("launch")
+      .alias("open")
+      .alias("o")
+      .description("Open the configured link for a service")
+      .argument("<service>", "Service to open link for")
+      .action(async (service, options, command) => {
+        await this.executeCommand("launch", service, command);
       });
   }
 

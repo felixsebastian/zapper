@@ -118,6 +118,7 @@ zap task build --list-params       # Show task parameters as JSON
 zap reset                   # Stop all services and delete .zap folder
 zap clone                   # Clone all repos defined in config
 zap clone --service api     # Clone specific repo
+zap launch <service>        # Open the service's configured link in browser
 ```
 
 ### Profiles
@@ -154,6 +155,10 @@ native:
     depends_on: [postgres]     # Start these first
     profiles: [dev, test]      # Only start when profile matches
     repo: myorg/api-repo       # Git repo (for zap clone)
+    healthCheck: 10            # Seconds to wait before considering "up"
+    # OR
+    healthCheck: http://localhost:3000/health  # URL to poll for readiness
+    link: http://localhost:3000  # URL to open with `zap launch`
 ```
 
 ### Working directory
@@ -214,6 +219,10 @@ docker:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     depends_on: [other]        # Start dependencies first
     profiles: [dev]            # Profile filtering
+    healthCheck: 10            # Seconds to wait before considering "up"
+    # OR
+    healthCheck: http://localhost:5432  # URL to poll for readiness
+    link: http://localhost:5432  # URL to open with `zap launch`
 ```
 
 ### Common database setups

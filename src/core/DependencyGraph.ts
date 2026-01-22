@@ -4,7 +4,7 @@ import { Action, ExecutionWave, ServiceType } from "../types";
 interface ServiceNode {
   name: string;
   serviceType: ServiceType;
-  healthCheck: number;
+  healthcheck: number | string;
   depends_on: string[];
 }
 
@@ -16,7 +16,7 @@ export class DependencyGraph {
     this.nodes.set(name, {
       name,
       serviceType: "native",
-      healthCheck: process.healthCheck ?? 5,
+      healthcheck: process.healthcheck ?? 5,
       depends_on: process.depends_on ?? [],
     });
   }
@@ -25,7 +25,7 @@ export class DependencyGraph {
     this.nodes.set(name, {
       name,
       serviceType: "docker",
-      healthCheck: container.healthCheck ?? 5,
+      healthcheck: container.healthcheck ?? 5,
       depends_on: container.depends_on ?? [],
     });
   }
@@ -106,7 +106,7 @@ export class DependencyGraph {
             type: "start",
             serviceType: node.serviceType,
             name: node.name,
-            healthCheck: node.healthCheck,
+            healthcheck: node.healthcheck,
           });
         }
       }
@@ -161,7 +161,7 @@ export class DependencyGraph {
             type: "stop",
             serviceType: node.serviceType,
             name: node.name,
-            healthCheck: node.healthCheck,
+            healthcheck: node.healthcheck,
           });
         }
       }

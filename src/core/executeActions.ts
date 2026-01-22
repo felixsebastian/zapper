@@ -7,6 +7,36 @@ import { findProcess } from "./findProcess";
 import { findContainer } from "./findContainer";
 import { updateServiceState, clearServiceState } from "../config/stateLoader";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function checkHealthUrl(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      signal: AbortSignal.timeout(2000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForHealth(action: Action): Promise<void> {
+  if (action.type !== "start") return;
+
+  const { healthcheck } = action;
+  if (typeof healthcheck === "number") {
+    await sleep(healthcheck * 1000);
+  } else if (typeof healthcheck === "string") {
+    const maxAttempts = 120;
+    for (let i = 0; i < maxAttempts; i++) {
+      if (await checkHealthUrl(healthcheck)) return;
+      await sleep(1000);
+    }
+    logger.warn(`Healthcheck timeout for ${action.name}: ${healthcheck}`);
+  }
+}
+
 async function executeAction(
   action: Action,
   config: ZapperConfig,
@@ -106,5 +136,7 @@ export async function executeActions(
         ),
       ),
     );
+
+    await Promise.all(wave.actions.map((action) => waitForHealth(action)));
   }
 }

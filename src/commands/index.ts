@@ -12,5 +12,7 @@ export { StateCommand } from "./StateCommand";
 export { CheckoutCommand } from "./CheckoutCommand";
 export { PullCommand } from "./PullCommand";
 export { GitStatusCommand } from "./GitStatusCommand";
+export { GitStashCommand } from "./GitStashCommand";
 export { ConfigCommand } from "./ConfigCommand";
 export { EnvCommand } from "./EnvCommand";
+export { LaunchCommand } from "./LaunchCommand";

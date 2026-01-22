@@ -35,7 +35,7 @@ function createMockDockerContainer(name: string, status: string) {
   };
 }
 
-function flattenActions(plan: ActionPlan): Omit<Action, "healthCheck">[] {
+function flattenActions(plan: ActionPlan): Omit<Action, "healthcheck">[] {
   return plan.waves.flatMap((w) =>
     w.actions.map(({ type, serviceType, name }) => ({
       type,
@@ -471,14 +471,14 @@ describe("Planner - Dependency-aware waves", () => {
     expect(plan.waves[1].actions[0].name).toBe("api");
   });
 
-  it("should include healthCheck in actions", async () => {
+  it("should include healthcheck in actions", async () => {
     const config: ZapperConfig = {
       project: "test-project",
       native: {
-        api: { cmd: "npm start", healthCheck: 10 },
+        api: { cmd: "npm start", healthcheck: 10 },
       },
       docker: {
-        database: { image: "postgres:15", healthCheck: 15 },
+        database: { image: "postgres:15", healthcheck: 15 },
       },
     };
 
@@ -492,11 +492,11 @@ describe("Planner - Dependency-aware waves", () => {
     const apiAction = allActions.find((a) => a.name === "api");
     const dbAction = allActions.find((a) => a.name === "database");
 
-    expect(apiAction?.healthCheck).toBe(10);
-    expect(dbAction?.healthCheck).toBe(15);
+    expect(apiAction?.healthcheck).toBe(10);
+    expect(dbAction?.healthcheck).toBe(15);
   });
 
-  it("should use default healthCheck of 5", async () => {
+  it("should use default healthcheck of 5", async () => {
     const config: ZapperConfig = {
       project: "test-project",
       native: {
@@ -509,7 +509,7 @@ describe("Planner - Dependency-aware waves", () => {
     const planner = new Planner(config);
     const plan = await planner.plan("start", undefined, "test-project", true);
 
-    expect(plan.waves[0].actions[0].healthCheck).toBe(5);
+    expect(plan.waves[0].actions[0].healthcheck).toBe(5);
   });
 
   it("should throw on circular dependencies", async () => {

@@ -5,8 +5,8 @@ describe("DependencyGraph", () => {
   describe("computeStartWaves", () => {
     it("should put independent services in the same wave", () => {
       const graph = new DependencyGraph();
-      graph.addProcess("api", { cmd: "npm start", healthCheck: 5 });
-      graph.addContainer("database", { image: "postgres:15", healthCheck: 5 });
+      graph.addProcess("api", { cmd: "npm start", healthcheck: 5 });
+      graph.addContainer("database", { image: "postgres:15", healthcheck: 5 });
 
       const waves = graph.computeStartWaves(new Set(["api", "database"]));
 
@@ -16,10 +16,10 @@ describe("DependencyGraph", () => {
 
     it("should order dependent services into separate waves", () => {
       const graph = new DependencyGraph();
-      graph.addContainer("database", { image: "postgres:15", healthCheck: 5 });
+      graph.addContainer("database", { image: "postgres:15", healthcheck: 5 });
       graph.addProcess("api", {
         cmd: "npm start",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["database"],
       });
 
@@ -32,16 +32,16 @@ describe("DependencyGraph", () => {
 
     it("should handle complex dependency chains", () => {
       const graph = new DependencyGraph();
-      graph.addContainer("database", { image: "postgres:15", healthCheck: 5 });
-      graph.addContainer("redis", { image: "redis:7", healthCheck: 5 });
+      graph.addContainer("database", { image: "postgres:15", healthcheck: 5 });
+      graph.addContainer("redis", { image: "redis:7", healthcheck: 5 });
       graph.addProcess("api", {
         cmd: "npm start",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["database", "redis"],
       });
       graph.addProcess("frontend", {
         cmd: "npm run dev",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["api"],
       });
 
@@ -60,12 +60,12 @@ describe("DependencyGraph", () => {
       const graph = new DependencyGraph();
       graph.addProcess("a", {
         cmd: "npm start",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["b"],
       });
       graph.addProcess("b", {
         cmd: "npm start",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["a"],
       });
 
@@ -78,17 +78,17 @@ describe("DependencyGraph", () => {
       const graph = new DependencyGraph();
       graph.addProcess("a", {
         cmd: "npm start",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["b"],
       });
       graph.addProcess("b", {
         cmd: "npm start",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["c"],
       });
       graph.addProcess("c", {
         cmd: "npm start",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["a"],
       });
 
@@ -101,7 +101,7 @@ describe("DependencyGraph", () => {
       const graph = new DependencyGraph();
       graph.addProcess("api", {
         cmd: "npm start",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["unknown"],
       });
 
@@ -112,9 +112,9 @@ describe("DependencyGraph", () => {
 
     it("should only start requested services", () => {
       const graph = new DependencyGraph();
-      graph.addContainer("database", { image: "postgres:15", healthCheck: 5 });
-      graph.addProcess("api", { cmd: "npm start", healthCheck: 5 });
-      graph.addProcess("worker", { cmd: "npm run worker", healthCheck: 5 });
+      graph.addContainer("database", { image: "postgres:15", healthcheck: 5 });
+      graph.addProcess("api", { cmd: "npm start", healthcheck: 5 });
+      graph.addProcess("worker", { cmd: "npm run worker", healthcheck: 5 });
 
       const waves = graph.computeStartWaves(new Set(["api"]));
 
@@ -123,26 +123,26 @@ describe("DependencyGraph", () => {
       expect(waves[0].actions[0].name).toBe("api");
     });
 
-    it("should preserve healthCheck values", () => {
+    it("should preserve healthcheck values", () => {
       const graph = new DependencyGraph();
-      graph.addProcess("api", { cmd: "npm start", healthCheck: 15 });
-      graph.addContainer("database", { image: "postgres:15", healthCheck: 30 });
+      graph.addProcess("api", { cmd: "npm start", healthcheck: 15 });
+      graph.addContainer("database", { image: "postgres:15", healthcheck: 30 });
 
       const waves = graph.computeStartWaves(new Set(["api", "database"]));
       const actions = waves.flatMap((w) => w.actions);
 
-      expect(actions.find((a) => a.name === "api")?.healthCheck).toBe(15);
-      expect(actions.find((a) => a.name === "database")?.healthCheck).toBe(30);
+      expect(actions.find((a) => a.name === "api")?.healthcheck).toBe(15);
+      expect(actions.find((a) => a.name === "database")?.healthcheck).toBe(30);
     });
   });
 
   describe("computeStopWaves", () => {
     it("should stop dependents before dependencies", () => {
       const graph = new DependencyGraph();
-      graph.addContainer("database", { image: "postgres:15", healthCheck: 5 });
+      graph.addContainer("database", { image: "postgres:15", healthcheck: 5 });
       graph.addProcess("api", {
         cmd: "npm start",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["database"],
       });
 
@@ -155,15 +155,15 @@ describe("DependencyGraph", () => {
 
     it("should stop all dependents before the dependency", () => {
       const graph = new DependencyGraph();
-      graph.addContainer("database", { image: "postgres:15", healthCheck: 5 });
+      graph.addContainer("database", { image: "postgres:15", healthcheck: 5 });
       graph.addProcess("api", {
         cmd: "npm start",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["database"],
       });
       graph.addProcess("worker", {
         cmd: "npm run worker",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["database"],
       });
 
@@ -179,15 +179,15 @@ describe("DependencyGraph", () => {
 
     it("should handle complex stop order", () => {
       const graph = new DependencyGraph();
-      graph.addContainer("database", { image: "postgres:15", healthCheck: 5 });
+      graph.addContainer("database", { image: "postgres:15", healthcheck: 5 });
       graph.addProcess("api", {
         cmd: "npm start",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["database"],
       });
       graph.addProcess("frontend", {
         cmd: "npm run dev",
-        healthCheck: 5,
+        healthcheck: 5,
         depends_on: ["api"],
       });
 

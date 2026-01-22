@@ -26,10 +26,17 @@ export class Zapper {
   constructor() {}
 
   async loadConfig(
-    configPath: string = "zap.yaml",
+    configPath?: string,
     cliOptions?: Record<string, any>,
   ): Promise<void> {
-    const resolvedPath = resolveConfigPath(configPath) ?? configPath;
+    const resolvedPath = resolveConfigPath(configPath);
+    if (!resolvedPath) {
+      throw new Error(
+        configPath
+          ? `Config file not found: ${configPath}`
+          : "No zap.yaml config file found in current directory or parent directories",
+      );
+    }
     const projectRoot = path.dirname(path.resolve(resolvedPath));
     const config = parseYamlFile(resolvedPath);
 
@@ -371,5 +378,10 @@ export class Zapper {
   async gitStatusAll(): Promise<void> {
     const targets = this.getNativeTargets();
     await GitManager.statusAll(targets);
+  }
+
+  async gitStashAll(): Promise<void> {
+    const targets = this.getNativeTargets();
+    await GitManager.stashAll(targets);
   }
 }

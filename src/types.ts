@@ -5,7 +5,7 @@ export interface Action {
   type: ActionType;
   serviceType: ServiceType;
   name: string;
-  healthCheck: number;
+  healthcheck: number | string;
 }
 
 export interface ExecutionWave {

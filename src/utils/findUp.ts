@@ -19,7 +19,7 @@ export function findFileUpwards(
 }
 
 export function resolveConfigPath(input?: string): string | null {
-  // If input provided, interpret it
+  // If input provided, use it directly (no fallback to default search)
   if (input && input.trim().length > 0) {
     const given = path.resolve(input);
     if (existsSync(given)) {
@@ -34,7 +34,9 @@ export function resolveConfigPath(input?: string): string | null {
         return null;
       }
     }
-    // If it's a directory that doesn't exist or file not found, fall back to upward search from cwd
+    // If custom config specified but not found, return null (will error in parseYamlFile)
+    return null;
   }
+  // No input provided, search for default config files
   return findFileUpwards(process.cwd());
 }

@@ -119,7 +119,7 @@ PORT=4000
       const tempDir = ".";
       const env1File = `${tempDir}/.env.base.${Date.now()}`;
       const env2File = `${tempDir}/.env.e2e.${Date.now()}`;
-      
+
       writeFileSync(env1File, env1Content);
       writeFileSync(env2File, env2Content);
       tempFiles.push(env1File, env2File);
