@@ -155,9 +155,9 @@ native:
     depends_on: [postgres]     # Start these first
     profiles: [dev, test]      # Only start when profile matches
     repo: myorg/api-repo       # Git repo (for zap clone)
-    healthCheck: 10            # Seconds to wait before considering "up"
+    healthcheck: 10            # Seconds to wait before considering "up"
     # OR
-    healthCheck: http://localhost:3000/health  # URL to poll for readiness
+    healthcheck: http://localhost:3000/health  # URL to poll for readiness
     link: http://localhost:3000  # URL to open with `zap launch`
 ```
 
@@ -219,9 +219,9 @@ docker:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     depends_on: [other]        # Start dependencies first
     profiles: [dev]            # Profile filtering
-    healthCheck: 10            # Seconds to wait before considering "up"
+    healthcheck: 10            # Seconds to wait before considering "up"
     # OR
-    healthCheck: http://localhost:5432  # URL to poll for readiness
+    healthcheck: http://localhost:5432  # URL to poll for readiness
     link: http://localhost:5432  # URL to open with `zap launch`
 ```
 
