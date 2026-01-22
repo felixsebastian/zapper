@@ -7,13 +7,11 @@ export class LaunchCommand extends CommandHandler {
     const { zapper, service } = context;
 
     if (!service) {
-      throw new Error("Service name is required. Usage: zap launch <service>");
+      throw new Error("Name is required. Usage: zap launch <name>");
     }
 
     const zapperContext = zapper.getContext();
-    if (!zapperContext) {
-      throw new Error("Context not loaded");
-    }
+    if (!zapperContext) throw new Error("Context not loaded");
 
     const nativeService = zapperContext.processes.find(
       (p) => p.name === service,
@@ -21,11 +19,11 @@ export class LaunchCommand extends CommandHandler {
     const dockerService = zapperContext.containers.find(
       (c) => c.name === service,
     );
-    const link = nativeService?.link ?? dockerService?.link;
+    const projectLink = zapperContext.links.find((l) => l.name === service);
 
-    if (!link) {
-      throw new Error(`No link configured for service: ${service}`);
-    }
+    const link = nativeService?.link ?? dockerService?.link ?? projectLink?.url;
+
+    if (!link) throw new Error(`No link found for: ${service}`);
 
     logger.info(`Opening ${link}`);
     const openCmd =

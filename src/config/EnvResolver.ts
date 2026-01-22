@@ -71,17 +71,33 @@ export class EnvResolver {
 
     for (const proc of resolvedContext.processes) {
       this.resolveProcessEnv(proc, mergedEnvFromFiles, context.projectRoot);
+      if (proc.link)
+        proc.link = this.expandString(proc.link, mergedEnvFromFiles);
     }
 
     for (const container of resolvedContext.containers) {
       this.resolveContainerEnv(container, mergedEnvFromFiles);
+      if (container.link)
+        container.link = this.expandString(container.link, mergedEnvFromFiles);
     }
 
     for (const task of resolvedContext.tasks) {
       this.resolveTaskEnv(task, mergedEnvFromFiles, context.projectRoot);
     }
 
+    for (const link of resolvedContext.links) {
+      link.url = this.expandString(link.url, mergedEnvFromFiles);
+    }
+
     return resolvedContext;
+  }
+
+  private static expandString(
+    value: string,
+    env: Record<string, string>,
+  ): string {
+    const expanded = expand({ parsed: { value }, processEnv: env });
+    return expanded.parsed?.value ?? value;
   }
 
   private static splitInlineEnv(entries?: string[] | string): InlineEnv {

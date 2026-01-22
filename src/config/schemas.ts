@@ -53,7 +53,7 @@ export const ProcessSchema = z.object({
     .optional(),
   healthcheck: HealthcheckSchema,
   depends_on: z.array(validNameSchema).optional(),
-  link: z.string().url("Link must be a valid URL").optional(),
+  link: z.string().min(1).optional(),
 });
 
 export const ContainerSchema = z.object({
@@ -73,7 +73,7 @@ export const ContainerSchema = z.object({
     .optional(),
   healthcheck: HealthcheckSchema,
   depends_on: z.array(validNameSchema).optional(),
-  link: z.url().optional(),
+  link: z.string().min(1).optional(),
 });
 
 export const TaskCmdSchema = z.union([
@@ -106,6 +106,14 @@ export const TaskDelimitersSchema = z
   .tuple([z.string().min(1), z.string().min(1)])
   .optional();
 
+export const LinkSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Link name cannot be empty")
+    .max(100, "Link name cannot exceed 100 characters"),
+  url: z.string().min(1, "Link URL cannot be empty"),
+});
+
 export const ZapperConfigSchema = processValidation(
   duplicateValidation(
     z.object({
@@ -126,6 +134,7 @@ export const ZapperConfigSchema = processValidation(
       containers: z.record(validNameSchema, ContainerSchema).optional(),
       processes: z.array(ProcessSchema).optional(),
       tasks: z.record(validNameSchema, TaskSchema).optional(),
+      links: z.array(LinkSchema).optional(),
     }),
   ),
 );
@@ -146,6 +155,7 @@ export type Container = z.infer<typeof ContainerSchema>;
 export type Volume = z.infer<typeof VolumeSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type TaskParam = z.infer<typeof TaskParamSchema>;
+export type Link = z.infer<typeof LinkSchema>;
 export type ZapperConfig = z.infer<typeof ZapperConfigSchema>;
 export type ServiceState = z.infer<typeof ServiceStateSchema>;
 export type ZapperState = z.infer<typeof ZapperStateSchema>;

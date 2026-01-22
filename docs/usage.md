@@ -15,6 +15,7 @@ Complete reference for `zap.yaml` syntax and all CLI commands.
 - [Tasks](#tasks)
 - [Dependencies](#dependencies)
 - [Profiles](#profiles)
+- [Links](#links)
 - [Git Cloning](#git-cloning)
 
 ---
@@ -56,6 +57,9 @@ docker:
 
 tasks:
   # ... task definitions
+
+links:
+  # ... quick reference links
 ```
 
 ---
@@ -158,7 +162,7 @@ native:
     healthcheck: 10            # Seconds to wait before considering "up"
     # OR
     healthcheck: http://localhost:3000/health  # URL to poll for readiness
-    link: http://localhost:3000  # URL to open with `zap launch`
+    link: http://localhost:${PORT}  # URL to open with `zap launch` (supports ${VAR})
 ```
 
 ### Working directory
@@ -222,7 +226,7 @@ docker:
     healthcheck: 10            # Seconds to wait before considering "up"
     # OR
     healthcheck: http://localhost:5432  # URL to poll for readiness
-    link: http://localhost:5432  # URL to open with `zap launch`
+    link: http://localhost:${PG_PORT}  # URL to open with `zap launch` (supports ${VAR})
 ```
 
 ### Common database setups
@@ -643,6 +647,61 @@ Services without a `profiles` field run in all profiles (including when no profi
 
 ---
 
+## Links
+
+Quick reference links for your project. These are for your own reference and can be displayed by tooling.
+
+### Basic usage
+
+```yaml
+links:
+  - name: API Docs
+    url: https://api.example.com/docs
+  - name: Staging
+    url: https://staging.example.com
+  - name: Figma
+    url: https://figma.com/file/abc123
+```
+
+### Environment variable interpolation
+
+Link URLs support `${VAR}` syntax to reference environment variables from your `env_files`:
+
+```yaml
+env_files: [.env]
+
+links:
+  - name: API
+    url: http://localhost:${API_PORT}
+  - name: Frontend
+    url: http://localhost:${FRONTEND_PORT}
+```
+
+This also works for service-level `link` fields:
+
+```yaml
+native:
+  api:
+    cmd: pnpm dev
+    link: http://localhost:${PORT}/docs
+```
+
+### Opening links
+
+```bash
+zap launch "API Docs"          # Open by link name (quote if spaces)
+zap launch api                 # Open service link by service name
+```
+
+### Properties
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| `name` | Yes | Display name (max 100 characters) |
+| `url` | Yes | URL (supports `${VAR}` interpolation) |
+
+---
+
 ## Git Cloning
 
 For multi-repo setups, Zapper can clone repositories.
@@ -773,4 +832,10 @@ tasks:
     cmds:
       - pnpm eslint . --fix
       - pnpm tsc --noEmit
+
+links:
+  - name: API Docs
+    url: http://localhost:3000/docs
+  - name: Storybook
+    url: http://localhost:6006
 ```

@@ -3,10 +3,11 @@ import {
   Container as ConfigContainer,
   Task as ConfigTask,
   TaskParam,
+  Link,
   ZapperState,
 } from "../config/schemas";
 
-export type { TaskParam };
+export type { TaskParam, Link };
 
 // Enhanced types that include name field and other context-specific data
 export interface Process extends Omit<ConfigProcess, "name"> {
@@ -33,6 +34,7 @@ export interface Context {
   processes: Process[]; // Combines native and processes from config
   containers: Container[]; // Combines docker and containers from config
   tasks: Task[]; // Tasks from config
+  links: Link[]; // Project bookmarks/links
   profiles: string[]; // All unique profiles from processes and containers
   state: ZapperState; // Validated state from state.json
 }

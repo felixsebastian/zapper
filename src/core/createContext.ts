@@ -1,6 +1,6 @@
 import path from "path";
 import { ZapperConfig } from "../config/schemas";
-import { Context, Process, Container, Task } from "../types/Context";
+import { Context, Process, Container, Task, Link } from "../types/Context";
 import { loadState } from "../config/stateLoader";
 
 /**
@@ -96,6 +96,8 @@ export function createContext(
   // Load and validate state from state.json
   const state = loadState(projectRoot);
 
+  const links: Link[] = config.links ?? [];
+
   return {
     projectName: config.project,
     projectRoot,
@@ -105,6 +107,7 @@ export function createContext(
     processes,
     containers,
     tasks,
+    links,
     profiles,
     state,
   };
