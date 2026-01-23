@@ -96,8 +96,11 @@ export class EnvResolver {
     value: string,
     env: Record<string, string>,
   ): string {
-    const expanded = expand({ parsed: { value }, processEnv: env });
-    return expanded.parsed?.value ?? value;
+    const result = expand({
+      parsed: { ...env, __value__: value },
+      processEnv: {},
+    });
+    return result.parsed?.__value__ ?? value;
   }
 
   private static splitInlineEnv(entries?: string[] | string): InlineEnv {

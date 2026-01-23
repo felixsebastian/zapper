@@ -456,4 +456,113 @@ TEST_VAR=test_value
       }).toThrow("Process nonexistent not found");
     });
   });
+
+  describe("link URL interpolation", () => {
+    it("should interpolate ${VAR} in process link URLs", () => {
+      const envContent = `
+API_PORT=3000
+FRONTEND_PORT=4000
+      `;
+      const envFile = createTempFile(envContent, ".env");
+
+      const context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: [envFile],
+        processes: [
+          { name: "api", cmd: "echo", link: "http://localhost:${API_PORT}" },
+          {
+            name: "frontend",
+            cmd: "echo",
+            link: "http://localhost:${FRONTEND_PORT}",
+          },
+        ],
+        containers: [],
+        tasks: [],
+        links: [],
+        profiles: [],
+        state: {},
+      };
+
+      const result = EnvResolver.resolveContext(context);
+
+      expect(result.processes[0].link).toBe("http://localhost:3000");
+      expect(result.processes[1].link).toBe("http://localhost:4000");
+    });
+
+    it("should interpolate ${VAR} in top-level link URLs", () => {
+      const envContent = `
+API_PORT=3000
+DOCS_PORT=8080
+      `;
+      const envFile = createTempFile(envContent, ".env");
+
+      const context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: [envFile],
+        processes: [],
+        containers: [],
+        tasks: [],
+        links: [
+          { name: "API", url: "http://localhost:${API_PORT}" },
+          { name: "Docs", url: "http://localhost:${DOCS_PORT}/docs" },
+        ],
+        profiles: [],
+        state: {},
+      };
+
+      const result = EnvResolver.resolveContext(context);
+
+      expect(result.links[0].url).toBe("http://localhost:3000");
+      expect(result.links[1].url).toBe("http://localhost:8080/docs");
+    });
+
+    it("should handle multiple variables in same URL", () => {
+      const envContent = `
+HOST=myapp.local
+PORT=3000
+      `;
+      const envFile = createTempFile(envContent, ".env");
+
+      const context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: [envFile],
+        processes: [],
+        containers: [],
+        tasks: [],
+        links: [{ name: "API", url: "http://${HOST}:${PORT}/api" }],
+        profiles: [],
+        state: {},
+      };
+
+      const result = EnvResolver.resolveContext(context);
+
+      expect(result.links[0].url).toBe("http://myapp.local:3000/api");
+    });
+
+    it("should leave undefined variables as empty", () => {
+      const envContent = `
+PORT=3000
+      `;
+      const envFile = createTempFile(envContent, ".env");
+
+      const context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: [envFile],
+        processes: [],
+        containers: [],
+        tasks: [],
+        links: [{ name: "API", url: "http://localhost:${UNDEFINED_VAR}" }],
+        profiles: [],
+        state: {},
+      };
+
+      const result = EnvResolver.resolveContext(context);
+
+      expect(result.links[0].url).toBe("http://localhost:");
+    });
+  });
 });
