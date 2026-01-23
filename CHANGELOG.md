@@ -1,5 +1,11 @@
 # zapper-cli
 
+## 0.12.1
+
+### Patch Changes
+
+- 129be80: fix link interpolation
+
 ## 0.12.0
 
 ### Minor Changes
