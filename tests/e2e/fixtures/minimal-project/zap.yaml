@@ -1,0 +1,4 @@
+project: minimal-test
+native:
+  app:
+    cmd: node -e "console.log('App running'); setInterval(() => {}, 1000)"

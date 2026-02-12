@@ -22,6 +22,7 @@
     "dev": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "npm run build && vitest run --config vitest.e2e.config.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "release": "changeset publish",
