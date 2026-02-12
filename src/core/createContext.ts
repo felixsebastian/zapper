@@ -66,12 +66,49 @@ export function createContext(
     }
   }
 
+  // Load and validate state from state.json
+  const state = loadState(projectRoot);
+
   // Resolve env_files to absolute paths relative to projectRoot
   let envFiles: string[] | undefined;
-  if (config.env_files && config.env_files.length > 0) {
-    envFiles = config.env_files.map((p) =>
-      path.isAbsolute(p) ? p : path.join(projectRoot, p),
-    );
+  const environmentSetNames: string[] = [];
+  if (config.env_files) {
+    if (Array.isArray(config.env_files)) {
+      if (
+        state.activeEnvironment &&
+        state.activeEnvironment !== "default"
+      ) {
+        throw new Error(
+          `Environment not found: ${state.activeEnvironment}. Available environments: default`,
+        );
+      }
+      if (config.env_files.length > 0) {
+        envFiles = config.env_files.map((p) =>
+          path.isAbsolute(p) ? p : path.join(projectRoot, p),
+        );
+        environmentSetNames.push("default");
+      }
+    } else {
+      const available = Object.keys(config.env_files).sort();
+      environmentSetNames.push(...available);
+
+      const activeName = state.activeEnvironment || "default";
+      const activeEnvironment = config.env_files[activeName];
+
+      if (!activeEnvironment && state.activeEnvironment) {
+        throw new Error(
+          `Environment not found: ${
+            state.activeEnvironment
+          }. Available environments: ${available.join(", ")}`,
+        );
+      }
+
+      if (activeEnvironment) {
+        envFiles = activeEnvironment.map((p) =>
+          path.isAbsolute(p) ? p : path.join(projectRoot, p),
+        );
+      }
+    }
   }
 
   // Extract all unique profiles from processes and containers
@@ -93,15 +130,13 @@ export function createContext(
 
   const profiles = Array.from(profileSet).sort();
 
-  // Load and validate state from state.json
-  const state = loadState(projectRoot);
-
   const links: Link[] = config.links ?? [];
 
   return {
     projectName: config.project,
     projectRoot,
     envFiles,
+    environments: environmentSetNames,
     gitMethod: config.git_method,
     taskDelimiters: config.task_delimiters,
     processes,

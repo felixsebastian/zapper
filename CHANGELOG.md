@@ -1,4 +1,4 @@
-# zapper-cli
+# @maplab/zapper
 
 ## 0.12.1
 

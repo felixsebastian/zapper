@@ -365,5 +365,42 @@ describe("ZodConfigValidator", () => {
         ZodConfigValidator.validate(config);
       }).toThrow();
     });
+
+    it("should validate env_files as environment map with default", () => {
+      const config = {
+        project: "myproj",
+        env_files: {
+          default: [".env"],
+          prod_dbs: [".env", ".env.prod-dbs"],
+        },
+        native: {
+          test: {
+            cmd: "echo hello",
+          },
+        },
+      };
+
+      expect(() => {
+        ZodConfigValidator.validate(config);
+      }).not.toThrow();
+    });
+
+    it("should allow env_files map without default", () => {
+      const config = {
+        project: "myproj",
+        env_files: {
+          prod_dbs: [".env", ".env.prod-dbs"],
+        },
+        native: {
+          test: {
+            cmd: "echo hello",
+          },
+        },
+      };
+
+      expect(() => {
+        ZodConfigValidator.validate(config);
+      }).not.toThrow();
+    });
   });
 });

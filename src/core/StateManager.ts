@@ -45,6 +45,20 @@ export class StateManager {
   }
 
   /**
+   * Set the active environment and reload config.
+   */
+  async setActiveEnvironment(environmentName: string): Promise<void> {
+    await this.updateStateAndReload({ activeEnvironment: environmentName });
+  }
+
+  /**
+   * Clear the active environment and reload config.
+   */
+  async clearActiveEnvironment(): Promise<void> {
+    await this.updateStateAndReload({ activeEnvironment: undefined });
+  }
+
+  /**
    * Update multiple state properties at once and reload config.
    */
   async updateState(stateUpdate: Partial<ZapperState>): Promise<void> {

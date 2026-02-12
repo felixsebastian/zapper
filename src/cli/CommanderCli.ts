@@ -86,6 +86,7 @@ export class CommanderCli {
     this.commandHandlers.set("clone", new CloneCommand());
     this.commandHandlers.set("task", new TaskCommand());
     this.commandHandlers.set("profile", new ProfilesCommand());
+    this.commandHandlers.set("environment", new EnvCommand());
     this.commandHandlers.set("state", new StateCommand());
     this.commandHandlers.set("git:checkout", new CheckoutCommand());
     this.commandHandlers.set("git:pull", new PullCommand());
@@ -219,6 +220,24 @@ export class CommanderCli {
       });
 
     this.program
+      .command("environment")
+      .alias("envset")
+      .description(
+        "Manage environments: show picker, enable an environment, list all environments, or disable active environment",
+      )
+      .argument("[environment]", "Environment name to enable")
+      .option("--list", "List all available environments")
+      .option("--disable", "Disable the currently active environment")
+      .option(
+        "-j, --json",
+        "Output environment list as minified JSON (use with --list)",
+      )
+      .option("--service <name>", "Show env vars for a service (env command)")
+      .action(async (environment, options, command) => {
+        await this.executeCommand("environment", environment, command);
+      });
+
+    this.program
       .command("state")
       .description("Show the current state JSON")
       .action(async (options, command) => {
@@ -304,8 +323,16 @@ export class CommanderCli {
 
     this.program
       .command("env")
-      .description("Show resolved environment variables for a service")
-      .argument("<service>", "Service to show environment variables for")
+      .description(
+        "Manage environments or show resolved environment variables for a service",
+      )
+      .argument(
+        "[name]",
+        "Environment to enable or service to show environment variables for",
+      )
+      .option("--list", "List all available environments")
+      .option("--disable", "Disable the currently active environment")
+      .option("--service <name>", "Show env vars for a service")
       .option("-j, --json", "Output as minified JSON")
       .action(async (service, options, command) => {
         await this.executeCommand("env", service, command);
@@ -343,9 +370,12 @@ export class CommanderCli {
     const zapper = new Zapper();
     await zapper.loadConfig(allOptions.config, allOptions);
 
-    const resolvedService = service
-      ? zapper.resolveServiceName(service)
-      : undefined;
+    const shouldResolveAliases =
+      command !== "env" && command !== "environment";
+    const resolvedService =
+      service && shouldResolveAliases
+        ? zapper.resolveServiceName(service)
+        : service;
 
     const handler = this.commandHandlers.get(command);
     if (!handler) {

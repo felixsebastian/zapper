@@ -480,6 +480,7 @@ FRONTEND_PORT=4000
         containers: [],
         tasks: [],
         links: [],
+        environments: ["default"],
         profiles: [],
         state: {},
       };
@@ -508,6 +509,7 @@ DOCS_PORT=8080
           { name: "API", url: "http://localhost:${API_PORT}" },
           { name: "Docs", url: "http://localhost:${DOCS_PORT}/docs" },
         ],
+        environments: ["default"],
         profiles: [],
         state: {},
       };
@@ -533,6 +535,7 @@ PORT=3000
         containers: [],
         tasks: [],
         links: [{ name: "API", url: "http://${HOST}:${PORT}/api" }],
+        environments: ["default"],
         profiles: [],
         state: {},
       };
@@ -556,6 +559,7 @@ PORT=3000
         containers: [],
         tasks: [],
         links: [{ name: "API", url: "http://localhost:${UNDEFINED_VAR}" }],
+        environments: ["default"],
         profiles: [],
         state: {},
       };

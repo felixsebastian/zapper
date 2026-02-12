@@ -27,6 +27,7 @@ export interface Context {
   projectName: string; // Renamed from 'project' in config
   projectRoot: string; // Absolute path to directory containing zap.yaml
   envFiles?: string[]; // Already resolved to absolute paths
+  environments: string[]; // Available env file sets
   gitMethod?: "http" | "ssh" | "cli";
   taskDelimiters?: [string, string]; // Custom delimiters for task interpolation
 

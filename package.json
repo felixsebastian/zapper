@@ -1,6 +1,6 @@
 {
   "name": "zapper-cli",
-  "version": "0.12.1",
+  "version": "0.12.1"
   "description": "A minimal TypeScript CLI project",
   "type": "commonjs",
   "main": "dist/index.js",
@@ -10,6 +10,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=18.0.0"
   },

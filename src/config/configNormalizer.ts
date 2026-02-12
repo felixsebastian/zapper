@@ -10,7 +10,7 @@
 
 export interface RawConfig {
   project?: string;
-  env_files?: string[];
+  env_files?: string[] | Record<string, string[]>;
   git_method?: "http" | "ssh" | "cli";
   whitelists?: Record<string, string[]>;
   native?: Record<string, unknown>;
@@ -42,4 +42,3 @@ export function denormalizeConfig<T extends RawConfig>(config: T): T {
   // This function exists if we ever need to convert back to legacy format
   return config;
 }
-

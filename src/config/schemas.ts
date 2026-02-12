@@ -33,6 +33,14 @@ const EnvSchema = z.union([
   z.string().min(1, "Environment whitelist reference cannot be empty"),
 ]);
 
+const EnvFilesArraySchema = z.array(
+  z.string().min(1, "Environment file path cannot be empty"),
+);
+
+const EnvFilesMapSchema = z.record(validNameSchema, EnvFilesArraySchema);
+
+const EnvFilesSchema = z.union([EnvFilesArraySchema, EnvFilesMapSchema]);
+
 const HealthcheckSchema = z
   .union([z.number(), z.string().url("Healthcheck must be a valid URL")])
   .optional();
@@ -118,9 +126,7 @@ export const ZapperConfigSchema = processValidation(
   duplicateValidation(
     z.object({
       project: validNameSchema,
-      env_files: z
-        .array(z.string().min(1, "Environment file path cannot be empty"))
-        .optional(),
+      env_files: EnvFilesSchema.optional(),
       git_method: z.enum(["http", "ssh", "cli"]).optional(),
       task_delimiters: TaskDelimitersSchema,
       whitelists: z
@@ -146,6 +152,7 @@ export const ServiceStateSchema = z.object({
 
 export const ZapperStateSchema = z.object({
   activeProfile: z.string().optional(),
+  activeEnvironment: z.string().optional(),
   lastUpdated: z.string().optional(),
   services: z.record(z.string(), ServiceStateSchema).optional(),
 });

@@ -23,7 +23,7 @@ Complete reference for `zap.yaml` syntax and all CLI commands.
 ## Installation
 
 ```bash
-npm install -g pm2 zapper-cli
+npm install -g pm2 @maplab/zapper
 ```
 
 For VS Code/Cursor, install the extension: `felixsebastian.zapper-vscode`
@@ -46,7 +46,9 @@ native:
 
 ```yaml
 project: myapp                    # Required. Used as PM2/Docker namespace
-env_files: [.env.base, .env]      # Load env vars from these files
+env_files:                        # Load env vars from these files
+  default: [.env.base, .env]
+  prod_dbs: [.env.base, .env.prod-dbs]
 git_method: ssh                   # ssh | http | cli (for repo cloning)
 
 native:
@@ -129,6 +131,21 @@ zap launch <service>        # Open the service's configured link in browser
 
 ```bash
 zap up --profile test       # Start only services matching profile
+```
+
+### Environments
+
+```bash
+zap env --list                    # List available environment sets
+zap env prod_dbs                  # Switch env file set
+zap env --disable                 # Reset to default env set
+```
+
+Aliases:
+
+```bash
+zap environment --list
+zap envset prod_dbs
 ```
 
 ---
@@ -297,6 +314,24 @@ env_files: [.env]                    # Single file
 env_files: [.env.base, .env]         # Multiple files (later files override)
 ```
 
+### Environment sets (recommended)
+
+You can define multiple env file sets and switch between them with
+`zap env <name>`. The `default` set is optional; if omitted and no
+environment is active, no env files are loaded.
+
+```yaml
+env_files:
+  default: [.env.base, .env]
+  prod_dbs: [.env.base, .env.prod-dbs]
+```
+
+Legacy array syntax is still supported:
+
+```yaml
+env_files: [.env.base, .env]
+```
+
 ### Recommended pattern
 
 Split into two files:
@@ -354,6 +389,13 @@ docker:
     env:
       - POSTGRES_PASSWORD=dev        # Hardcoded
       - POSTGRES_DB                   # From env_files
+```
+
+### Inspecting resolved env vars
+
+```bash
+zap env --service api              # Show resolved env vars for a service
+zap env api                        # Works if no environment set named 'api'
 ```
 
 ---

@@ -21,6 +21,7 @@ export type Command =
   | "clone"
   | "task"
   | "profile"
+  | "environment"
   | "state"
   | "git:checkout"
   | "git:pull"

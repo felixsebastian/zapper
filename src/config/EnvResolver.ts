@@ -23,7 +23,7 @@ export class EnvResolver {
     const resolvedConfig = { ...config };
 
     const mergedEnvFromFiles = this.loadAndMergeEnvFiles(
-      resolvedConfig.env_files,
+      this.pickDefaultEnvFiles(resolvedConfig.env_files),
     );
 
     logger.debug("Merged env files:", { data: mergedEnvFromFiles });
@@ -361,6 +361,14 @@ export class EnvResolver {
     }
 
     return merged;
+  }
+
+  private static pickDefaultEnvFiles(
+    envFiles?: ZapperConfig["env_files"],
+  ): string[] | undefined {
+    if (!envFiles) return undefined;
+    if (Array.isArray(envFiles)) return envFiles;
+    return envFiles.default;
   }
 
   static getProcessEnv(

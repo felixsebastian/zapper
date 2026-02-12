@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import {
   mkdirSync,
   writeFileSync,
@@ -86,12 +86,17 @@ export class Pm2Manager {
             }
             return resolved;
           })(),
-          env: { ...(process.env || {}), ...(processConfig.resolvedEnv || {}) },
+          env: processConfig.resolvedEnv || {},
           log: path.join(
             logsDir,
             `${projectName}.${processConfig.name as string}.log`,
           ),
           merge_logs: true,
+          // Limit restarts for faster feedback in local development
+          // Instead of infinite retries, fail fast after 2 attempts
+          autorestart: true,
+          max_restarts: 2,
+          min_uptime: 4000, // Must stay up 4s to count as successful start
         },
       ],
     } as Record<string, unknown>;
@@ -125,12 +130,84 @@ export class Pm2Manager {
     await this.runPm2Command(args);
   }
 
+  /**
+   * Kill an entire process tree rooted at the given PID.
+   * Uses `kill -TERM -<pgid>` to signal the process group first,
+   * then falls back to killing individual child PIDs via `pgrep -P`.
+   */
+  private static killProcessTree(pid: number): void {
+    if (!pid || pid <= 1) return;
+
+    try {
+      // Try to kill the entire process group (negative PID)
+      try {
+        globalThis.process.kill(-pid, "SIGTERM");
+        logger.debug(`Killed process group for PID ${pid}`);
+      } catch {
+        // Process group kill may fail if the process isn't a group leader.
+        // Fall back to finding and killing children individually.
+        logger.debug(
+          `Process group kill failed for PID ${pid}, killing children individually`,
+        );
+      }
+
+      // Also explicitly find and kill all descendant processes
+      try {
+        const childPids = execSync(`pgrep -P ${pid}`, { encoding: "utf-8" })
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .map(Number);
+
+        for (const childPid of childPids) {
+          this.killProcessTree(childPid);
+        }
+      } catch {
+        // pgrep returns non-zero when no children found – that's fine
+      }
+
+      // Finally kill the root process itself
+      try {
+        globalThis.process.kill(pid, "SIGTERM");
+      } catch {
+        // Already dead – ignore
+      }
+    } catch (error) {
+      logger.warn(`Error killing process tree for PID ${pid}: ${error}`);
+    }
+  }
+
+  /**
+   * Get the PID of a PM2-managed process and kill its entire tree
+   * before removing it from PM2.
+   */
+  private static async killManagedProcessTree(
+    prefixedName: string,
+  ): Promise<void> {
+    try {
+      const info = await this.getProcessInfo(prefixedName);
+      if (info?.pid && info.pid > 0) {
+        logger.debug(
+          `Killing process tree for ${prefixedName} (PID ${info.pid})`,
+        );
+        this.killProcessTree(info.pid);
+        // Give processes a moment to exit cleanly
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    } catch (error) {
+      logger.debug(
+        `Could not kill process tree for ${prefixedName}: ${error}`,
+      );
+    }
+  }
+
   static async stopProcess(
     name: string,
     projectName?: string,
     configDir?: string,
   ): Promise<void> {
     const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
+    await this.killManagedProcessTree(prefixedName);
     await this.runPm2Command(["stop", prefixedName]);
 
     if (projectName) {
@@ -144,6 +221,7 @@ export class Pm2Manager {
     projectName?: string,
   ): Promise<void> {
     const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
+    await this.killManagedProcessTree(prefixedName);
     await this.runPm2Command(["restart", prefixedName]);
   }
 
@@ -153,6 +231,7 @@ export class Pm2Manager {
     configDir?: string,
   ): Promise<void> {
     const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
+    await this.killManagedProcessTree(prefixedName);
     await this.runPm2Command(["delete", prefixedName]);
 
     if (projectName) {
@@ -183,8 +262,9 @@ export class Pm2Manager {
         `Deleting ${matchingProcesses.length} process(es) matching ${prefixedName}`,
       );
 
-      for (const process of matchingProcesses) {
-        await this.runPm2Command(["delete", process.name]);
+      for (const proc of matchingProcesses) {
+        await this.killManagedProcessTree(proc.name);
+        await this.runPm2Command(["delete", proc.name]);
       }
 
       if (projectName) {

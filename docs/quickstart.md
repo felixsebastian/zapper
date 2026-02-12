@@ -5,7 +5,7 @@ Get your dev environment running in under 5 minutes.
 ## Install
 
 ```bash
-npm install -g pm2 zapper-cli
+npm install -g pm2 @maplab/zapper
 ```
 
 ## Create `zap.yaml`
