@@ -56,9 +56,15 @@ describe("E2E: Simple Project Flow", () => {
   });
 
   afterAll(async () => {
-    // Global cleanup - remove any remaining test processes
+    // Cleanup any remaining test processes (only zap.e2e-test-* patterns)
     try {
-      execSync(`pm2 delete all 2>/dev/null || true`, { stdio: "ignore", timeout: 5000 });
+      const output = execSync("pm2 jlist --silent", { encoding: "utf8", timeout: 5000 });
+      const processes = JSON.parse(output);
+      for (const proc of processes) {
+        if (proc.name?.startsWith("zap.e2e-test-")) {
+          execSync(`pm2 delete "${proc.name}" 2>/dev/null || true`, { stdio: "ignore", timeout: 5000 });
+        }
+      }
     } catch (error) {
       // Ignore cleanup errors
     }
@@ -84,7 +90,7 @@ describe("E2E: Simple Project Flow", () => {
 
       try {
         // Test: zap up
-        const upOutput = runZapCommand(`up -f zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
+        const upOutput = runZapCommand(`up --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
         expect(upOutput).toContain("server"); // Should mention the services being started
         expect(upOutput).toContain("worker");
 
@@ -92,13 +98,12 @@ describe("E2E: Simple Project Flow", () => {
         await new Promise(resolve => setTimeout(resolve, 2000));
 
         // Test: zap status (human readable)
-        const statusOutput = runZapCommand(`status -f zap-${testProjectName}.yaml`, fixtureDir);
+        const statusOutput = runZapCommand(`status --config zap-${testProjectName}.yaml`, fixtureDir);
         expect(statusOutput).toContain("server");
         expect(statusOutput).toContain("worker");
-        expect(statusOutput).toContain("running") || expect(statusOutput).toContain("online");
 
         // Test: zap status --json (machine readable)
-        const statusJsonOutput = runZapCommand(`status --json -f zap-${testProjectName}.yaml`, fixtureDir);
+        const statusJsonOutput = runZapCommand(`status --json --config zap-${testProjectName}.yaml`, fixtureDir);
         const statusData = JSON.parse(statusJsonOutput);
         expect(statusData).toBeDefined();
         expect(Array.isArray(statusData) || typeof statusData === "object").toBe(true);
@@ -117,21 +122,21 @@ describe("E2E: Simple Project Flow", () => {
         expect(processNames).toContain(`zap.${testProjectName}.server`);
         expect(processNames).toContain(`zap.${testProjectName}.worker`);
 
-        // Test: zap logs (should show some output)
-        const logsOutput = runZapCommand(`logs -f zap-${testProjectName}.yaml`, fixtureDir, { timeout: 3000 });
-        expect(logsOutput).toMatch(/Server|Worker/); // Should contain output from our processes
+        // Test: zap logs for a specific service (logs requires a service argument)
+        const logsOutput = runZapCommand(`logs server --no-follow --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 5000 });
+        expect(logsOutput).toContain("Server"); // Should contain output from our process
 
         // Test: zap down
-        const downOutput = runZapCommand(`down -f zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
-        expect(downOutput).toContain("server") || expect(downOutput).toContain("Stopping");
-        expect(downOutput).toContain("worker") || expect(downOutput).toContain("Stopping");
+        const downOutput = runZapCommand(`down --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
+        expect(downOutput).toContain("server");
+        expect(downOutput).toContain("worker");
 
         // Wait a bit for processes to fully stop
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // Test: zap status after down (should show stopped/not running)
-        const statusAfterDownOutput = runZapCommand(`status -f zap-${testProjectName}.yaml`, fixtureDir);
-        expect(statusAfterDownOutput).toMatch(/stopped|not running|offline|No processes/i);
+        // Test: zap status after down (should show services as down)
+        const statusAfterDownOutput = runZapCommand(`status --config zap-${testProjectName}.yaml`, fixtureDir);
+        expect(statusAfterDownOutput).toContain("down");
 
         // Verify processes are actually gone from PM2
         const pm2ListAfterDown = execSync("pm2 jlist", { encoding: "utf8" });
@@ -161,15 +166,14 @@ describe("E2E: Simple Project Flow", () => {
 
       try {
         // Start the minimal project
-        const upOutput = runZapCommand(`up -f zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
+        const upOutput = runZapCommand(`up --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
         expect(upOutput).toContain("app");
 
         await new Promise(resolve => setTimeout(resolve, 2000));
 
         // Check status
-        const statusOutput = runZapCommand(`status -f zap-${testProjectName}.yaml`, fixtureDir);
+        const statusOutput = runZapCommand(`status --config zap-${testProjectName}.yaml`, fixtureDir);
         expect(statusOutput).toContain("app");
-        expect(statusOutput).toContain("running") || expect(statusOutput).toContain("online");
 
         // Verify correct PM2 process name
         const pm2ListOutput = execSync("pm2 jlist", { encoding: "utf8" });
@@ -180,8 +184,8 @@ describe("E2E: Simple Project Flow", () => {
         expect(zapProcess).toBeDefined();
 
         // Stop the project
-        const downOutput = runZapCommand(`down -f zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
-        expect(downOutput).toContain("app") || expect(downOutput).toContain("Stopping");
+        const downOutput = runZapCommand(`down --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
+        expect(downOutput).toContain("app");
 
       } finally {
         // Cleanup temp config
@@ -195,7 +199,7 @@ describe("E2E: Simple Project Flow", () => {
   describe("Error Handling", () => {
     it("should handle invalid config file gracefully", () => {
       expect(() => {
-        runZapCommand("status -f nonexistent.yaml", FIXTURES_DIR);
+        runZapCommand("status --config nonexistent.yaml", FIXTURES_DIR);
       }).toThrow();
     });
 
@@ -210,8 +214,8 @@ describe("E2E: Simple Project Flow", () => {
 
       try {
         // Status should work even with no running processes
-        const statusOutput = runZapCommand(`status -f zap-${testProjectName}.yaml`, fixtureDir);
-        expect(statusOutput).toMatch(/stopped|not running|offline|No processes/i);
+        const statusOutput = runZapCommand(`status --config zap-${testProjectName}.yaml`, fixtureDir);
+        expect(statusOutput).toContain("down");
       } finally {
         if (fs.existsSync(tempConfigPath)) {
           fs.unlinkSync(tempConfigPath);

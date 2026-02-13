@@ -436,7 +436,7 @@ describe("executeActions", () => {
 
       await executeActions(mockConfig, "test-project", null, plan);
 
-      expect(Pm2Executor).toHaveBeenCalledWith("test-project", undefined);
+      expect(Pm2Executor).toHaveBeenCalledWith("test-project", undefined, undefined);
     });
 
     it("should pass config directory to Pm2Executor", async () => {
@@ -467,6 +467,7 @@ describe("executeActions", () => {
       expect(Pm2Executor).toHaveBeenCalledWith(
         "test-project",
         "/custom/config",
+        undefined,
       );
     });
   });

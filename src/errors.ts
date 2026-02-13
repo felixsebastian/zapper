@@ -97,6 +97,18 @@ export class GitOperationError extends Error {
   }
 }
 
+export class ExclusiveLockError extends Error {
+  constructor(
+    public projectName: string,
+    public lockInfo: { projectRoot: string; pid: number; timestamp: string },
+  ) {
+    super(
+      `Project "${projectName}" is already running from ${lockInfo.projectRoot}. Stop it first or use --force to take over.`,
+    );
+    this.name = "ExclusiveLockError";
+  }
+}
+
 // ANSI color codes
 const colors = {
   reset: "\u001B[0m",
@@ -116,7 +128,8 @@ export function formatError(error: unknown, showStackTrace = false): string {
     error instanceof WhitelistReferenceError ||
     error instanceof ContainerNotRunningError ||
     error instanceof ContextNotLoadedError ||
-    error instanceof GitOperationError
+    error instanceof GitOperationError ||
+    error instanceof ExclusiveLockError
   ) {
     const errorType = error.name.replace(/Error$/, "");
     const message = error.message;

@@ -30,6 +30,7 @@ export interface Context {
   environments: string[]; // Available env file sets
   gitMethod?: "http" | "ssh" | "cli";
   taskDelimiters?: [string, string]; // Custom delimiters for task interpolation
+  instanceId?: string | null; // Instance ID for worktree isolation
 
   // Services organized by type with names included
   processes: Process[]; // Combines native and processes from config

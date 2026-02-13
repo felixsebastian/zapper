@@ -3,6 +3,7 @@ import { Pm2Manager } from "./process/Pm2Manager";
 import { DockerManager } from "./docker";
 import { ActionPlan, ExecutionWave } from "../types";
 import { DependencyGraph } from "./DependencyGraph";
+import { buildServiceName } from "../utils/nameBuilder";
 
 export class Planner {
   constructor(private readonly config: ZapperConfig) {}
@@ -89,12 +90,13 @@ export class Planner {
         .filter((p) => p.status.toLowerCase() === "online")
         .map((p) => p.name as string),
     );
+    const instanceId = (this.config as ZapperConfig & { instanceId?: string }).instanceId;
     const isPm2Running = (name: string) =>
-      runningPm2.has(`zap.${projectName}.${name}`);
+      runningPm2.has(buildServiceName(projectName, name, instanceId));
 
     const isDockerRunning = async (name: string): Promise<boolean> => {
       const info = await DockerManager.getContainerInfo(
-        `zap.${projectName}.${name}`,
+        buildServiceName(projectName, name, instanceId),
       );
       return (
         !!info &&

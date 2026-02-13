@@ -26,7 +26,6 @@ export class EnvResolver {
       this.pickDefaultEnvFiles(resolvedConfig.env_files),
     );
 
-    logger.debug("Merged env files:", { data: mergedEnvFromFiles });
 
     if (resolvedConfig.native) {
       for (const [name, proc] of Object.entries(resolvedConfig.native)) {
@@ -66,8 +65,6 @@ export class EnvResolver {
     const mergedEnvFromFiles = this.loadAndMergeEnvFiles(
       resolvedContext.envFiles,
     );
-
-    logger.debug("Merged env files:", { data: mergedEnvFromFiles });
 
     for (const proc of resolvedContext.processes) {
       this.resolveProcessEnv(proc, mergedEnvFromFiles, context.projectRoot);
@@ -127,7 +124,6 @@ export class EnvResolver {
     proc: ConfigProcess,
     mergedEnvFromFiles: Record<string, string>,
   ): void {
-    logger.debug(`Processing process: ${proc.name}`);
     const local = this.loadAndMergeEnvFiles(proc.env_files);
     const useLocalOnly = Object.keys(local).length > 0;
 
@@ -135,10 +131,6 @@ export class EnvResolver {
       const inline = this.splitInlineEnv(proc.env);
       proc.resolvedEnv = { ...local, ...inline.pairs };
 
-      logger.debug(
-        `Final resolved env for ${proc.name} (local env_files + inline pairs):`,
-        { data: proc.resolvedEnv },
-      );
 
       return;
     }
@@ -162,9 +154,6 @@ export class EnvResolver {
     proc.resolvedEnv = { ...envSubset, ...inline.pairs };
     if (!Array.isArray(proc.env)) proc.env = whitelist;
 
-    logger.debug(`Final resolved env for ${proc.name}:`, {
-      data: proc.resolvedEnv,
-    });
   }
 
   private static resolveConfigContainerEnv(
@@ -213,7 +202,6 @@ export class EnvResolver {
     mergedEnvFromFiles: Record<string, string>,
     projectRoot: string,
   ): void {
-    logger.debug(`Processing process: ${proc.name}`);
 
     let processEnvFiles: string[] | undefined;
     if (proc.env_files && proc.env_files.length > 0) {
@@ -229,10 +217,6 @@ export class EnvResolver {
       const inline = this.splitInlineEnv(proc.env);
       proc.resolvedEnv = { ...local, ...inline.pairs };
 
-      logger.debug(
-        `Final resolved env for ${proc.name} (local env_files + inline pairs):`,
-        { data: proc.resolvedEnv },
-      );
 
       return;
     }
@@ -256,9 +240,6 @@ export class EnvResolver {
     proc.resolvedEnv = { ...envSubset, ...inline.pairs };
     if (!Array.isArray(proc.env)) proc.env = whitelist;
 
-    logger.debug(`Final resolved env for ${proc.name}:`, {
-      data: proc.resolvedEnv,
-    });
   }
 
   private static resolveContainerEnv(
@@ -331,35 +312,44 @@ export class EnvResolver {
   private static loadAndMergeEnvFiles(
     files?: string[],
   ): Record<string, string> {
-    if (!Array.isArray(files) || files.length === 0) return {};
+    if (!Array.isArray(files) || files.length === 0) {
+      logger.debug("No env files to load:", { files });
+      return {};
+    }
+
+    logger.debug("Loading env files:", { files });
     const merged: Record<string, string> = {};
 
     for (const file of files) {
-      if (!existsSync(file)) continue;
+      if (!existsSync(file)) {
+        logger.debug(`Env file does not exist: ${file}`);
+        continue;
+      }
       const ext = path.extname(file).toLowerCase();
       const base = path.basename(file);
 
       try {
         const content = readFileSync(file, "utf8");
-        const isDotenv = base.startsWith(".env") || base.endsWith(".env");
 
-        if (isDotenv) {
+        // Check if it's a YAML file with special envs array structure
+        if (ext === ".yaml" || ext === ".yml") {
+          const data = parse(content) as RawEnvFile | undefined;
+          const envs = Array.isArray(data?.envs) ? data?.envs : [];
+          for (const kv of envs) Object.assign(merged, kv);
+        } else {
+          // Default: treat all other files as dotenv format (KEY=value pairs with expansion)
           const parsed = dotenvParse(content);
+          logger.debug(`Parsed env file ${file}:`, { data: parsed });
           // Merge previous values with new parsed values, with parsed taking precedence
           // This allows variable expansion to reference previously loaded vars
           const combined = { ...merged, ...parsed };
           const expanded = expand({ parsed: combined, processEnv: {} });
           Object.assign(merged, expanded.parsed);
-        } else if (ext === ".yaml" || ext === ".yml") {
-          const data = parse(content) as RawEnvFile | undefined;
-          const envs = Array.isArray(data?.envs) ? data?.envs : [];
-          for (const kv of envs) Object.assign(merged, kv);
         }
       } catch (e) {
         logger.debug(`Failed to read env file ${file}: ${e}`);
       }
     }
-
     return merged;
   }
 

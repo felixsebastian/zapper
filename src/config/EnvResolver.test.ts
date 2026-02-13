@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { writeFileSync, unlinkSync } from "fs";
 import { EnvResolver } from "./EnvResolver";
 import { ZapperConfig } from "../config/schemas";
+import { Context } from "../types/Context";
+import { logger } from "../utils/logger";
+import path from "path";
 
 describe("EnvResolver", () => {
   let tempFiles: string[] = [];
@@ -26,9 +29,10 @@ describe("EnvResolver", () => {
     extension: string = ".tmp",
   ): string => {
     const filename = `temp-${Date.now()}-${Math.random()}${extension}`;
-    writeFileSync(filename, content);
-    tempFiles.push(filename);
-    return filename;
+    const fullPath = path.resolve(filename);
+    writeFileSync(fullPath, content);
+    tempFiles.push(fullPath);
+    return fullPath;
   };
 
   describe("loadAndMergeEnvFiles", () => {
@@ -567,6 +571,335 @@ PORT=3000
       const result = EnvResolver.resolveContext(context);
 
       expect(result.links[0].url).toBe("http://localhost:");
+    });
+  });
+
+  describe("named environment sets", () => {
+    it("should load default environment when no activeEnvironment is set", () => {
+      const defaultEnvContent = `TEST_VALUE=default_value
+NODE_ENV=development`;
+
+      const defaultEnvFile = createTempFile(defaultEnvContent, ".env.default");
+
+      const context: Context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: [defaultEnvFile],
+        environments: ["default"],
+        processes: [
+          {
+            name: "echo-service",
+            cmd: "echo test",
+            env: ["TEST_VALUE", "NODE_ENV"],
+          },
+        ],
+        containers: [],
+        tasks: [],
+        links: [],
+        profiles: [],
+        state: {
+          activeEnvironment: null,
+          activeProfile: null,
+          services: {},
+        },
+      };
+
+      const result = EnvResolver.resolveContext(context);
+
+      expect(result.processes[0].resolvedEnv).toEqual({
+        TEST_VALUE: "default_value",
+        NODE_ENV: "development",
+      });
+    });
+
+    it("should load alternate environment when activeEnvironment is set", () => {
+      const defaultEnvContent = `
+TEST_VALUE=default_value
+NODE_ENV=development
+      `;
+      const alternateEnvContent = `
+TEST_VALUE=alternate_value
+NODE_ENV=staging
+      `;
+
+      const defaultEnvFile = createTempFile(defaultEnvContent, ".env.default");
+      const alternateEnvFile = createTempFile(alternateEnvContent, ".env.alternate");
+
+      const context: Context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: [alternateEnvFile], // Should pick alternate
+        environments: ["default", "alternate"],
+        processes: [
+          {
+            name: "echo-service",
+            cmd: "echo test",
+            env: ["TEST_VALUE", "NODE_ENV"],
+          },
+        ],
+        containers: [],
+        tasks: [],
+        links: [],
+        profiles: [],
+        state: {
+          activeEnvironment: "alternate",
+          activeProfile: null,
+          services: {},
+        },
+      };
+
+      const result = EnvResolver.resolveContext(context);
+
+      expect(result.processes[0].resolvedEnv).toEqual({
+        TEST_VALUE: "alternate_value",
+        NODE_ENV: "staging",
+      });
+    });
+
+    it("should handle multiple env files in environment set", () => {
+      const baseEnvContent = `
+DATABASE_URL=postgresql://localhost:5432/myapp
+REDIS_URL=redis://localhost:6379
+      `;
+      const alternateEnvContent = `
+TEST_VALUE=alternate_value
+NODE_ENV=staging
+DATABASE_URL=postgresql://localhost:5433/myapp_staging
+      `;
+
+      const baseEnvFile = createTempFile(baseEnvContent, ".env.base");
+      const alternateEnvFile = createTempFile(alternateEnvContent, ".env.alternate");
+
+      const context: Context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: [baseEnvFile, alternateEnvFile], // Multiple files
+        environments: ["default", "alternate"],
+        processes: [
+          {
+            name: "app",
+            cmd: "node app.js",
+            env: ["TEST_VALUE", "NODE_ENV", "DATABASE_URL", "REDIS_URL"],
+          },
+        ],
+        containers: [],
+        tasks: [],
+        links: [],
+        profiles: [],
+        state: {
+          activeEnvironment: "alternate",
+          activeProfile: null,
+          services: {},
+        },
+      };
+
+      const result = EnvResolver.resolveContext(context);
+
+      expect(result.processes[0].resolvedEnv).toEqual({
+        TEST_VALUE: "alternate_value",
+        NODE_ENV: "staging",
+        DATABASE_URL: "postgresql://localhost:5433/myapp_staging", // Should be overridden
+        REDIS_URL: "redis://localhost:6379", // Should come from base
+      });
+    });
+
+    it("should handle process-specific env_files overriding global environment", () => {
+      const globalEnvContent = `
+GLOBAL_VAR=global_value
+TEST_VALUE=global_test_value
+      `;
+      const processEnvContent = `
+TEST_VALUE=process_specific_value
+PROCESS_VAR=process_value
+      `;
+
+      const globalEnvFile = createTempFile(globalEnvContent, ".env.global");
+      const processEnvFile = createTempFile(processEnvContent, ".env.process");
+
+      const context: Context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: [globalEnvFile], // Global environment
+        environments: ["default"],
+        processes: [
+          {
+            name: "app",
+            cmd: "node app.js",
+            env: ["GLOBAL_VAR", "TEST_VALUE", "PROCESS_VAR"],
+            env_files: [processEnvFile], // Process-specific override
+          },
+        ],
+        containers: [],
+        tasks: [],
+        links: [],
+        profiles: [],
+        state: {
+          activeEnvironment: null,
+          activeProfile: null,
+          services: {},
+        },
+      };
+
+      const result = EnvResolver.resolveContext(context);
+
+      // Process-specific env_files should completely override global env
+      expect(result.processes[0].resolvedEnv).toEqual({
+        TEST_VALUE: "process_specific_value",
+        PROCESS_VAR: "process_value",
+        // GLOBAL_VAR should NOT be present when process has env_files
+      });
+    });
+
+    it("should expand environment variables within files", () => {
+      const envContent = `
+BASE_URL=https://api.example.com
+API_VERSION=v1
+FULL_API_URL=\${BASE_URL}/\${API_VERSION}
+DATABASE_PREFIX=myapp
+DATABASE_NAME=\${DATABASE_PREFIX}_production
+      `;
+
+      const envFile = createTempFile(envContent, ".env");
+
+      const context: Context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: [envFile],
+        environments: ["default"],
+        processes: [
+          {
+            name: "api",
+            cmd: "node api.js",
+            env: ["FULL_API_URL", "DATABASE_NAME"],
+          },
+        ],
+        containers: [],
+        tasks: [],
+        links: [],
+        profiles: [],
+        state: {
+          activeEnvironment: null,
+          activeProfile: null,
+          services: {},
+        },
+      };
+
+      const result = EnvResolver.resolveContext(context);
+
+      expect(result.processes[0].resolvedEnv).toEqual({
+        FULL_API_URL: "https://api.example.com/v1",
+        DATABASE_NAME: "myapp_production",
+      });
+    });
+
+    it("should handle empty or missing environment files gracefully", () => {
+      const context: Context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: ["/nonexistent/file.env"], // Missing file
+        environments: ["default"],
+        processes: [
+          {
+            name: "app",
+            cmd: "node app.js",
+            env: ["TEST_VAR"],
+          },
+        ],
+        containers: [],
+        tasks: [],
+        links: [],
+        profiles: [],
+        state: {
+          activeEnvironment: null,
+          activeProfile: null,
+          services: {},
+        },
+      };
+
+      const result = EnvResolver.resolveContext(context);
+
+      // Should not crash and should have empty resolved env
+      expect(result.processes[0].resolvedEnv).toEqual({});
+    });
+
+    it("should handle containers with named environment sets", () => {
+      const envContent = `
+POSTGRES_DB=myapp_staging
+POSTGRES_USER=staging_user
+POSTGRES_PASSWORD=staging_pass
+      `;
+
+      const envFile = createTempFile(envContent, ".env.staging");
+
+      const context: Context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: [envFile],
+        environments: ["default", "staging"],
+        processes: [],
+        containers: [
+          {
+            name: "database",
+            image: "postgres:15",
+            env: ["POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD"],
+          },
+        ],
+        tasks: [],
+        links: [],
+        profiles: [],
+        state: {
+          activeEnvironment: "staging",
+          activeProfile: null,
+          services: {},
+        },
+      };
+
+      const result = EnvResolver.resolveContext(context);
+
+      expect(result.containers[0].resolvedEnv).toEqual({
+        POSTGRES_DB: "myapp_staging",
+        POSTGRES_USER: "staging_user",
+        POSTGRES_PASSWORD: "staging_pass",
+      });
+    });
+
+    it("should log environment resolution process for debugging", () => {
+      const envContent = `
+DEBUG_VAR=debug_value
+      `;
+
+      const envFile = createTempFile(envContent, ".env.debug");
+
+      const context: Context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: [envFile],
+        environments: ["default", "debug"],
+        processes: [
+          {
+            name: "debug-service",
+            cmd: "node debug.js",
+            env: ["DEBUG_VAR"],
+          },
+        ],
+        containers: [],
+        tasks: [],
+        links: [],
+        profiles: [],
+        state: {
+          activeEnvironment: "debug",
+          activeProfile: null,
+          services: {},
+        },
+      };
+
+      // This test verifies the resolution works and produces logs
+      // The actual logging verification would require mocking the logger
+      const result = EnvResolver.resolveContext(context);
+
+      expect(result.processes[0].resolvedEnv).toEqual({
+        DEBUG_VAR: "debug_value",
+      });
     });
   });
 });

@@ -6,6 +6,7 @@ import { Action, ActionPlan } from "../types";
 import { findProcess } from "./findProcess";
 import { findContainer } from "./findContainer";
 import { updateServiceState, clearServiceState } from "../config/stateLoader";
+import { buildServiceName } from "../utils/nameBuilder";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -59,7 +60,8 @@ async function executeAction(
     const pair = findContainer(config, action.name);
     if (!pair) throw new Error(`Docker service not found: ${action.name}`);
     const [name, c] = pair;
-    const dockerName = `zap.${projectName}.${name}`;
+    const instanceId = (config as ZapperConfig & { instanceId?: string }).instanceId;
+    const dockerName = buildServiceName(projectName, name, instanceId);
 
     if (action.type === "start") {
       const ports = Array.isArray(c.ports) ? c.ports : [];
@@ -122,7 +124,8 @@ export async function executeActions(
   configDir: string | null,
   plan: ActionPlan,
 ): Promise<void> {
-  const pm2 = new Pm2Executor(projectName, configDir || undefined);
+  const instanceId = (config as ZapperConfig & { instanceId?: string }).instanceId;
+  const pm2 = new Pm2Executor(projectName, configDir || undefined, instanceId);
 
   for (const wave of plan.waves) {
     await Promise.all(

@@ -12,6 +12,7 @@ Complete reference for `zap.yaml` syntax and all CLI commands.
 - [Native Processes](#native-processes)
 - [Docker Services](#docker-services)
 - [Environment Variables](#environment-variables)
+- [Instances](#instances)
 - [Tasks](#tasks)
 - [Dependencies](#dependencies)
 - [Profiles](#profiles)
@@ -396,6 +397,19 @@ docker:
 ```bash
 zap env --service api              # Show resolved env vars for a service
 zap env api                        # Works if no environment set named 'api'
+```
+
+---
+
+## Instances
+
+Instances allow running multiple isolated copies of your project simultaneously using Git worktrees. Each instance gets its own processes and environment isolation through port shifting.
+
+```bash
+zap instance create feature-auth      # Create new instance from current branch
+zap instance list                     # List all instances
+zap instance switch main              # Switch between instances
+zap instance remove feature-auth      # Clean up instance
 ```
 
 ---

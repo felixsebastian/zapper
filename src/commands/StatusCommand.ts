@@ -15,7 +15,7 @@ export class StatusCommand extends CommandHandler {
       const jsonOutput = formatStatusAsJson(statusResult);
       console.log(jsonOutput);
     } else {
-      const formattedOutput = formatStatus(statusResult);
+      const formattedOutput = formatStatus(statusResult, zapperContext);
       logger.info(formattedOutput, { noEmoji: true });
     }
   }

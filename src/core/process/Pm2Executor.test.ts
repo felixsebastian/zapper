@@ -59,7 +59,8 @@ describe("Pm2Executor", () => {
       expect(Pm2Manager.startProcessWithTempEcosystem).toHaveBeenCalledWith(
         projectName,
         mockProcess,
-        testConfigDir
+        testConfigDir,
+        undefined
       );
       expect(Pm2Manager.startProcessWithTempEcosystem).toHaveBeenCalledTimes(1);
     });
@@ -77,6 +78,7 @@ describe("Pm2Executor", () => {
       expect(Pm2Manager.startProcessWithTempEcosystem).toHaveBeenCalledWith(
         projectName,
         mockProcess,
+        undefined,
         undefined
       );
     });
@@ -95,7 +97,8 @@ describe("Pm2Executor", () => {
       expect(Pm2Manager.deleteAllMatchingProcesses).toHaveBeenCalledWith(
         processName,
         testProjectName,
-        testConfigDir
+        testConfigDir,
+        undefined
       );
       expect(Pm2Manager.deleteAllMatchingProcesses).toHaveBeenCalledTimes(1);
     });
@@ -108,6 +111,7 @@ describe("Pm2Executor", () => {
 
       expect(Pm2Manager.deleteAllMatchingProcesses).toHaveBeenCalledWith(
         processName,
+        undefined,
         undefined,
         undefined
       );
@@ -126,7 +130,8 @@ describe("Pm2Executor", () => {
 
       expect(Pm2Manager.restartProcess).toHaveBeenCalledWith(
         processName,
-        testProjectName
+        testProjectName,
+        undefined
       );
       expect(Pm2Manager.restartProcess).toHaveBeenCalledTimes(1);
     });
@@ -139,6 +144,7 @@ describe("Pm2Executor", () => {
 
       expect(Pm2Manager.restartProcess).toHaveBeenCalledWith(
         processName,
+        undefined,
         undefined
       );
     });
@@ -158,7 +164,8 @@ describe("Pm2Executor", () => {
         processName,
         testProjectName,
         false,
-        testConfigDir
+        testConfigDir,
+        undefined
       );
       expect(Pm2Manager.showLogs).toHaveBeenCalledTimes(1);
     });
@@ -172,7 +179,8 @@ describe("Pm2Executor", () => {
         processName,
         testProjectName,
         true,
-        testConfigDir
+        testConfigDir,
+        undefined
       );
     });
 
@@ -186,6 +194,7 @@ describe("Pm2Executor", () => {
         processName,
         undefined,
         true,
+        undefined,
         undefined
       );
     });

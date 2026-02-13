@@ -1,4 +1,5 @@
 import { StatusResult, ServiceStatus } from "./getStatus";
+import { Context } from "../types/Context";
 
 const color = {
   reset: "\u001B[0m",
@@ -27,8 +28,21 @@ function formatServiceLine(s: ServiceStatus): string {
   return `${name} ${status}`;
 }
 
-export function formatStatus(statusResult: StatusResult): string {
+export function formatStatus(
+  statusResult: StatusResult,
+  context?: Context,
+): string {
   const sections: string[] = [];
+
+  // Add project header with instance info if available
+  if (context) {
+    let header = context.projectName;
+    if (context.instanceId) {
+      header += ` (instance: ${context.instanceId})`;
+    }
+    header += "\n"; // Add blank line
+    sections.push(header);
+  }
 
   if (statusResult.native.length > 0) {
     const nativeSection = ["💾 Native"]

@@ -10,17 +10,20 @@ import path from "path";
 import { Process } from "../../config/schemas";
 import { ProcessInfo } from "../../types/index";
 import { logger } from "../../utils/logger";
+import { buildServiceName, buildPrefix } from "../../utils/nameBuilder";
 
 export class Pm2Manager {
   static async startProcess(
     processConfig: Process,
     projectName: string,
+    instanceId?: string | null,
   ): Promise<void> {
     // Always use ecosystem approach for consistency
     await this.startProcessWithTempEcosystem(
       projectName,
       processConfig,
       globalThis.process?.cwd(),
+      instanceId,
     );
   }
 
@@ -28,6 +31,7 @@ export class Pm2Manager {
     projectName: string,
     processConfig: Process,
     configDir?: string,
+    instanceId?: string | null,
   ): Promise<void> {
     if (!configDir) {
       throw new Error("Config directory is required for process management");
@@ -38,6 +42,7 @@ export class Pm2Manager {
       processConfig.name as string,
       projectName,
       configDir,
+      instanceId,
     );
 
     const zapDir = path.join(configDir, ".zap");
@@ -49,6 +54,7 @@ export class Pm2Manager {
       projectName,
       processConfig.name as string,
       configDir,
+      instanceId,
     );
 
     // Create a minimal wrapper script for PM2 to execute
@@ -56,6 +62,7 @@ export class Pm2Manager {
       projectName,
       processConfig,
       configDir,
+      instanceId,
     );
 
     logger.debug(
@@ -70,7 +77,7 @@ export class Pm2Manager {
     const ecosystem = {
       apps: [
         {
-          name: `zap.${projectName}.${processConfig.name as string}`,
+          name: buildServiceName(projectName, processConfig.name as string, instanceId),
           script: wrapperScript,
           interpreter: "/bin/bash",
           cwd: (() => {
@@ -205,22 +212,24 @@ export class Pm2Manager {
     name: string,
     projectName?: string,
     configDir?: string,
+    instanceId?: string | null,
   ): Promise<void> {
-    const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
+    const prefixedName = projectName ? buildServiceName(projectName, name, instanceId) : name;
     await this.killManagedProcessTree(prefixedName);
     await this.runPm2Command(["stop", prefixedName]);
 
     if (projectName) {
-      await this.cleanupLogs(projectName, name, configDir);
-      this.cleanupWrapperScripts(projectName, name, configDir);
+      await this.cleanupLogs(projectName, name, configDir, instanceId);
+      this.cleanupWrapperScripts(projectName, name, configDir, instanceId);
     }
   }
 
   static async restartProcess(
     name: string,
     projectName?: string,
+    instanceId?: string | null,
   ): Promise<void> {
-    const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
+    const prefixedName = projectName ? buildServiceName(projectName, name, instanceId) : name;
     await this.killManagedProcessTree(prefixedName);
     await this.runPm2Command(["restart", prefixedName]);
   }
@@ -229,14 +238,15 @@ export class Pm2Manager {
     name: string,
     projectName?: string,
     configDir?: string,
+    instanceId?: string | null,
   ): Promise<void> {
-    const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
+    const prefixedName = projectName ? buildServiceName(projectName, name, instanceId) : name;
     await this.killManagedProcessTree(prefixedName);
     await this.runPm2Command(["delete", prefixedName]);
 
     if (projectName) {
-      await this.cleanupLogs(projectName, name, configDir);
-      this.cleanupWrapperScripts(projectName, name, configDir);
+      await this.cleanupLogs(projectName, name, configDir, instanceId);
+      this.cleanupWrapperScripts(projectName, name, configDir, instanceId);
     }
   }
 
@@ -244,8 +254,9 @@ export class Pm2Manager {
     name: string,
     projectName?: string,
     configDir?: string,
+    instanceId?: string | null,
   ): Promise<void> {
-    const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
+    const prefixedName = projectName ? buildServiceName(projectName, name, instanceId) : name;
 
     try {
       const processes = await this.listProcesses();
@@ -268,8 +279,8 @@ export class Pm2Manager {
       }
 
       if (projectName) {
-        await this.cleanupLogs(projectName, name, configDir);
-        this.cleanupWrapperScripts(projectName, name, configDir);
+        await this.cleanupLogs(projectName, name, configDir, instanceId);
+        this.cleanupWrapperScripts(projectName, name, configDir, instanceId);
       }
     } catch (error) {
       logger.warn(`Error deleting processes: ${error}`);
@@ -280,6 +291,7 @@ export class Pm2Manager {
     projectName: string,
     processName: string,
     configDir?: string,
+    instanceId?: string | null,
   ): Promise<void> {
     try {
       const { rmSync, unlinkSync, existsSync } = await import("fs");
@@ -314,6 +326,7 @@ export class Pm2Manager {
     projectName: string,
     processName: string,
     configDir?: string,
+    instanceId?: string | null,
   ): void {
     try {
       const zapDir = path.join(configDir || ".", ".zap");
@@ -354,8 +367,9 @@ export class Pm2Manager {
     projectName?: string,
     follow: boolean = false,
     configDir?: string,
+    instanceId?: string | null,
   ): Promise<void> {
-    const prefixedName = projectName ? `zap.${projectName}.${name}` : name;
+    const prefixedName = projectName ? buildServiceName(projectName, name, instanceId) : name;
     const processInfo = await this.getProcessInfo(prefixedName);
 
     if (!processInfo) {
@@ -370,6 +384,7 @@ export class Pm2Manager {
       prefixedName,
       projectName,
       configDir,
+      instanceId,
     );
 
     if (!logFile) {
@@ -427,12 +442,13 @@ export class Pm2Manager {
     processName: string,
     projectName?: string,
     configDir?: string,
+    instanceId?: string | null,
   ): Promise<string | null> {
     try {
       // For Zapper-managed processes, use our custom log path
-      if (projectName && processName.startsWith(`zap.${projectName}.`)) {
+      if (projectName && processName.startsWith(buildPrefix(projectName, instanceId) + ".")) {
         const logsDir = path.join(configDir || ".", ".zap", "logs");
-        const baseName = processName.replace(`zap.${projectName}.`, "");
+        const baseName = processName.replace(buildPrefix(projectName, instanceId) + ".", "");
         return path.join(logsDir, `${projectName}.${baseName}.log`);
       }
 
@@ -710,6 +726,7 @@ export class Pm2Manager {
     projectName: string,
     processConfig: Process,
     configDir: string,
+    instanceId?: string | null,
   ): string {
     const zapDir = path.join(configDir, ".zap");
     const timestamp = Date.now();

@@ -20,6 +20,9 @@ import {
   ServiceNotFoundError,
   ContainerNotRunningError,
 } from "../errors";
+import { buildServiceName } from "../utils/nameBuilder";
+import { resolveInstance } from "./instanceResolver";
+import { acquireExclusiveLock } from "../config/exclusiveLock";
 
 export class Zapper {
   private context: Context | null = null;
@@ -48,6 +51,15 @@ export class Zapper {
 
     // Resolve environment variables with proper path resolution
     this.context = EnvResolver.resolveContext(this.context);
+
+    // Resolve instance configuration (worktree detection, etc.)
+    const instanceResolution = await resolveInstance(projectRoot);
+    this.context.instanceId = instanceResolution.instanceId;
+
+    // Handle exclusive mode locking
+    if (instanceResolution.mode === "exclusive") {
+      acquireExclusiveLock(this.context.projectName, projectRoot);
+    }
   }
 
   private applyCliOverrides(
@@ -179,7 +191,8 @@ export class Zapper {
       native,
       docker,
       tasks,
-    };
+      instanceId: this.context.instanceId,
+    } as ZapperConfig & { instanceId?: string | null };
   }
 
   async startProcesses(processNames?: string[]): Promise<void> {
@@ -281,12 +294,12 @@ export class Zapper {
     );
 
     if (isContainer) {
-      const dockerName = `zap.${projectName}.${resolvedName}`;
+      const dockerName = buildServiceName(projectName, resolvedName, this.context.instanceId);
       const exists = await DockerManager.containerExists(dockerName);
       if (!exists) throw new ContainerNotRunningError(resolvedName, dockerName);
       await DockerManager.showLogs(dockerName, follow);
     } else if (isProcess) {
-      const pm2Executor = new Pm2Executor(projectName, projectRoot);
+      const pm2Executor = new Pm2Executor(projectName, projectRoot, this.context.instanceId);
       await pm2Executor.showLogs(resolvedName, follow);
     } else {
       throw new ServiceNotFoundError(processName);
