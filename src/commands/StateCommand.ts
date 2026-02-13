@@ -9,7 +9,7 @@ export class StateCommand extends CommandHandler {
       throw new Error("Context not loaded");
     }
 
-    // Pretty print the state JSON
-    console.log(JSON.stringify(zapperContext.state, null, 2));
+    // Output the state JSON in minified format
+    console.log(JSON.stringify(zapperContext.state));
   }
 }
