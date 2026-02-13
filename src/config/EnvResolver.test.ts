@@ -621,7 +621,6 @@ TEST_VALUE=alternate_value
 NODE_ENV=staging
       `;
 
-      createTempFile(defaultEnvContent, ".env.default");
       const alternateEnvFile = createTempFile(
         alternateEnvContent,
         ".env.alternate",

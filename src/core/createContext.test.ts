@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createContext } from "./createContext";
-import { ZapperConfig, ZapperState } from "../config/schemas";
+import { ZapperConfig, ZapperState, Process } from "../config/schemas";
 import * as stateLoader from "../config/stateLoader";
 import { mkdirSync, rmSync, existsSync } from "fs";
 import path from "path";
@@ -118,7 +118,7 @@ describe("createContext", () => {
       const config: ZapperConfig = {
         project: "test-project",
         processes: [
-          { cmd: "npm run dev" } as unknown as { name: string; cmd: string }, // Missing name field
+          { cmd: "npm run dev" } as Omit<Process, "name">, // Missing name field
         ],
       };
 
@@ -731,7 +731,7 @@ describe("createContext", () => {
       const config: ZapperConfig = {
         project: "test-project",
         processes: [
-          { cmd: "some command" } as unknown as { name: string; cmd: string }, // Missing name
+          { cmd: "some command" } as Omit<Process, "name">, // Missing name
         ],
       };
 
