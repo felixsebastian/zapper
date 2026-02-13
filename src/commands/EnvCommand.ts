@@ -54,10 +54,7 @@ export class EnvCommand extends CommandHandler {
         : isEnvironment
           ? targetName
           : zapper.resolveServiceName(targetName);
-      const hasService = this.serviceExists(
-        zapperContext,
-        resolvedServiceName,
-      );
+      const hasService = this.serviceExists(zapperContext, resolvedServiceName);
 
       if (forcedService) {
         await this.showServiceEnv(zapperContext, resolvedServiceName, options);
@@ -81,11 +78,7 @@ export class EnvCommand extends CommandHandler {
       }
 
       if (hasService) {
-        await this.showServiceEnv(
-          zapperContext,
-          resolvedServiceName,
-          options,
-        );
+        await this.showServiceEnv(zapperContext, resolvedServiceName, options);
         return;
       }
 
@@ -110,7 +103,7 @@ export class EnvCommand extends CommandHandler {
   private async showServiceEnv(
     zapperContext: Context,
     serviceName: string,
-    options: Record<string, any>,
+    options: Record<string, unknown>,
   ): Promise<void> {
     const process = zapperContext.processes.find((p) => p.name === serviceName);
     const container = zapperContext.containers.find(

@@ -23,7 +23,10 @@ describe("stateLoader", () => {
 
   beforeEach(() => {
     testCounter++;
-    testDir = path.join(tmpdir(), `zapper-state-test-${Date.now()}-${testCounter}`);
+    testDir = path.join(
+      tmpdir(),
+      `zapper-state-test-${Date.now()}-${testCounter}`,
+    );
     mkdirSync(testDir, { recursive: true });
   });
 
@@ -133,7 +136,7 @@ describe("stateLoader", () => {
       saveState(testDir, {
         activeProfile: "dev",
         services: {
-          "service1": {
+          service1: {
             startPid: 1234,
           },
         },
@@ -150,7 +153,7 @@ describe("stateLoader", () => {
         activeProfile: "dev",
         activeEnvironment: "production",
         services: {
-          "service1": {
+          service1: {
             startPid: 1234,
           },
         },
@@ -162,7 +165,7 @@ describe("stateLoader", () => {
       saveState(testDir, {
         activeProfile: "dev",
         services: {
-          "service1": {
+          service1: {
             startPid: 1234,
           },
         },
@@ -171,7 +174,7 @@ describe("stateLoader", () => {
       // Then, save with a new services object (this replaces the entire services object)
       saveState(testDir, {
         services: {
-          "service2": {
+          service2: {
             startPid: 5678,
           },
         },
@@ -182,7 +185,7 @@ describe("stateLoader", () => {
       expect(state).toMatchObject({
         activeProfile: "dev",
         services: {
-          "service2": {
+          service2: {
             startPid: 5678,
           },
         },
@@ -207,8 +210,8 @@ describe("stateLoader", () => {
       expect(() => {
         saveState(testDir, {
           services: {
-            "test": {
-              startPid: "not a number" as any, // Invalid type
+            test: {
+              startPid: "not a number" as unknown as number, // Invalid type
             },
           },
         });
@@ -283,16 +286,18 @@ describe("stateLoader", () => {
       updateServiceState(testDir, "service2", { startPid: 2222 });
 
       // Update one service
-      updateServiceState(testDir, "service1", { startRequestedAt: "2024-01-01T00:00:00.000Z" });
+      updateServiceState(testDir, "service1", {
+        startRequestedAt: "2024-01-01T00:00:00.000Z",
+      });
 
       const state = loadState(testDir);
 
       expect(state.services).toEqual({
-        "service1": {
+        service1: {
           startPid: 1111,
           startRequestedAt: "2024-01-01T00:00:00.000Z",
         },
-        "service2": {
+        service2: {
           startPid: 2222,
         },
       });
@@ -331,7 +336,7 @@ describe("stateLoader", () => {
       const state = loadState(testDir);
 
       expect(state.services).toEqual({
-        "service2": {
+        service2: {
           startPid: 2222,
         },
       });
@@ -347,7 +352,7 @@ describe("stateLoader", () => {
       const state = loadState(testDir);
 
       expect(state.services).toEqual({
-        "service1": {
+        service1: {
           startPid: 1111,
         },
       });
@@ -376,7 +381,7 @@ describe("stateLoader", () => {
           "api-server": {
             startPid: 5678,
           },
-          "database": {
+          database: {
             startRequestedAt: "2024-01-01T12:01:00.000Z",
           },
         },
@@ -415,8 +420,8 @@ describe("stateLoader", () => {
         activeProfile: "dev",
         activeEnvironment: "test",
         services: {
-          "service1": { startPid: 1234 },
-          "service2": { startPid: 5678 },
+          service1: { startPid: 1234 },
+          service2: { startPid: 5678 },
         },
       });
     });
@@ -448,7 +453,9 @@ describe("stateLoader", () => {
     it("should handle rapid successive updates correctly", () => {
       // Simulate rapid updates to the same service
       updateServiceState(testDir, "test-service", { startPid: 1111 });
-      updateServiceState(testDir, "test-service", { startRequestedAt: "2024-01-01T00:00:00.000Z" });
+      updateServiceState(testDir, "test-service", {
+        startRequestedAt: "2024-01-01T00:00:00.000Z",
+      });
       updateServiceState(testDir, "test-service", { startPid: 2222 });
 
       const state = loadState(testDir);
@@ -467,16 +474,18 @@ describe("stateLoader", () => {
 
       // Clear one and update another
       clearServiceState(testDir, "service2");
-      updateServiceState(testDir, "service1", { startRequestedAt: "2024-01-01T00:00:00.000Z" });
+      updateServiceState(testDir, "service1", {
+        startRequestedAt: "2024-01-01T00:00:00.000Z",
+      });
 
       const state = loadState(testDir);
 
       expect(state.services).toEqual({
-        "service1": {
+        service1: {
           startPid: 1111,
           startRequestedAt: "2024-01-01T00:00:00.000Z",
         },
-        "service3": {
+        service3: {
           startPid: 3333,
         },
       });

@@ -115,7 +115,11 @@ export async function getStatus(
   for (const proc of context.processes) {
     if (service && proc.name !== service) continue;
 
-    const expectedPm2Name = buildServiceName(projectName, proc.name, context.instanceId);
+    const expectedPm2Name = buildServiceName(
+      projectName,
+      proc.name,
+      context.instanceId,
+    );
     const runningProcess = pm2List.find((p) => p.name === expectedPm2Name);
     const healthcheck = proc.healthcheck ?? 5;
     const enabled = isServiceEnabled(proc.profiles, activeProfile);
@@ -142,7 +146,11 @@ export async function getStatus(
   for (const container of context.containers) {
     if (service && container.name !== service) continue;
 
-    const expectedDockerName = buildServiceName(projectName, container.name, context.instanceId);
+    const expectedDockerName = buildServiceName(
+      projectName,
+      container.name,
+      context.instanceId,
+    );
     const containerInfo =
       await DockerManager.getContainerInfo(expectedDockerName);
     const healthcheck = container.healthcheck ?? 5;

@@ -60,7 +60,7 @@ describe("Pm2Executor", () => {
         projectName,
         mockProcess,
         testConfigDir,
-        undefined
+        undefined,
       );
       expect(Pm2Manager.startProcessWithTempEcosystem).toHaveBeenCalledTimes(1);
     });
@@ -79,7 +79,7 @@ describe("Pm2Executor", () => {
         projectName,
         mockProcess,
         undefined,
-        undefined
+        undefined,
       );
     });
   });
@@ -98,7 +98,7 @@ describe("Pm2Executor", () => {
         processName,
         testProjectName,
         testConfigDir,
-        undefined
+        undefined,
       );
       expect(Pm2Manager.deleteAllMatchingProcesses).toHaveBeenCalledTimes(1);
     });
@@ -113,7 +113,7 @@ describe("Pm2Executor", () => {
         processName,
         undefined,
         undefined,
-        undefined
+        undefined,
       );
     });
   });
@@ -131,7 +131,7 @@ describe("Pm2Executor", () => {
       expect(Pm2Manager.restartProcess).toHaveBeenCalledWith(
         processName,
         testProjectName,
-        undefined
+        undefined,
       );
       expect(Pm2Manager.restartProcess).toHaveBeenCalledTimes(1);
     });
@@ -145,7 +145,7 @@ describe("Pm2Executor", () => {
       expect(Pm2Manager.restartProcess).toHaveBeenCalledWith(
         processName,
         undefined,
-        undefined
+        undefined,
       );
     });
   });
@@ -165,7 +165,7 @@ describe("Pm2Executor", () => {
         testProjectName,
         false,
         testConfigDir,
-        undefined
+        undefined,
       );
       expect(Pm2Manager.showLogs).toHaveBeenCalledTimes(1);
     });
@@ -180,7 +180,7 @@ describe("Pm2Executor", () => {
         testProjectName,
         true,
         testConfigDir,
-        undefined
+        undefined,
       );
     });
 
@@ -195,7 +195,7 @@ describe("Pm2Executor", () => {
         undefined,
         true,
         undefined,
-        undefined
+        undefined,
       );
     });
   });

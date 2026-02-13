@@ -8,7 +8,12 @@ const CLI_PATH = path.join(__dirname, "../../dist/index.js");
 const FIXTURES_DIR = path.join(__dirname, "fixtures");
 
 // Utility function to run CLI commands
-function runZapCommand(command: string, cwd: string, configFile: string, options: { timeout?: number; encoding?: BufferEncoding } = {}) {
+function runZapCommand(
+  command: string,
+  cwd: string,
+  configFile: string,
+  options: { timeout?: number; encoding?: BufferEncoding } = {},
+) {
   const { timeout = 15000, encoding = "utf8" } = options;
   try {
     return execSync(`node "${CLI_PATH}" --config ${configFile} ${command}`, {
@@ -17,10 +22,15 @@ function runZapCommand(command: string, cwd: string, configFile: string, options
       encoding,
       stdio: ["pipe", "pipe", "pipe"],
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Include stderr in error for better debugging
-    if (error.stderr) {
-      error.message += `\nStderr: ${error.stderr.toString()}`;
+    if (error && typeof error === "object" && "stderr" in error) {
+      const execError = error as { stderr?: Buffer | string; message?: string };
+      if (execError.stderr) {
+        const message = execError.message || "";
+        (error as { message: string }).message =
+          message + `\nStderr: ${execError.stderr.toString()}`;
+      }
     }
     throw error;
   }
@@ -37,7 +47,7 @@ async function cleanupPm2Processes(projectName: string) {
     // Delete all processes matching the project pattern
     execSync(`pm2 delete "zap.${projectName}.*" 2>/dev/null || true`, {
       stdio: "ignore",
-      timeout: 5000
+      timeout: 5000,
     });
   } catch (error) {
     // Ignore cleanup errors - processes might not exist
@@ -45,21 +55,28 @@ async function cleanupPm2Processes(projectName: string) {
 }
 
 // Utility function to wait for services to be healthy
-async function waitForServices(projectName: string, expectedServices: string[], maxWaitMs = 30000) {
+async function waitForServices(
+  projectName: string,
+  expectedServices: string[],
+  maxWaitMs = 30000,
+) {
   const startTime = Date.now();
   while (Date.now() - startTime < maxWaitMs) {
     try {
       const pm2ListOutput = execSync("pm2 jlist", { encoding: "utf8" });
       const pm2Processes = JSON.parse(pm2ListOutput);
 
-      const zapProcesses = pm2Processes.filter((proc: any) =>
-        proc.name?.startsWith(`zap.${projectName}.`) &&
-        expectedServices.some(service => proc.name === `zap.${projectName}.${service}`)
+      const zapProcesses = pm2Processes.filter(
+        (proc: { name: string }) =>
+          proc.name?.startsWith(`zap.${projectName}.`) &&
+          expectedServices.some(
+            (service) => proc.name === `zap.${projectName}.${service}`,
+          ),
       );
 
       const runningServices = zapProcesses
-        .filter((proc: any) => proc.pm2_env?.status === "online")
-        .map((proc: any) => proc.name.split('.').pop());
+        .filter((proc: { name: string }) => proc.pm2_env?.status === "online")
+        .map((proc: { name: string }) => proc.name.split(".").pop());
 
       if (runningServices.length === expectedServices.length) {
         return true;
@@ -67,7 +84,7 @@ async function waitForServices(projectName: string, expectedServices: string[], 
     } catch (error) {
       // Continue waiting
     }
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   return false;
 }
@@ -79,11 +96,12 @@ function getRunningServices(projectName: string): string[] {
     const pm2Processes = JSON.parse(pm2ListOutput);
 
     return pm2Processes
-      .filter((proc: any) =>
-        proc.name?.startsWith(`zap.${projectName}.`) &&
-        proc.pm2_env?.status === "online"
+      .filter(
+        (proc: { name: string }) =>
+          proc.name?.startsWith(`zap.${projectName}.`) &&
+          proc.pm2_env?.status === "online",
       )
-      .map((proc: any) => proc.name.split('.').pop());
+      .map((proc: { name: string }) => proc.name.split(".").pop());
   } catch (error) {
     return [];
   }
@@ -97,7 +115,9 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
   beforeAll(() => {
     // Ensure CLI is built
     if (!fs.existsSync(CLI_PATH)) {
-      throw new Error(`CLI not found at ${CLI_PATH}. Run 'npm run build' first.`);
+      throw new Error(
+        `CLI not found at ${CLI_PATH}. Run 'npm run build' first.`,
+      );
     }
     fixtureDir = path.join(FIXTURES_DIR, "multi-service");
   });
@@ -105,7 +125,10 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
   afterAll(async () => {
     // Global cleanup - remove any remaining test processes
     try {
-      execSync(`pm2 delete all 2>/dev/null || true`, { stdio: "ignore", timeout: 5000 });
+      execSync(`pm2 delete all 2>/dev/null || true`, {
+        stdio: "ignore",
+        timeout: 5000,
+      });
     } catch (error) {
       // Ignore cleanup errors
     }
@@ -119,7 +142,11 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
     if (tempConfigPath && fs.existsSync(tempConfigPath)) {
       // Disable any active profiles before cleanup
       try {
-        runZapCommand(`profile --disable`, fixtureDir, `zap-${testProjectName}.yaml`);
+        runZapCommand(
+          `profile --disable`,
+          fixtureDir,
+          `zap-${testProjectName}.yaml`,
+        );
       } catch (error) {
         // Ignore profile cleanup errors
       }
@@ -130,8 +157,14 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
   function setupTempConfig() {
     testProjectName = generateTestProjectName();
     tempConfigPath = path.join(fixtureDir, `zap-${testProjectName}.yaml`);
-    const originalConfig = fs.readFileSync(path.join(fixtureDir, "zap.yaml"), "utf8");
-    const uniqueConfig = originalConfig.replace("project: multi-service-test", `project: ${testProjectName}`);
+    const originalConfig = fs.readFileSync(
+      path.join(fixtureDir, "zap.yaml"),
+      "utf8",
+    );
+    const uniqueConfig = originalConfig.replace(
+      "project: multi-service-test",
+      `project: ${testProjectName}`,
+    );
     fs.writeFileSync(tempConfigPath, uniqueConfig);
   }
 
@@ -140,7 +173,12 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       setupTempConfig();
 
       // Start all services
-      const upOutput = runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, { timeout: 30000 });
+      const upOutput = runZapCommand(
+        `up`,
+        fixtureDir,
+        `zap-${testProjectName}.yaml`,
+        { timeout: 30000 },
+      );
 
       // Should mention all services
       expect(upOutput).toContain("database");
@@ -149,22 +187,31 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       expect(upOutput).toContain("worker");
 
       // Wait for services to be healthy
-      const isHealthy = await waitForServices(testProjectName, ["database", "api", "frontend", "worker"]);
+      const isHealthy = await waitForServices(testProjectName, [
+        "database",
+        "api",
+        "frontend",
+        "worker",
+      ]);
       expect(isHealthy).toBe(true);
 
       // Verify all services are running
       const runningServices = getRunningServices(testProjectName);
-      expect(runningServices.sort()).toEqual(["database", "api", "frontend", "worker"].sort());
+      expect(runningServices.sort()).toEqual(
+        ["database", "api", "frontend", "worker"].sort(),
+      );
 
       // Verify PM2 process names follow convention
       const pm2ListOutput = execSync("pm2 jlist", { encoding: "utf8" });
       const pm2Processes = JSON.parse(pm2ListOutput);
-      const zapProcesses = pm2Processes.filter((proc: any) =>
-        proc.name?.startsWith(`zap.${testProjectName}.`)
+      const zapProcesses = pm2Processes.filter((proc: { name: string }) =>
+        proc.name?.startsWith(`zap.${testProjectName}.`),
       );
 
       expect(zapProcesses.length).toBe(4);
-      const processNames = zapProcesses.map((proc: any) => proc.name);
+      const processNames = zapProcesses.map(
+        (proc: { name: string }) => proc.name,
+      );
       expect(processNames).toContain(`zap.${testProjectName}.database`);
       expect(processNames).toContain(`zap.${testProjectName}.api`);
       expect(processNames).toContain(`zap.${testProjectName}.frontend`);
@@ -175,11 +222,22 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       setupTempConfig();
 
       // Start services first
-      runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, { timeout: 30000 });
-      await waitForServices(testProjectName, ["database", "api", "frontend", "worker"]);
+      runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {
+        timeout: 30000,
+      });
+      await waitForServices(testProjectName, [
+        "database",
+        "api",
+        "frontend",
+        "worker",
+      ]);
 
       // Check status
-      const statusOutput = runZapCommand(`status`, fixtureDir, `zap-${testProjectName}.yaml`);
+      const statusOutput = runZapCommand(
+        `status`,
+        fixtureDir,
+        `zap-${testProjectName}.yaml`,
+      );
 
       expect(statusOutput).toContain("database");
       expect(statusOutput).toContain("api");
@@ -188,10 +246,16 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       expect(statusOutput).toMatch(/running|online/);
 
       // Check JSON status
-      const statusJsonOutput = runZapCommand(`status --json`, fixtureDir, `zap-${testProjectName}.yaml`);
+      const statusJsonOutput = runZapCommand(
+        `status --json`,
+        fixtureDir,
+        `zap-${testProjectName}.yaml`,
+      );
       const statusData = JSON.parse(statusJsonOutput);
       expect(statusData).toBeDefined();
-      expect(Array.isArray(statusData) || typeof statusData === "object").toBe(true);
+      expect(Array.isArray(statusData) || typeof statusData === "object").toBe(
+        true,
+      );
     }, 45000);
   });
 
@@ -200,7 +264,9 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       setupTempConfig();
 
       // Start only frontend (should start database, api, and frontend due to dependencies)
-      const upOutput = runZapCommand(`up frontend`, fixtureDir, `zap-${testProjectName}.yaml`, { timeout: 30000 });
+      runZapCommand(`up frontend`, fixtureDir, `zap-${testProjectName}.yaml`, {
+        timeout: 30000,
+      });
 
       // Wait for dependent services to start
       await waitForServices(testProjectName, ["database", "api", "frontend"]);
@@ -221,14 +287,25 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       setupTempConfig();
 
       // Start all services first
-      runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, { timeout: 30000 });
-      await waitForServices(testProjectName, ["database", "api", "frontend", "worker"]);
+      runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {
+        timeout: 30000,
+      });
+      await waitForServices(testProjectName, [
+        "database",
+        "api",
+        "frontend",
+        "worker",
+      ]);
 
       // Stop only the frontend service
-      const downOutput = runZapCommand(`down frontend`, fixtureDir, `zap-${testProjectName}.yaml`);
+      const downOutput = runZapCommand(
+        `down frontend`,
+        fixtureDir,
+        `zap-${testProjectName}.yaml`,
+      );
       expect(downOutput).toContain("frontend");
 
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       const runningServices = getRunningServices(testProjectName);
 
@@ -245,29 +322,40 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       setupTempConfig();
 
       // Start all services first
-      runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, { timeout: 30000 });
-      await waitForServices(testProjectName, ["database", "api", "frontend", "worker"]);
+      runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {
+        timeout: 30000,
+      });
+      await waitForServices(testProjectName, [
+        "database",
+        "api",
+        "frontend",
+        "worker",
+      ]);
 
       // Get initial process info for api service
       const initialPm2List = execSync("pm2 jlist", { encoding: "utf8" });
       const initialProcesses = JSON.parse(initialPm2List);
-      const initialApiProcess = initialProcesses.find((proc: any) =>
-        proc.name === `zap.${testProjectName}.api`
+      const initialApiProcess = initialProcesses.find(
+        (proc: { name: string }) => proc.name === `zap.${testProjectName}.api`,
       );
       expect(initialApiProcess).toBeDefined();
       const initialPid = initialApiProcess.pid;
 
       // Restart the api service
-      const restartOutput = runZapCommand(`restart api`, fixtureDir, `zap-${testProjectName}.yaml`);
+      const restartOutput = runZapCommand(
+        `restart api`,
+        fixtureDir,
+        `zap-${testProjectName}.yaml`,
+      );
       expect(restartOutput).toContain("api");
 
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       // Verify service is still running but with new PID
       const afterRestartPm2List = execSync("pm2 jlist", { encoding: "utf8" });
       const afterRestartProcesses = JSON.parse(afterRestartPm2List);
-      const restartedApiProcess = afterRestartProcesses.find((proc: any) =>
-        proc.name === `zap.${testProjectName}.api`
+      const restartedApiProcess = afterRestartProcesses.find(
+        (proc: { name: string }) => proc.name === `zap.${testProjectName}.api`,
       );
 
       expect(restartedApiProcess).toBeDefined();
@@ -276,7 +364,9 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
 
       // Other services should still be running and unchanged
       const runningServices = getRunningServices(testProjectName);
-      expect(runningServices.sort()).toEqual(["database", "api", "frontend", "worker"].sort());
+      expect(runningServices.sort()).toEqual(
+        ["database", "api", "frontend", "worker"].sort(),
+      );
     }, 45000);
   });
 
@@ -288,7 +378,9 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       runZapCommand(`profile dev`, fixtureDir, `zap-${testProjectName}.yaml`);
 
       // Start services (should only start dev-profiled ones)
-      const upOutput = runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, { timeout: 30000 });
+      runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {
+        timeout: 30000,
+      });
 
       // Wait for dev services to start (database, api, frontend)
       await waitForServices(testProjectName, ["database", "api", "frontend"]);
@@ -312,7 +404,9 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       runZapCommand(`profile prod`, fixtureDir, `zap-${testProjectName}.yaml`);
 
       // Start services (should only start prod-profiled ones)
-      const upOutput = runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, { timeout: 30000 });
+      runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {
+        timeout: 30000,
+      });
 
       // Wait for prod services to start (database, api, worker)
       await waitForServices(testProjectName, ["database", "api", "worker"]);
@@ -335,18 +429,32 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       setupTempConfig();
 
       // 1. Start all services
-      const upOutput = runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, { timeout: 30000 });
+      const upOutput = runZapCommand(
+        `up`,
+        fixtureDir,
+        `zap-${testProjectName}.yaml`,
+        { timeout: 30000 },
+      );
       expect(upOutput).toContain("database");
       expect(upOutput).toContain("api");
       expect(upOutput).toContain("frontend");
       expect(upOutput).toContain("worker");
 
       // Wait for all services to be healthy
-      const isHealthy = await waitForServices(testProjectName, ["database", "api", "frontend", "worker"]);
+      const isHealthy = await waitForServices(testProjectName, [
+        "database",
+        "api",
+        "frontend",
+        "worker",
+      ]);
       expect(isHealthy).toBe(true);
 
       // 2. Check status shows all running
-      const statusOutput = runZapCommand(`status`, fixtureDir, `zap-${testProjectName}.yaml`);
+      const statusOutput = runZapCommand(
+        `status`,
+        fixtureDir,
+        `zap-${testProjectName}.yaml`,
+      );
       expect(statusOutput).toContain("database");
       expect(statusOutput).toContain("api");
       expect(statusOutput).toContain("frontend");
@@ -354,24 +462,36 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       expect(statusOutput).toMatch(/running|online/);
 
       // 3. Stop all services
-      const downOutput = runZapCommand(`down`, fixtureDir, `zap-${testProjectName}.yaml`, { timeout: 20000 });
+      const downOutput = runZapCommand(
+        `down`,
+        fixtureDir,
+        `zap-${testProjectName}.yaml`,
+        { timeout: 20000 },
+      );
       expect(downOutput).toMatch(/database|api|frontend|worker|Stopping/);
 
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       // 4. Verify all services are stopped
       const runningServices = getRunningServices(testProjectName);
       expect(runningServices.length).toBe(0);
 
       // 5. Status should show no running processes
-      const statusAfterDown = runZapCommand(`status`, fixtureDir, `zap-${testProjectName}.yaml`);
-      expect(statusAfterDown).toMatch(/stopped|not running|offline|No processes/i);
+      const statusAfterDown = runZapCommand(
+        `status`,
+        fixtureDir,
+        `zap-${testProjectName}.yaml`,
+      );
+      expect(statusAfterDown).toMatch(
+        /stopped|not running|offline|No processes/i,
+      );
 
       // 6. Verify processes are completely gone from PM2
       const pm2ListAfterDown = execSync("pm2 jlist", { encoding: "utf8" });
       const pm2ProcessesAfterDown = JSON.parse(pm2ListAfterDown);
-      const zapProcessesAfterDown = pm2ProcessesAfterDown.filter((proc: any) =>
-        proc.name?.startsWith(`zap.${testProjectName}.`)
+      const zapProcessesAfterDown = pm2ProcessesAfterDown.filter(
+        (proc: { name: string }) =>
+          proc.name?.startsWith(`zap.${testProjectName}.`),
       );
       expect(zapProcessesAfterDown.length).toBe(0);
     }, 60000);
@@ -382,15 +502,22 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       setupTempConfig();
 
       // Start services
-      runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, { timeout: 30000 });
-      await waitForServices(testProjectName, ["database", "api", "frontend", "worker"]);
+      runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {
+        timeout: 30000,
+      });
+      await waitForServices(testProjectName, [
+        "database",
+        "api",
+        "frontend",
+        "worker",
+      ]);
 
       // Verify naming convention
       const pm2ListOutput = execSync("pm2 jlist", { encoding: "utf8" });
       const pm2Processes = JSON.parse(pm2ListOutput);
 
-      const zapProcesses = pm2Processes.filter((proc: any) =>
-        proc.name?.startsWith(`zap.${testProjectName}.`)
+      const zapProcesses = pm2Processes.filter((proc: { name: string }) =>
+        proc.name?.startsWith(`zap.${testProjectName}.`),
       );
 
       // Should have exactly 4 processes
@@ -398,11 +525,17 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
 
       // Each process should follow the naming convention
       for (const proc of zapProcesses) {
-        expect(proc.name).toMatch(new RegExp(`^zap\\.${testProjectName}\\.(database|api|frontend|worker)$`));
+        expect(proc.name).toMatch(
+          new RegExp(
+            `^zap\\.${testProjectName}\\.(database|api|frontend|worker)$`,
+          ),
+        );
       }
 
       // Verify each expected service exists
-      const processNames = zapProcesses.map((proc: any) => proc.name);
+      const processNames = zapProcesses.map(
+        (proc: { name: string }) => proc.name,
+      );
       expect(processNames).toContain(`zap.${testProjectName}.database`);
       expect(processNames).toContain(`zap.${testProjectName}.api`);
       expect(processNames).toContain(`zap.${testProjectName}.frontend`);

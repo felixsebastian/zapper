@@ -6,7 +6,11 @@ export class Pm2Executor {
   private configDir?: string;
   private instanceId?: string | null;
 
-  constructor(projectName?: string, configDir?: string, instanceId?: string | null) {
+  constructor(
+    projectName?: string,
+    configDir?: string,
+    instanceId?: string | null,
+  ) {
     this.projectName = projectName;
     this.configDir = configDir;
     this.instanceId = instanceId;
@@ -31,7 +35,11 @@ export class Pm2Executor {
   }
 
   async restartProcess(processName: string): Promise<void> {
-    await Pm2Manager.restartProcess(processName, this.projectName, this.instanceId);
+    await Pm2Manager.restartProcess(
+      processName,
+      this.projectName,
+      this.instanceId,
+    );
   }
 
   async showLogs(processName: string, follow: boolean = false): Promise<void> {

@@ -74,10 +74,7 @@ export function createContext(
   const environmentSetNames: string[] = [];
   if (config.env_files) {
     if (Array.isArray(config.env_files)) {
-      if (
-        state.activeEnvironment &&
-        state.activeEnvironment !== "default"
-      ) {
+      if (state.activeEnvironment && state.activeEnvironment !== "default") {
         throw new Error(
           `Environment not found: ${state.activeEnvironment}. Available environments: default`,
         );

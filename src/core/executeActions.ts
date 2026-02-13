@@ -60,7 +60,8 @@ async function executeAction(
     const pair = findContainer(config, action.name);
     if (!pair) throw new Error(`Docker service not found: ${action.name}`);
     const [name, c] = pair;
-    const instanceId = (config as ZapperConfig & { instanceId?: string }).instanceId;
+    const instanceId = (config as ZapperConfig & { instanceId?: string })
+      .instanceId;
     const dockerName = buildServiceName(projectName, name, instanceId);
 
     if (action.type === "start") {
@@ -124,7 +125,8 @@ export async function executeActions(
   configDir: string | null,
   plan: ActionPlan,
 ): Promise<void> {
-  const instanceId = (config as ZapperConfig & { instanceId?: string }).instanceId;
+  const instanceId = (config as ZapperConfig & { instanceId?: string })
+    .instanceId;
   const pm2 = new Pm2Executor(projectName, configDir || undefined, instanceId);
 
   for (const wave of plan.waves) {

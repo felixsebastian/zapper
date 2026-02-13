@@ -8,7 +8,11 @@ const CLI_PATH = path.join(__dirname, "../../dist/index.js");
 const FIXTURES_DIR = path.join(__dirname, "fixtures");
 
 // Utility function to run CLI commands
-function runZapCommand(command: string, cwd: string, options: { timeout?: number; encoding?: BufferEncoding } = {}) {
+function runZapCommand(
+  command: string,
+  cwd: string,
+  options: { timeout?: number; encoding?: BufferEncoding } = {},
+) {
   const { timeout = 10000, encoding = "utf8" } = options;
   try {
     return execSync(`node "${CLI_PATH}" ${command}`, {
@@ -17,10 +21,15 @@ function runZapCommand(command: string, cwd: string, options: { timeout?: number
       encoding,
       stdio: ["pipe", "pipe", "pipe"],
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Include stderr in error for better debugging
-    if (error.stderr) {
-      error.message += `\nStderr: ${error.stderr.toString()}`;
+    if (error && typeof error === "object" && "stderr" in error) {
+      const execError = error as { stderr?: Buffer | string; message?: string };
+      if (execError.stderr) {
+        const message = execError.message || "";
+        (error as { message: string }).message =
+          message + `\nStderr: ${execError.stderr.toString()}`;
+      }
     }
     throw error;
   }
@@ -37,7 +46,7 @@ async function cleanupPm2Processes(projectName: string) {
     // Delete all processes matching the project pattern
     execSync(`pm2 delete "zap.${projectName}.*" 2>/dev/null || true`, {
       stdio: "ignore",
-      timeout: 5000
+      timeout: 5000,
     });
   } catch (error) {
     // Ignore cleanup errors - processes might not exist
@@ -45,7 +54,7 @@ async function cleanupPm2Processes(projectName: string) {
 }
 
 // Utility function to read state file if it exists
-function readStateFile(fixtureDir: string): any | null {
+function readStateFile(fixtureDir: string): Record<string, unknown> | null {
   const statePath = path.join(fixtureDir, ".zap", "state.json");
   if (fs.existsSync(statePath)) {
     return JSON.parse(fs.readFileSync(statePath, "utf8"));
@@ -54,7 +63,12 @@ function readStateFile(fixtureDir: string): any | null {
 }
 
 // Utility function to wait and capture logs with environment variables
-function waitAndCaptureLogs(command: string, cwd: string, expectedValues: string[], timeout = 5000): string {
+function waitAndCaptureLogs(
+  command: string,
+  cwd: string,
+  expectedValues: string[],
+  timeout = 5000,
+): string {
   const startTime = Date.now();
   let lastOutput = "";
 
@@ -64,7 +78,9 @@ function waitAndCaptureLogs(command: string, cwd: string, expectedValues: string
       lastOutput = output;
 
       // Check if all expected values are present in the output
-      const hasAllValues = expectedValues.every(value => output.includes(value));
+      const hasAllValues = expectedValues.every((value) =>
+        output.includes(value),
+      );
       if (hasAllValues) {
         return output;
       }
@@ -87,14 +103,19 @@ describe("E2E: Environment Sets and State Persistence", () => {
   beforeAll(() => {
     // Ensure CLI is built
     if (!fs.existsSync(CLI_PATH)) {
-      throw new Error(`CLI not found at ${CLI_PATH}. Run 'npm run build' first.`);
+      throw new Error(
+        `CLI not found at ${CLI_PATH}. Run 'npm run build' first.`,
+      );
     }
   });
 
   afterAll(async () => {
     // Global cleanup - remove any remaining test processes
     try {
-      execSync(`pm2 delete all 2>/dev/null || true`, { stdio: "ignore", timeout: 5000 });
+      execSync(`pm2 delete all 2>/dev/null || true`, {
+        stdio: "ignore",
+        timeout: 5000,
+      });
     } catch (error) {
       // Ignore cleanup errors
     }
@@ -124,34 +145,53 @@ describe("E2E: Environment Sets and State Persistence", () => {
 
     // Create temp config with unique project name
     tempConfigPath = path.join(fixtureDir, `zap-${testProjectName}.yaml`);
-    const originalConfig = fs.readFileSync(path.join(fixtureDir, "zap.yaml"), "utf8");
-    const uniqueConfig = originalConfig.replace("project: env-test", `project: ${testProjectName}`);
+    const originalConfig = fs.readFileSync(
+      path.join(fixtureDir, "zap.yaml"),
+      "utf8",
+    );
+    const uniqueConfig = originalConfig.replace(
+      "project: env-test",
+      `project: ${testProjectName}`,
+    );
     fs.writeFileSync(tempConfigPath, uniqueConfig);
 
     try {
       // Test 1: Start with default environment
-      const upOutput = runZapCommand(`up --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
+      const upOutput = runZapCommand(
+        `up --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+        { timeout: 15000 },
+      );
       expect(upOutput).toContain("echo-service");
 
       // Wait for process to start and capture logs to verify default environment
       const logsWithDefault = waitAndCaptureLogs(
         `logs --no-follow --config zap-${testProjectName}.yaml echo-service`,
         fixtureDir,
-        ["TEST_VALUE=default_value", "NODE_ENV=development"]
+        ["TEST_VALUE=default_value", "NODE_ENV=development"],
       );
       expect(logsWithDefault).toContain("TEST_VALUE=default_value");
       expect(logsWithDefault).toContain("NODE_ENV=development");
 
       // Test 2: Stop processes
-      const downOutput = runZapCommand(`down --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
-      expect(downOutput).toContain("echo-service") || expect(downOutput).toContain("Stopping");
+      const downOutput = runZapCommand(
+        `down --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+        { timeout: 15000 },
+      );
+      expect(downOutput).toContain("echo-service") ||
+        expect(downOutput).toContain("Stopping");
 
       // Wait for processes to fully stop
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Test 3: Switch to alternate environment
-      const envSwitchOutput = runZapCommand(`env alternate --config zap-${testProjectName}.yaml`, fixtureDir);
-      expect(envSwitchOutput).toContain("alternate") || expect(envSwitchOutput).toContain("environment");
+      const envSwitchOutput = runZapCommand(
+        `env alternate --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      );
+      expect(envSwitchOutput).toContain("alternate") ||
+        expect(envSwitchOutput).toContain("environment");
 
       // Test 4: Verify state file was created and contains correct environment
       const stateAfterSwitch = readStateFile(fixtureDir);
@@ -159,47 +199,66 @@ describe("E2E: Environment Sets and State Persistence", () => {
       expect(stateAfterSwitch.activeEnvironment).toBe("alternate");
 
       // Test 5: Start with alternate environment
-      const upAlternateOutput = runZapCommand(`up --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
+      const upAlternateOutput = runZapCommand(
+        `up --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+        { timeout: 15000 },
+      );
       expect(upAlternateOutput).toContain("echo-service");
 
       // Wait for process to start and capture logs to verify alternate environment
       const logsWithAlternate = waitAndCaptureLogs(
         `logs --no-follow --config zap-${testProjectName}.yaml echo-service`,
         fixtureDir,
-        ["TEST_VALUE=alternate_value", "NODE_ENV=staging"]
+        ["TEST_VALUE=alternate_value", "NODE_ENV=staging"],
       );
       expect(logsWithAlternate).toContain("TEST_VALUE=alternate_value");
       expect(logsWithAlternate).toContain("NODE_ENV=staging");
 
       // Test 6: Stop processes again
-      runZapCommand(`down --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      runZapCommand(`down --config zap-${testProjectName}.yaml`, fixtureDir, {
+        timeout: 15000,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Test 7: Disable environment (reset to default)
-      const envDisableOutput = runZapCommand(`env --disable --config zap-${testProjectName}.yaml`, fixtureDir);
-      expect(envDisableOutput).toMatch(/disabled|reset|default/i) || expect(envDisableOutput).toMatch(/environment/);
+      const envDisableOutput = runZapCommand(
+        `env --disable --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      );
+      expect(envDisableOutput).toMatch(/disabled|reset|default/i) ||
+        expect(envDisableOutput).toMatch(/environment/);
 
       // Test 8: Verify state file reflects the change
       const stateAfterDisable = readStateFile(fixtureDir);
       expect(stateAfterDisable).toBeDefined();
-      expect([null, undefined, "default"]).toContain(stateAfterDisable.activeEnvironment);
+      expect([null, undefined, "default"]).toContain(
+        stateAfterDisable.activeEnvironment,
+      );
 
       // Test 9: Start again and verify we're back to default
-      runZapCommand(`up --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
+      runZapCommand(`up --config zap-${testProjectName}.yaml`, fixtureDir, {
+        timeout: 15000,
+      });
 
       const logsBackToDefault = waitAndCaptureLogs(
         `logs --no-follow --config zap-${testProjectName}.yaml echo-service`,
         fixtureDir,
-        ["TEST_VALUE=default_value", "NODE_ENV=development"]
+        ["TEST_VALUE=default_value", "NODE_ENV=development"],
       );
       expect(logsBackToDefault).toContain("TEST_VALUE=default_value");
       expect(logsBackToDefault).toContain("NODE_ENV=development");
 
       // Test 10: Stop and test `zap state` command
-      runZapCommand(`down --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      runZapCommand(`down --config zap-${testProjectName}.yaml`, fixtureDir, {
+        timeout: 15000,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      const stateOutput = runZapCommand(`state --config zap-${testProjectName}.yaml`, fixtureDir);
+      const stateOutput = runZapCommand(
+        `state --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      );
 
       // Should output valid JSON
       expect(() => {
@@ -209,8 +268,9 @@ describe("E2E: Environment Sets and State Persistence", () => {
       }).not.toThrow();
 
       const finalState = JSON.parse(stateOutput);
-      expect([null, undefined, "default"]).toContain(finalState.activeEnvironment);
-
+      expect([null, undefined, "default"]).toContain(
+        finalState.activeEnvironment,
+      );
     } finally {
       // Ensure cleanup happens
       await cleanupPm2Processes(testProjectName);
@@ -222,13 +282,22 @@ describe("E2E: Environment Sets and State Persistence", () => {
     fixtureDir = path.join(FIXTURES_DIR, "env-switching");
 
     tempConfigPath = path.join(fixtureDir, `zap-${testProjectName}.yaml`);
-    const originalConfig = fs.readFileSync(path.join(fixtureDir, "zap.yaml"), "utf8");
-    const uniqueConfig = originalConfig.replace("project: env-test", `project: ${testProjectName}`);
+    const originalConfig = fs.readFileSync(
+      path.join(fixtureDir, "zap.yaml"),
+      "utf8",
+    );
+    const uniqueConfig = originalConfig.replace(
+      "project: env-test",
+      `project: ${testProjectName}`,
+    );
     fs.writeFileSync(tempConfigPath, uniqueConfig);
 
     // Try to switch to a non-existent environment
     expect(() => {
-      runZapCommand(`env nonexistent --config zap-${testProjectName}.yaml`, fixtureDir);
+      runZapCommand(
+        `env nonexistent --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      );
     }).toThrow(); // Should fail gracefully
 
     // State file should either not exist or not be corrupted
@@ -243,37 +312,49 @@ describe("E2E: Environment Sets and State Persistence", () => {
     fixtureDir = path.join(FIXTURES_DIR, "env-switching");
 
     tempConfigPath = path.join(fixtureDir, `zap-${testProjectName}.yaml`);
-    const originalConfig = fs.readFileSync(path.join(fixtureDir, "zap.yaml"), "utf8");
-    const uniqueConfig = originalConfig.replace("project: env-test", `project: ${testProjectName}`);
+    const originalConfig = fs.readFileSync(
+      path.join(fixtureDir, "zap.yaml"),
+      "utf8",
+    );
+    const uniqueConfig = originalConfig.replace(
+      "project: env-test",
+      `project: ${testProjectName}`,
+    );
     fs.writeFileSync(tempConfigPath, uniqueConfig);
 
     try {
       // Set alternate environment
-      runZapCommand(`env alternate --config zap-${testProjectName}.yaml`, fixtureDir);
+      runZapCommand(
+        `env alternate --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      );
 
       // Multiple up/down cycles
       for (let i = 0; i < 3; i++) {
         // Start
-        runZapCommand(`up --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
+        runZapCommand(`up --config zap-${testProjectName}.yaml`, fixtureDir, {
+          timeout: 15000,
+        });
 
         // Quick log check
         const logs = waitAndCaptureLogs(
           `logs --no-follow --config zap-${testProjectName}.yaml echo-service`,
           fixtureDir,
           ["TEST_VALUE=alternate_value"],
-          3000
+          3000,
         );
         expect(logs).toContain("TEST_VALUE=alternate_value");
 
         // Stop
-        runZapCommand(`down --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        runZapCommand(`down --config zap-${testProjectName}.yaml`, fixtureDir, {
+          timeout: 15000,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         // Verify state persists
         const state = readStateFile(fixtureDir);
         expect(state.activeEnvironment).toBe("alternate");
       }
-
     } finally {
       await cleanupPm2Processes(testProjectName);
     }

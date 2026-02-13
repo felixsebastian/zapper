@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  buildServiceName,
-  buildPrefix,
-  parseServiceName,
-} from "./nameBuilder";
+import { buildServiceName, buildPrefix, parseServiceName } from "./nameBuilder";
 
 describe("nameBuilder", () => {
   describe("buildServiceName", () => {

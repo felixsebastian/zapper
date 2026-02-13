@@ -19,8 +19,10 @@ vi.mock("../config/yamlParser");
 
 const mockPlanner = vi.mocked(Planner);
 const mockExecuteActions = vi.mocked(executeActions);
-const mockPm2Manager = vi.mocked(Pm2Manager);
-const mockDockerManager = vi.mocked(DockerManager);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _mockPm2Manager = vi.mocked(Pm2Manager);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _mockDockerManager = vi.mocked(DockerManager);
 
 // Mock parseYamlFile
 const mockParseYamlFile = vi.mocked(parseYamlFile);
@@ -41,11 +43,11 @@ describe("Zapper", () => {
       project: "test-project",
       native: {
         api: { cmd: "npm start" },
-        frontend: { cmd: "npm run dev" }
+        frontend: { cmd: "npm run dev" },
       },
       docker: {
-        database: { image: "postgres:15" }
-      }
+        database: { image: "postgres:15" },
+      },
     });
   });
 
@@ -97,14 +99,14 @@ native:
       const nonExistentPath = path.join(tempDir, "nonexistent.yaml");
 
       await expect(zapper.loadConfig(nonExistentPath)).rejects.toThrow(
-        `Config file not found: ${nonExistentPath}`
+        `Config file not found: ${nonExistentPath}`,
       );
     });
 
     it("should throw when no config found without custom path", async () => {
       // Test the case where no configPath is provided and no config is found
       await expect(zapper.loadConfig()).rejects.toThrow(
-        "No zap.yaml config file found in current directory or parent directories"
+        "No zap.yaml config file found in current directory or parent directories",
       );
     });
 
@@ -115,7 +117,7 @@ native:
       // When a directory is provided that doesn't contain a config file,
       // resolveConfigPath will search in that directory and return null
       await expect(zapper.loadConfig(emptyDir)).rejects.toThrow(
-        /config file found|Config file not found/
+        /config file found|Config file not found/,
       );
     });
 
@@ -123,7 +125,7 @@ native:
       const configPath = createMinimalTempConfig();
       mockParseYamlFile.mockReturnValue({
         project: "test-project",
-        native: { api: { cmd: "npm start" } }
+        native: { api: { cmd: "npm start" } },
       });
 
       await zapper.loadConfig(configPath, { http: true });
@@ -136,7 +138,7 @@ native:
       const configPath = createMinimalTempConfig();
       mockParseYamlFile.mockReturnValue({
         project: "test-project",
-        native: { api: { cmd: "npm start" } }
+        native: { api: { cmd: "npm start" } },
       });
 
       await zapper.loadConfig(configPath, { ssh: true });
@@ -149,11 +151,11 @@ native:
       const configPath = createMinimalTempConfig();
       mockParseYamlFile.mockReturnValue({
         project: "test-project",
-        native: { api: { cmd: "npm start" } }
+        native: { api: { cmd: "npm start" } },
       });
 
       await expect(
-        zapper.loadConfig(configPath, { http: true, ssh: true })
+        zapper.loadConfig(configPath, { http: true, ssh: true }),
       ).rejects.toThrow("Cannot specify both --http and --ssh options");
     });
 
@@ -161,7 +163,7 @@ native:
       const configPath = createMinimalTempConfig();
       mockParseYamlFile.mockReturnValue({
         project: "test-project",
-        native: { api: { cmd: "npm start" } }
+        native: { api: { cmd: "npm start" } },
       });
 
       await zapper.loadConfig(configPath);
@@ -197,10 +199,14 @@ native:
       if (context) {
         context.processes = [
           { name: "api", cmd: "npm start", aliases: ["backend", "server"] },
-          { name: "frontend", cmd: "npm run dev", aliases: ["web"] }
+          { name: "frontend", cmd: "npm run dev", aliases: ["web"] },
         ];
         context.containers = [
-          { name: "database", image: "postgres:15", aliases: ["db", "postgres"] }
+          {
+            name: "database",
+            image: "postgres:15",
+            aliases: ["db", "postgres"],
+          },
         ];
       }
 
@@ -226,21 +232,23 @@ native:
       { name: "gitCheckoutAll", args: ["main"] },
       { name: "gitPullAll", args: [] },
       { name: "gitStatusAll", args: [] },
-      { name: "gitStashAll", args: [] }
+      { name: "gitStashAll", args: [] },
     ];
 
     contextRequiredMethods.forEach(({ name, args }) => {
       it(`should throw ContextNotLoadedError when ${name} called before loadConfig`, async () => {
-        await expect((zapper as any)[name](...args)).rejects.toThrow(
-          ContextNotLoadedError
-        );
+        await expect(
+          (zapper as Record<string, (...args: unknown[]) => Promise<unknown>>)[
+            name
+          ](...args),
+        ).rejects.toThrow(ContextNotLoadedError);
       });
     });
   });
 
   describe("orchestration methods", () => {
-    let mockPlannerInstance: any;
-    let mockPlan: any;
+    let mockPlannerInstance: { getPlan: () => unknown };
+    let mockPlan: unknown;
 
     beforeEach(async () => {
       const configPath = createTempConfig({});
@@ -250,14 +258,19 @@ native:
         waves: [
           {
             actions: [
-              { type: "start", serviceType: "native", name: "api", healthcheck: 5 }
-            ]
-          }
-        ]
+              {
+                type: "start",
+                serviceType: "native",
+                name: "api",
+                healthcheck: 5,
+              },
+            ],
+          },
+        ],
       };
 
       mockPlannerInstance = {
-        plan: vi.fn().mockResolvedValue(mockPlan)
+        plan: vi.fn().mockResolvedValue(mockPlan),
       };
       mockPlanner.mockImplementation(() => mockPlannerInstance);
       mockExecuteActions.mockResolvedValue(undefined);
@@ -269,8 +282,8 @@ native:
 
         expect(mockPlanner).toHaveBeenCalledWith(
           expect.objectContaining({
-            project: "test-project"
-          })
+            project: "test-project",
+          }),
         );
 
         expect(mockPlannerInstance.plan).toHaveBeenCalledWith(
@@ -278,16 +291,16 @@ native:
           undefined,
           "test-project",
           false,
-          undefined
+          undefined,
         );
 
         expect(mockExecuteActions).toHaveBeenCalledWith(
           expect.objectContaining({
-            project: "test-project"
+            project: "test-project",
           }),
           "test-project",
           tempDir,
-          mockPlan
+          mockPlan,
         );
       });
 
@@ -295,7 +308,7 @@ native:
         const context = zapper.getContext();
         if (context) {
           context.processes = [
-            { name: "api", cmd: "npm start", aliases: ["backend"] }
+            { name: "api", cmd: "npm start", aliases: ["backend"] },
           ];
         }
 
@@ -306,7 +319,7 @@ native:
           ["api"], // Should resolve "backend" to "api"
           "test-project",
           false,
-          undefined
+          undefined,
         );
       });
 
@@ -318,7 +331,7 @@ native:
         }
 
         await expect(zapper.startProcesses()).rejects.toThrow(
-          ServiceNotFoundError
+          ServiceNotFoundError,
         );
       });
 
@@ -326,7 +339,7 @@ native:
         mockPlan.waves = []; // No actions planned
 
         await expect(zapper.startProcesses(["nonexistent"])).rejects.toThrow(
-          ServiceNotFoundError
+          ServiceNotFoundError,
         );
       });
     });
@@ -340,16 +353,16 @@ native:
           ["api"],
           "test-project",
           false,
-          undefined
+          undefined,
         );
 
         expect(mockExecuteActions).toHaveBeenCalledWith(
           expect.objectContaining({
-            project: "test-project"
+            project: "test-project",
           }),
           "test-project",
           tempDir,
-          mockPlan
+          mockPlan,
         );
       });
 
@@ -357,7 +370,7 @@ native:
         mockPlan.waves = []; // No actions planned
 
         await expect(zapper.stopProcesses(["nonexistent"])).rejects.toThrow(
-          ServiceNotFoundError
+          ServiceNotFoundError,
         );
       });
     });
@@ -371,16 +384,16 @@ native:
           ["api"],
           "test-project",
           false,
-          undefined
+          undefined,
         );
 
         expect(mockExecuteActions).toHaveBeenCalledWith(
           expect.objectContaining({
-            project: "test-project"
+            project: "test-project",
           }),
           "test-project",
           tempDir,
-          mockPlan
+          mockPlan,
         );
       });
 
@@ -392,7 +405,7 @@ native:
           undefined,
           "test-project",
           false,
-          undefined
+          undefined,
         );
       });
     });
@@ -413,11 +426,16 @@ native:
           waves: [
             {
               actions: [
-                { type: "start", serviceType: "native", name: "api", healthcheck: 5 }
-              ]
-            }
-          ]
-        })
+                {
+                  type: "start",
+                  serviceType: "native",
+                  name: "api",
+                  healthcheck: 5,
+                },
+              ],
+            },
+          ],
+        }),
       };
       mockPlanner.mockImplementation(() => mockPlannerInstance);
       mockExecuteActions.mockResolvedValue(undefined);
@@ -429,7 +447,7 @@ native:
         ["api"],
         "test-project",
         false,
-        undefined
+        undefined,
       );
 
       // Stop processes
@@ -439,7 +457,7 @@ native:
         ["api"],
         "test-project",
         false,
-        undefined
+        undefined,
       );
     });
 
@@ -447,7 +465,7 @@ native:
       const configPath = createMinimalTempConfig("my-custom-project");
       mockParseYamlFile.mockReturnValue({
         project: "my-custom-project",
-        native: { api: { cmd: "npm start" } }
+        native: { api: { cmd: "npm start" } },
       });
 
       await zapper.loadConfig(configPath);
@@ -498,7 +516,7 @@ native:
         await expect(zapper.loadConfig(restrictedDir)).rejects.toThrow();
       } catch (error) {
         // Skip test if we can't change permissions (e.g., Windows)
-        if ((error as any).code !== "EPERM") {
+        if ((error as { code?: string }).code !== "EPERM") {
           throw error;
         }
       } finally {

@@ -57,7 +57,10 @@ describe("worktreeDetector", () => {
     mkdirSync(mainGitDir, { recursive: true });
 
     // Create worktree .git file with relative path
-    writeFileSync(gitFile, "gitdir: main-relative/.git/worktrees/feature-branch");
+    writeFileSync(
+      gitFile,
+      "gitdir: main-relative/.git/worktrees/feature-branch",
+    );
 
     const result = detectWorktree(testDir);
     expect(result.isWorktree).toBe(true);

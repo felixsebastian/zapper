@@ -8,7 +8,11 @@ const CLI_PATH = path.join(__dirname, "../../dist/index.js");
 const FIXTURES_DIR = path.join(__dirname, "fixtures");
 
 // Utility function to run CLI commands
-function runZapCommand(command: string, cwd: string, options: { timeout?: number; encoding?: BufferEncoding } = {}) {
+function runZapCommand(
+  command: string,
+  cwd: string,
+  options: { timeout?: number; encoding?: BufferEncoding } = {},
+) {
   const { timeout = 10000, encoding = "utf8" } = options;
   try {
     return execSync(`node "${CLI_PATH}" ${command}`, {
@@ -17,10 +21,15 @@ function runZapCommand(command: string, cwd: string, options: { timeout?: number
       encoding,
       stdio: ["pipe", "pipe", "pipe"],
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Include stderr in error for better debugging
-    if (error.stderr) {
-      error.message += `\nStderr: ${error.stderr.toString()}`;
+    if (error && typeof error === "object" && "stderr" in error) {
+      const execError = error as { stderr?: Buffer | string; message?: string };
+      if (execError.stderr) {
+        const message = execError.message || "";
+        (error as { message: string }).message =
+          message + `\nStderr: ${execError.stderr.toString()}`;
+      }
     }
     throw error;
   }
@@ -37,7 +46,7 @@ async function cleanupPm2Processes(projectName: string) {
     // Delete all processes matching the project pattern
     execSync(`pm2 delete "zap.${projectName}.*" 2>/dev/null || true`, {
       stdio: "ignore",
-      timeout: 5000
+      timeout: 5000,
     });
   } catch (error) {
     // Ignore cleanup errors - processes might not exist
@@ -52,7 +61,9 @@ describe("E2E: Service Aliases", () => {
   beforeAll(() => {
     // Ensure CLI is built
     if (!fs.existsSync(CLI_PATH)) {
-      throw new Error(`CLI not found at ${CLI_PATH}. Run 'pnpm run build' first.`);
+      throw new Error(
+        `CLI not found at ${CLI_PATH}. Run 'pnpm run build' first.`,
+      );
     }
   });
 
@@ -75,11 +86,17 @@ describe("E2E: Service Aliases", () => {
   afterAll(async () => {
     // Cleanup any remaining test processes (only zap.e2e-test-* patterns)
     try {
-      const output = execSync("pm2 jlist --silent", { encoding: "utf8", timeout: 5000 });
+      const output = execSync("pm2 jlist --silent", {
+        encoding: "utf8",
+        timeout: 5000,
+      });
       const processes = JSON.parse(output);
       for (const proc of processes) {
         if (proc.name?.startsWith("zap.e2e-test-")) {
-          execSync(`pm2 delete "${proc.name}" 2>/dev/null || true`, { stdio: "ignore", timeout: 5000 });
+          execSync(`pm2 delete "${proc.name}" 2>/dev/null || true`, {
+            stdio: "ignore",
+            timeout: 5000,
+          });
         }
       }
     } catch (error) {
@@ -90,7 +107,11 @@ describe("E2E: Service Aliases", () => {
   const setupTestConfig = () => {
     testProjectName = generateTestProjectName();
     fixtureDir = path.join(FIXTURES_DIR, "service-aliases");
-    tempConfigPath = path.join(__dirname, "test-data", `${testProjectName}-zap.yaml`);
+    tempConfigPath = path.join(
+      __dirname,
+      "test-data",
+      `${testProjectName}-zap.yaml`,
+    );
 
     // Ensure test-data directory exists
     const testDataDir = path.dirname(tempConfigPath);
@@ -101,7 +122,10 @@ describe("E2E: Service Aliases", () => {
     // Copy fixture and modify project name
     const fixtureConfigPath = path.join(fixtureDir, "zap.yaml");
     let configContent = fs.readFileSync(fixtureConfigPath, "utf-8");
-    configContent = configContent.replace("project: alias-test", `project: ${testProjectName}`);
+    configContent = configContent.replace(
+      "project: alias-test",
+      `project: ${testProjectName}`,
+    );
 
     // Write temp config
     fs.writeFileSync(tempConfigPath, configContent);
@@ -115,18 +139,24 @@ describe("E2E: Service Aliases", () => {
 
       try {
         // Start service using alias
-        const startOutput = runZapCommand("up api", workingDir, { timeout: 15000 });
+        const startOutput = runZapCommand("up api", workingDir, {
+          timeout: 15000,
+        });
         expect(startOutput).toContain("api-server");
 
         // Wait for process to stabilize
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // Check status - should show canonical name
-        const statusOutput = runZapCommand("status", workingDir, { timeout: 10000 });
+        const statusOutput = runZapCommand("status", workingDir, {
+          timeout: 10000,
+        });
         expect(statusOutput).toContain("api-server");
 
         // Stop service using different alias
-        const stopOutput = runZapCommand("down backend", workingDir, { timeout: 15000 });
+        const stopOutput = runZapCommand("down backend", workingDir, {
+          timeout: 15000,
+        });
         expect(stopOutput).toContain("api-server");
       } catch (error) {
         console.error("Test failed:", error);
@@ -142,21 +172,25 @@ describe("E2E: Service Aliases", () => {
 
         for (const alias of aliases) {
           // Start with alias
-          const startOutput = runZapCommand(`up ${alias}`, workingDir, { timeout: 15000 });
+          const startOutput = runZapCommand(`up ${alias}`, workingDir, {
+            timeout: 15000,
+          });
           expect(startOutput).toContain("user-service");
 
           // Wait for stabilization
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
 
           // Verify it's running (should show canonical name)
-          const statusOutput = runZapCommand("status", workingDir, { timeout: 10000 });
+          const statusOutput = runZapCommand("status", workingDir, {
+            timeout: 10000,
+          });
           expect(statusOutput).toContain("user-service");
 
           // Stop with same alias
           runZapCommand(`down ${alias}`, workingDir, { timeout: 15000 });
 
           // Wait before next iteration
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       } catch (error) {
         console.error("Test failed:", error);
@@ -169,19 +203,27 @@ describe("E2E: Service Aliases", () => {
 
       try {
         // Start some services with canonical names, others with aliases
-        const startOutput = runZapCommand("up api-server notifications", workingDir, { timeout: 20000 });
+        const startOutput = runZapCommand(
+          "up api-server notifications",
+          workingDir,
+          { timeout: 20000 },
+        );
         expect(startOutput).toContain("api-server");
         expect(startOutput).toContain("notification-worker");
 
         // Wait for processes to stabilize
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise((resolve) => setTimeout(resolve, 3000));
 
-        const statusOutput = runZapCommand("status", workingDir, { timeout: 10000 });
+        const statusOutput = runZapCommand("status", workingDir, {
+          timeout: 10000,
+        });
         expect(statusOutput).toContain("api-server");
         expect(statusOutput).toContain("notification-worker");
 
         // Stop with mixed canonical and alias
-        runZapCommand("down api notification-worker", workingDir, { timeout: 15000 });
+        runZapCommand("down api notification-worker", workingDir, {
+          timeout: 15000,
+        });
       } catch (error) {
         console.error("Test failed:", error);
         throw error;
@@ -195,7 +237,9 @@ describe("E2E: Service Aliases", () => {
 
       try {
         // Start frontend using alias - should start dependencies too
-        const startOutput = runZapCommand("up fe", workingDir, { timeout: 25000 });
+        const startOutput = runZapCommand("up fe", workingDir, {
+          timeout: 25000,
+        });
 
         // Should mention starting dependencies
         expect(startOutput).toContain("api-server");
@@ -203,10 +247,12 @@ describe("E2E: Service Aliases", () => {
         expect(startOutput).toContain("frontend");
 
         // Wait for all processes to stabilize
-        await new Promise(resolve => setTimeout(resolve, 4000));
+        await new Promise((resolve) => setTimeout(resolve, 4000));
 
         // Verify all are running
-        const statusOutput = runZapCommand("status", workingDir, { timeout: 15000 });
+        const statusOutput = runZapCommand("status", workingDir, {
+          timeout: 15000,
+        });
         expect(statusOutput).toContain("api-server");
         expect(statusOutput).toContain("user-service");
         expect(statusOutput).toContain("frontend");
@@ -223,16 +269,22 @@ describe("E2E: Service Aliases", () => {
 
       try {
         // Run task using alias
-        const taskOutput = runZapCommand("task build", workingDir, { timeout: 15000 });
+        const taskOutput = runZapCommand("task build", workingDir, {
+          timeout: 15000,
+        });
         expect(taskOutput).toContain("Building frontend");
         expect(taskOutput).toContain("Building API");
 
         // Run same task using different alias
-        const taskOutput2 = runZapCommand("task b", workingDir, { timeout: 15000 });
+        const taskOutput2 = runZapCommand("task b", workingDir, {
+          timeout: 15000,
+        });
         expect(taskOutput2).toContain("Building frontend");
 
         // Run task with single alias
-        const testOutput = runZapCommand("task test", workingDir, { timeout: 15000 });
+        const testOutput = runZapCommand("task test", workingDir, {
+          timeout: 15000,
+        });
         expect(testOutput).toContain("Running unit tests");
       } catch (error) {
         console.error("Test failed:", error);

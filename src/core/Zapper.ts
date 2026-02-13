@@ -294,12 +294,20 @@ export class Zapper {
     );
 
     if (isContainer) {
-      const dockerName = buildServiceName(projectName, resolvedName, this.context.instanceId);
+      const dockerName = buildServiceName(
+        projectName,
+        resolvedName,
+        this.context.instanceId,
+      );
       const exists = await DockerManager.containerExists(dockerName);
       if (!exists) throw new ContainerNotRunningError(resolvedName, dockerName);
       await DockerManager.showLogs(dockerName, follow);
     } else if (isProcess) {
-      const pm2Executor = new Pm2Executor(projectName, projectRoot, this.context.instanceId);
+      const pm2Executor = new Pm2Executor(
+        projectName,
+        projectRoot,
+        this.context.instanceId,
+      );
       await pm2Executor.showLogs(resolvedName, follow);
     } else {
       throw new ServiceNotFoundError(processName);

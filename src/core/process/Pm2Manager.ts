@@ -77,7 +77,11 @@ export class Pm2Manager {
     const ecosystem = {
       apps: [
         {
-          name: buildServiceName(projectName, processConfig.name as string, instanceId),
+          name: buildServiceName(
+            projectName,
+            processConfig.name as string,
+            instanceId,
+          ),
           script: wrapperScript,
           interpreter: "/bin/bash",
           cwd: (() => {
@@ -202,9 +206,7 @@ export class Pm2Manager {
         await new Promise((r) => setTimeout(r, 300));
       }
     } catch (error) {
-      logger.debug(
-        `Could not kill process tree for ${prefixedName}: ${error}`,
-      );
+      logger.debug(`Could not kill process tree for ${prefixedName}: ${error}`);
     }
   }
 
@@ -214,7 +216,9 @@ export class Pm2Manager {
     configDir?: string,
     instanceId?: string | null,
   ): Promise<void> {
-    const prefixedName = projectName ? buildServiceName(projectName, name, instanceId) : name;
+    const prefixedName = projectName
+      ? buildServiceName(projectName, name, instanceId)
+      : name;
     await this.killManagedProcessTree(prefixedName);
     await this.runPm2Command(["stop", prefixedName]);
 
@@ -229,7 +233,9 @@ export class Pm2Manager {
     projectName?: string,
     instanceId?: string | null,
   ): Promise<void> {
-    const prefixedName = projectName ? buildServiceName(projectName, name, instanceId) : name;
+    const prefixedName = projectName
+      ? buildServiceName(projectName, name, instanceId)
+      : name;
     await this.killManagedProcessTree(prefixedName);
     await this.runPm2Command(["restart", prefixedName]);
   }
@@ -240,7 +246,9 @@ export class Pm2Manager {
     configDir?: string,
     instanceId?: string | null,
   ): Promise<void> {
-    const prefixedName = projectName ? buildServiceName(projectName, name, instanceId) : name;
+    const prefixedName = projectName
+      ? buildServiceName(projectName, name, instanceId)
+      : name;
     await this.killManagedProcessTree(prefixedName);
     await this.runPm2Command(["delete", prefixedName]);
 
@@ -256,7 +264,9 @@ export class Pm2Manager {
     configDir?: string,
     instanceId?: string | null,
   ): Promise<void> {
-    const prefixedName = projectName ? buildServiceName(projectName, name, instanceId) : name;
+    const prefixedName = projectName
+      ? buildServiceName(projectName, name, instanceId)
+      : name;
 
     try {
       const processes = await this.listProcesses();
@@ -291,7 +301,8 @@ export class Pm2Manager {
     projectName: string,
     processName: string,
     configDir?: string,
-    instanceId?: string | null,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _instanceId?: string | null,
   ): Promise<void> {
     try {
       const { rmSync, unlinkSync, existsSync } = await import("fs");
@@ -326,7 +337,8 @@ export class Pm2Manager {
     projectName: string,
     processName: string,
     configDir?: string,
-    instanceId?: string | null,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _instanceId?: string | null,
   ): void {
     try {
       const zapDir = path.join(configDir || ".", ".zap");
@@ -369,7 +381,9 @@ export class Pm2Manager {
     configDir?: string,
     instanceId?: string | null,
   ): Promise<void> {
-    const prefixedName = projectName ? buildServiceName(projectName, name, instanceId) : name;
+    const prefixedName = projectName
+      ? buildServiceName(projectName, name, instanceId)
+      : name;
     const processInfo = await this.getProcessInfo(prefixedName);
 
     if (!processInfo) {
@@ -446,9 +460,15 @@ export class Pm2Manager {
   ): Promise<string | null> {
     try {
       // For Zapper-managed processes, use our custom log path
-      if (projectName && processName.startsWith(buildPrefix(projectName, instanceId) + ".")) {
+      if (
+        projectName &&
+        processName.startsWith(buildPrefix(projectName, instanceId) + ".")
+      ) {
         const logsDir = path.join(configDir || ".", ".zap", "logs");
-        const baseName = processName.replace(buildPrefix(projectName, instanceId) + ".", "");
+        const baseName = processName.replace(
+          buildPrefix(projectName, instanceId) + ".",
+          "",
+        );
         return path.join(logsDir, `${projectName}.${baseName}.log`);
       }
 
@@ -726,7 +746,8 @@ export class Pm2Manager {
     projectName: string,
     processConfig: Process,
     configDir: string,
-    instanceId?: string | null,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _instanceId?: string | null,
   ): string {
     const zapDir = path.join(configDir, ".zap");
     const timestamp = Date.now();

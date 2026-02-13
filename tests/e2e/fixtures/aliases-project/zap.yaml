@@ -1,0 +1,48 @@
+project: aliases-test
+native:
+  webserver:
+    cmd: node -e "console.log('WebServer started'); setInterval(() => console.log('WebServer running on port 3000'), 2000)"
+    aliases: [web, server, s]
+  background-worker:
+    cmd: node -e "console.log('Background Worker started'); setInterval(() => console.log('Worker processing jobs'), 1500)"
+    aliases: [worker, bg, w]
+  database:
+    cmd: node -e "console.log('Database started'); setInterval(() => console.log('Database ready for connections'), 3000)"
+    aliases: [db, postgres, pg]
+
+tasks:
+  build:
+    desc: Build the entire project
+    aliases: [b, compile]
+    cmds:
+      - echo "Building frontend..."
+      - echo "Building backend..."
+      - echo "Build completed successfully!"
+
+  test:
+    desc: Run all tests
+    aliases: [t, tests, check]
+    cmds:
+      - echo "Running unit tests..."
+      - echo "Running integration tests..."
+      - { task: build }
+      - echo "All tests passed!"
+
+  deploy:
+    desc: Deploy to production
+    aliases: [d, prod, production]
+    cmds:
+      - { task: test }
+      - echo "Deploying to staging..."
+      - echo "Running smoke tests..."
+      - echo "Deploying to production..."
+      - echo "Deployment completed!"
+
+  start-services:
+    desc: Start all services
+    aliases: [start, up, services]
+    cmds:
+      - echo "Starting database service..."
+      - echo "Starting web server..."
+      - echo "Starting background worker..."
+      - echo "All services started!"

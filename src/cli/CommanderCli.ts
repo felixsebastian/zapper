@@ -370,8 +370,7 @@ export class CommanderCli {
     const zapper = new Zapper();
     await zapper.loadConfig(allOptions.config, allOptions);
 
-    const shouldResolveAliases =
-      command !== "env" && command !== "environment";
+    const shouldResolveAliases = command !== "env" && command !== "environment";
     const resolvedService =
       service && shouldResolveAliases
         ? zapper.resolveServiceName(service)

@@ -90,7 +90,8 @@ export class Planner {
         .filter((p) => p.status.toLowerCase() === "online")
         .map((p) => p.name as string),
     );
-    const instanceId = (this.config as ZapperConfig & { instanceId?: string }).instanceId;
+    const instanceId = (this.config as ZapperConfig & { instanceId?: string })
+      .instanceId;
     const isPm2Running = (name: string) =>
       runningPm2.has(buildServiceName(projectName, name, instanceId));
 

@@ -8,7 +8,10 @@ import {
 } from "./instanceConfig";
 
 describe("instanceConfig", () => {
-  const testDir = path.join(__dirname, "../../test-fixtures/instance-config-test");
+  const testDir = path.join(
+    __dirname,
+    "../../test-fixtures/instance-config-test",
+  );
   const zapDir = path.join(testDir, ".zap");
   const configPath = path.join(zapDir, "instance.json");
 
