@@ -54,10 +54,7 @@ export class EnvCommand extends CommandHandler {
         : isEnvironment
           ? targetName
           : zapper.resolveServiceName(targetName);
-      const hasService = this.serviceExists(
-        zapperContext,
-        resolvedServiceName,
-      );
+      const hasService = this.serviceExists(zapperContext, resolvedServiceName);
 
       if (forcedService) {
         await this.showServiceEnv(zapperContext, resolvedServiceName, options);
@@ -81,11 +78,7 @@ export class EnvCommand extends CommandHandler {
       }
 
       if (hasService) {
-        await this.showServiceEnv(
-          zapperContext,
-          resolvedServiceName,
-          options,
-        );
+        await this.showServiceEnv(zapperContext, resolvedServiceName, options);
         return;
       }
 

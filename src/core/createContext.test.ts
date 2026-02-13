@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createContext } from "./createContext";
-import { ZapperConfig, ZapperState } from "../config/schemas";
+import { ZapperConfig, ZapperState, Process } from "../config/schemas";
 import * as stateLoader from "../config/stateLoader";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
+import { mkdirSync, rmSync, existsSync } from "fs";
 import path from "path";
 import { tmpdir } from "os";
 
@@ -38,7 +38,9 @@ describe("createContext", () => {
         },
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -60,7 +62,9 @@ describe("createContext", () => {
         native: {},
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -72,7 +76,9 @@ describe("createContext", () => {
         project: "test-project",
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -90,7 +96,9 @@ describe("createContext", () => {
         ],
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -110,11 +118,13 @@ describe("createContext", () => {
       const config: ZapperConfig = {
         project: "test-project",
         processes: [
-          { cmd: "npm run dev" } as any, // Missing name field
+          { cmd: "npm run dev" } as Omit<Process, "name">, // Missing name field
         ],
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       expect(() => createContext(config, testDir)).toThrow(
         "Process in processes array missing name field",
@@ -127,12 +137,12 @@ describe("createContext", () => {
         native: {
           api: { cmd: "native api" },
         },
-        processes: [
-          { name: "legacy", cmd: "legacy process" },
-        ],
+        processes: [{ name: "legacy", cmd: "legacy process" }],
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -158,7 +168,9 @@ describe("createContext", () => {
         },
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -182,7 +194,9 @@ describe("createContext", () => {
         },
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -199,7 +213,9 @@ describe("createContext", () => {
         docker: {},
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -211,7 +227,9 @@ describe("createContext", () => {
         project: "test-project",
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -229,7 +247,9 @@ describe("createContext", () => {
         },
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -251,7 +271,9 @@ describe("createContext", () => {
         tasks: {},
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -263,7 +285,9 @@ describe("createContext", () => {
         project: "test-project",
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -279,7 +303,9 @@ describe("createContext", () => {
           env_files: [".env", "config/.env.local"],
         };
 
-        mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+        mockLoadState.mockReturnValue({
+          lastUpdated: "2024-01-01T00:00:00.000Z",
+        });
 
         const result = createContext(config, testDir);
 
@@ -297,7 +323,9 @@ describe("createContext", () => {
           env_files: [absolutePath, ".env.local"],
         };
 
-        mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+        mockLoadState.mockReturnValue({
+          lastUpdated: "2024-01-01T00:00:00.000Z",
+        });
 
         const result = createContext(config, testDir);
 
@@ -313,7 +341,9 @@ describe("createContext", () => {
           env_files: [],
         };
 
-        mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+        mockLoadState.mockReturnValue({
+          lastUpdated: "2024-01-01T00:00:00.000Z",
+        });
 
         const result = createContext(config, testDir);
 
@@ -348,7 +378,9 @@ describe("createContext", () => {
           },
         };
 
-        mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+        mockLoadState.mockReturnValue({
+          lastUpdated: "2024-01-01T00:00:00.000Z",
+        });
 
         const result = createContext(config, testDir);
 
@@ -406,7 +438,9 @@ describe("createContext", () => {
           },
         };
 
-        mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+        mockLoadState.mockReturnValue({
+          lastUpdated: "2024-01-01T00:00:00.000Z",
+        });
 
         const result = createContext(config, testDir);
 
@@ -422,7 +456,9 @@ describe("createContext", () => {
           },
         };
 
-        mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+        mockLoadState.mockReturnValue({
+          lastUpdated: "2024-01-01T00:00:00.000Z",
+        });
 
         const result = createContext(config, testDir);
 
@@ -448,11 +484,19 @@ describe("createContext", () => {
         },
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
-      expect(result.profiles).toEqual(["background", "cache", "db", "dev", "web"]);
+      expect(result.profiles).toEqual([
+        "background",
+        "cache",
+        "db",
+        "dev",
+        "web",
+      ]);
     });
 
     it("should handle processes and containers without profiles", () => {
@@ -466,7 +510,9 @@ describe("createContext", () => {
         },
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -481,7 +527,9 @@ describe("createContext", () => {
         },
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -497,7 +545,9 @@ describe("createContext", () => {
         },
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -540,7 +590,9 @@ describe("createContext", () => {
         links,
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -553,7 +605,9 @@ describe("createContext", () => {
         links: [],
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -565,7 +619,9 @@ describe("createContext", () => {
         project: "test-project",
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -581,7 +637,9 @@ describe("createContext", () => {
         task_delimiters: ["{{", "}}"],
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -596,7 +654,9 @@ describe("createContext", () => {
         project: "minimal-project",
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       const result = createContext(config, testDir);
 
@@ -621,18 +681,14 @@ describe("createContext", () => {
         native: {
           api: { cmd: "npm run dev", profiles: ["web"] },
         },
-        processes: [
-          { name: "legacy", cmd: "legacy command" },
-        ],
+        processes: [{ name: "legacy", cmd: "legacy command" }],
         docker: {
           postgres: { image: "postgres:13", profiles: ["db"] },
         },
         tasks: {
           build: { cmd: "npm run build" },
         },
-        links: [
-          { name: "docs", url: "https://docs.example.com" },
-        ],
+        links: [{ name: "docs", url: "https://docs.example.com" }],
       };
 
       mockLoadState.mockReturnValue({
@@ -666,18 +722,22 @@ describe("createContext", () => {
         throw new Error("State loading failed");
       });
 
-      expect(() => createContext(config, testDir)).toThrow("State loading failed");
+      expect(() => createContext(config, testDir)).toThrow(
+        "State loading failed",
+      );
     });
 
     it("should throw error for process without name in processes array", () => {
       const config: ZapperConfig = {
         project: "test-project",
         processes: [
-          { cmd: "some command" } as any, // Missing name
+          { cmd: "some command" } as Omit<Process, "name">, // Missing name
         ],
       };
 
-      mockLoadState.mockReturnValue({ lastUpdated: "2024-01-01T00:00:00.000Z" });
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
 
       expect(() => createContext(config, testDir)).toThrow(
         "Process in processes array missing name field",

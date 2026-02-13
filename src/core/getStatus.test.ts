@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getStatus, ServiceStatus, StatusResult } from "./getStatus";
+import { getStatus } from "./getStatus";
 import { Pm2Manager } from "./process";
 import { DockerManager } from "./docker";
 import { clearServiceState } from "../config/stateLoader";
@@ -25,7 +25,11 @@ const mockProcessKill = vi.fn();
 vi.spyOn(process, "kill").mockImplementation(mockProcessKill);
 
 // Helper functions for creating mock data
-function createMockProcessInfo(name: string, status: string, uptime: number = 1000): ProcessInfo {
+function createMockProcessInfo(
+  name: string,
+  status: string,
+  uptime: number = 1000,
+): ProcessInfo {
   return {
     name,
     status,
@@ -228,7 +232,7 @@ describe("getStatus", () => {
 
       expect(result.native).toHaveLength(3); // All processes from context
 
-      const apiService = result.native.find(s => s.service === "api");
+      const apiService = result.native.find((s) => s.service === "api");
       expect(apiService).toEqual({
         rawName: "zap.myproject.api",
         service: "api",
@@ -237,7 +241,7 @@ describe("getStatus", () => {
         enabled: false, // api has 'dev' profile but no activeProfile is set
       });
 
-      const workerService = result.native.find(s => s.service === "worker");
+      const workerService = result.native.find((s) => s.service === "worker");
       expect(workerService).toEqual({
         rawName: "zap.myproject.worker",
         service: "worker",
@@ -258,7 +262,7 @@ describe("getStatus", () => {
       ]);
 
       const result = await getStatus(context);
-      const apiService = result.native.find(s => s.service === "api");
+      const apiService = result.native.find((s) => s.service === "api");
 
       // healthcheck is 10 seconds, uptime is 8000ms, elapsed = (15000 - 7000) / 1000 = 8s
       // Since 8 < 10, should be "pending"
@@ -277,7 +281,7 @@ describe("getStatus", () => {
       ]);
 
       const result = await getStatus(context);
-      const apiService = result.native.find(s => s.service === "api");
+      const apiService = result.native.find((s) => s.service === "api");
 
       // elapsed = (20000 - 5000) / 1000 = 15s, healthcheck = 10s
       // Since 15 >= 10, should be "up"
@@ -296,7 +300,9 @@ describe("getStatus", () => {
       mockFetch.mockResolvedValueOnce({ ok: true });
 
       const result = await getStatus(context);
-      const frontendService = result.native.find(s => s.service === "frontend");
+      const frontendService = result.native.find(
+        (s) => s.service === "frontend",
+      );
 
       expect(frontendService?.status).toBe("up");
       expect(mockFetch).toHaveBeenCalledWith(
@@ -304,7 +310,7 @@ describe("getStatus", () => {
         expect.objectContaining({
           method: "GET",
           signal: expect.any(AbortSignal),
-        })
+        }),
       );
     });
 
@@ -318,7 +324,9 @@ describe("getStatus", () => {
       mockFetch.mockRejectedValueOnce(new Error("Connection failed"));
 
       const result = await getStatus(context);
-      const frontendService = result.native.find(s => s.service === "frontend");
+      const frontendService = result.native.find(
+        (s) => s.service === "frontend",
+      );
 
       expect(frontendService?.status).toBe("pending");
     });
@@ -333,8 +341,8 @@ describe("getStatus", () => {
 
       const result = await getStatus(context);
 
-      const apiService = result.native.find(s => s.service === "api");
-      const workerService = result.native.find(s => s.service === "worker");
+      const apiService = result.native.find((s) => s.service === "api");
+      const workerService = result.native.find((s) => s.service === "worker");
 
       expect(apiService?.enabled).toBe(true); // Has 'dev' profile
       expect(workerService?.enabled).toBe(true); // No profile specified
@@ -349,7 +357,7 @@ describe("getStatus", () => {
 
       const result = await getStatus(context);
 
-      const apiService = result.native.find(s => s.service === "api");
+      const apiService = result.native.find((s) => s.service === "api");
       expect(apiService?.enabled).toBe(false); // 'dev' profile doesn't match 'prod'
     });
 
@@ -362,7 +370,9 @@ describe("getStatus", () => {
 
       const result = await getStatus(context);
 
-      const frontendService = result.native.find(s => s.service === "frontend");
+      const frontendService = result.native.find(
+        (s) => s.service === "frontend",
+      );
       expect(frontendService?.enabled).toBe(true); // Has both 'dev' and 'staging' profiles
     });
 
@@ -386,15 +396,23 @@ describe("getStatus", () => {
       const context = createMockContext("myproject");
 
       mockDockerManager.getContainerInfo
-        .mockResolvedValueOnce(createMockDockerContainer("zap.myproject.database", "running", "2023-01-01T10:00:00Z"))
+        .mockResolvedValueOnce(
+          createMockDockerContainer(
+            "zap.myproject.database",
+            "running",
+            "2023-01-01T10:00:00Z",
+          ),
+        )
         .mockResolvedValueOnce(null) // cache not found
-        .mockResolvedValueOnce(createMockDockerContainer("zap.myproject.analytics", "exited"));
+        .mockResolvedValueOnce(
+          createMockDockerContainer("zap.myproject.analytics", "exited"),
+        );
 
       const result = await getStatus(context);
 
       expect(result.docker).toHaveLength(3); // All containers from context
 
-      const dbService = result.docker.find(s => s.service === "database");
+      const dbService = result.docker.find((s) => s.service === "database");
       expect(dbService).toEqual({
         rawName: "zap.myproject.database",
         service: "database",
@@ -403,7 +421,7 @@ describe("getStatus", () => {
         enabled: false, // database has 'dev' and 'prod' profiles but no activeProfile is set
       });
 
-      const cacheService = result.docker.find(s => s.service === "cache");
+      const cacheService = result.docker.find((s) => s.service === "cache");
       expect(cacheService).toEqual({
         rawName: "zap.myproject.cache",
         service: "cache",
@@ -416,7 +434,7 @@ describe("getStatus", () => {
     it("should handle pending Docker containers with startPid", async () => {
       const context = createMockContext("test", "dev"); // Set active profile so database is enabled
       context.state.services = {
-        "zap.test.database": { startPid: process.pid } // Use current process PID which is guaranteed to be alive
+        "zap.test.database": { startPid: process.pid }, // Use current process PID which is guaranteed to be alive
       };
 
       // Mock getContainerInfo for each container in order: database, cache, analytics
@@ -427,7 +445,7 @@ describe("getStatus", () => {
 
       const result = await getStatus(context);
 
-      const dbService = result.docker.find(s => s.service === "database");
+      const dbService = result.docker.find((s) => s.service === "database");
 
       expect(dbService?.status).toBe("pending");
       expect(dbService?.enabled).toBe(true);
@@ -439,20 +457,24 @@ describe("getStatus", () => {
       // Use a PID that's highly likely to be dead on most systems
       const deadPid = 999999; // Very high PID unlikely to exist
       context.state.services = {
-        "zap.test.database": { startPid: deadPid }
+        "zap.test.database": { startPid: deadPid },
       };
 
       // Mock getContainerInfo for each container in order: database, cache, analytics
       mockDockerManager.getContainerInfo
         .mockResolvedValueOnce(
-          createMockDockerContainer("zap.test.database", "running", "2023-01-01T10:00:00Z")
+          createMockDockerContainer(
+            "zap.test.database",
+            "running",
+            "2023-01-01T10:00:00Z",
+          ),
         )
         .mockResolvedValueOnce(null) // cache
         .mockResolvedValueOnce(null); // analytics
 
       const result = await getStatus(context);
 
-      const dbService = result.docker.find(s => s.service === "database");
+      const dbService = result.docker.find((s) => s.service === "database");
 
       // The key behavior is that if the PID is alive, status should be "pending"
       // If the PID is dead, status should be based on container info (in this case "up")
@@ -462,7 +484,10 @@ describe("getStatus", () => {
 
       // If status is "up", then the PID was considered dead and clearServiceState should have been called
       if (dbService?.status === "up") {
-        expect(mockClearServiceState).toHaveBeenCalledWith("/test/project", "zap.test.database");
+        expect(mockClearServiceState).toHaveBeenCalledWith(
+          "/test/project",
+          "zap.test.database",
+        );
       }
     });
 
@@ -473,11 +498,11 @@ describe("getStatus", () => {
       const startedAt = "2023-01-01T10:00:15.000Z"; // 5 seconds ago
 
       mockDockerManager.getContainerInfo.mockResolvedValueOnce(
-        createMockDockerContainer("zap.test.database", "running", startedAt)
+        createMockDockerContainer("zap.test.database", "running", startedAt),
       );
 
       const result = await getStatus(context);
-      const dbService = result.docker.find(s => s.service === "database");
+      const dbService = result.docker.find((s) => s.service === "database");
 
       // elapsed = 5s, healthcheck = 15s, so should be "pending"
       expect(dbService?.status).toBe("pending");
@@ -492,14 +517,21 @@ describe("getStatus", () => {
       mockDockerManager.getContainerInfo
         .mockResolvedValueOnce(null) // database
         .mockResolvedValueOnce(null) // cache
-        .mockResolvedValueOnce( // analytics
-          createMockDockerContainer("zap.test.analytics", "running", "2023-01-01T10:00:00Z")
+        .mockResolvedValueOnce(
+          // analytics
+          createMockDockerContainer(
+            "zap.test.analytics",
+            "running",
+            "2023-01-01T10:00:00Z",
+          ),
         );
 
       mockFetch.mockResolvedValueOnce({ ok: true });
 
       const result = await getStatus(context);
-      const analyticsService = result.docker.find(s => s.service === "analytics");
+      const analyticsService = result.docker.find(
+        (s) => s.service === "analytics",
+      );
 
       expect(analyticsService?.status).toBe("up");
       expect(mockFetch).toHaveBeenCalledWith(
@@ -507,7 +539,7 @@ describe("getStatus", () => {
         expect.objectContaining({
           method: "GET",
           signal: expect.any(AbortSignal),
-        })
+        }),
       );
     });
 
@@ -515,15 +547,21 @@ describe("getStatus", () => {
       const context = createMockContext("test", "prod");
 
       mockDockerManager.getContainerInfo
-        .mockResolvedValueOnce(createMockDockerContainer("zap.test.database", "running"))
+        .mockResolvedValueOnce(
+          createMockDockerContainer("zap.test.database", "running"),
+        )
         .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(createMockDockerContainer("zap.test.analytics", "running"));
+        .mockResolvedValueOnce(
+          createMockDockerContainer("zap.test.analytics", "running"),
+        );
 
       const result = await getStatus(context);
 
-      const dbService = result.docker.find(s => s.service === "database");
-      const cacheService = result.docker.find(s => s.service === "cache");
-      const analyticsService = result.docker.find(s => s.service === "analytics");
+      const dbService = result.docker.find((s) => s.service === "database");
+      const cacheService = result.docker.find((s) => s.service === "cache");
+      const analyticsService = result.docker.find(
+        (s) => s.service === "analytics",
+      );
 
       expect(dbService?.enabled).toBe(true); // Has 'prod' profile
       expect(cacheService?.enabled).toBe(true); // No profile specified
@@ -540,7 +578,7 @@ describe("getStatus", () => {
       const result = await getStatus(context);
 
       expect(result.docker).toHaveLength(3);
-      result.docker.forEach(service => {
+      result.docker.forEach((service) => {
         expect(service.status).toBe("down");
       });
     });
@@ -555,7 +593,9 @@ describe("getStatus", () => {
       mockFetch.mockRejectedValueOnce(new Error("Timeout"));
 
       const result = await getStatus(context);
-      const frontendService = result.native.find(s => s.service === "frontend");
+      const frontendService = result.native.find(
+        (s) => s.service === "frontend",
+      );
 
       expect(frontendService?.status).toBe("pending");
     });
@@ -564,11 +604,11 @@ describe("getStatus", () => {
       const context = createMockContext("test");
 
       mockDockerManager.getContainerInfo.mockResolvedValueOnce(
-        createMockDockerContainer("zap.test.database", "running") // No startedAt
+        createMockDockerContainer("zap.test.database", "running"), // No startedAt
       );
 
       const result = await getStatus(context);
-      const dbService = result.docker.find(s => s.service === "database");
+      const dbService = result.docker.find((s) => s.service === "database");
 
       expect(dbService?.status).toBe("up"); // Should default to "up" when no startedAt
     });
@@ -581,7 +621,7 @@ describe("getStatus", () => {
       ]);
 
       const result = await getStatus(context);
-      const apiService = result.native.find(s => s.service === "api");
+      const apiService = result.native.find((s) => s.service === "api");
 
       expect(apiService?.status).toBe("down");
     });
@@ -589,8 +629,8 @@ describe("getStatus", () => {
     it("should use default healthcheck value when not specified", async () => {
       const context = createMockContext("test");
       // Remove healthcheck from worker process
-      context.processes = context.processes.map(p =>
-        p.name === "worker" ? { ...p, healthcheck: undefined } : p
+      context.processes = context.processes.map((p) =>
+        p.name === "worker" ? { ...p, healthcheck: undefined } : p,
       );
 
       const mockNow = vi.spyOn(Date, "now").mockReturnValue(10000);
@@ -600,7 +640,7 @@ describe("getStatus", () => {
       ]);
 
       const result = await getStatus(context);
-      const workerService = result.native.find(s => s.service === "worker");
+      const workerService = result.native.find((s) => s.service === "worker");
 
       // elapsed = (10000 - 7000) / 1000 = 3s, default healthcheck = 5s
       // Since 3 < 5, should be "pending"
@@ -618,7 +658,7 @@ describe("getStatus", () => {
       const result = await getStatus(context);
 
       expect(result.docker).toHaveLength(3);
-      result.docker.forEach(service => {
+      result.docker.forEach((service) => {
         expect(service.status).toBe("down");
       });
     });

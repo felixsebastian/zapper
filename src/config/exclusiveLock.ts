@@ -1,6 +1,12 @@
 import path from "path";
 import os from "os";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  unlinkSync,
+} from "fs";
 import { ExclusiveLockError } from "../errors";
 
 export interface LockInfo {
@@ -111,7 +117,6 @@ export function releaseExclusiveLock(projectName: string): void {
 
     // Only release if we own the lock
     if (lockInfo.pid === process.pid) {
-      const { unlinkSync } = require("fs");
       unlinkSync(lockPath);
     }
   } catch (error) {

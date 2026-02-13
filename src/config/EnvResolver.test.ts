@@ -3,7 +3,6 @@ import { writeFileSync, unlinkSync } from "fs";
 import { EnvResolver } from "./EnvResolver";
 import { ZapperConfig } from "../config/schemas";
 import { Context } from "../types/Context";
-import { logger } from "../utils/logger";
 import path from "path";
 
 describe("EnvResolver", () => {
@@ -622,8 +621,10 @@ TEST_VALUE=alternate_value
 NODE_ENV=staging
       `;
 
-      const defaultEnvFile = createTempFile(defaultEnvContent, ".env.default");
-      const alternateEnvFile = createTempFile(alternateEnvContent, ".env.alternate");
+      const alternateEnvFile = createTempFile(
+        alternateEnvContent,
+        ".env.alternate",
+      );
 
       const context: Context = {
         projectName: "test",
@@ -668,7 +669,10 @@ DATABASE_URL=postgresql://localhost:5433/myapp_staging
       `;
 
       const baseEnvFile = createTempFile(baseEnvContent, ".env.base");
-      const alternateEnvFile = createTempFile(alternateEnvContent, ".env.alternate");
+      const alternateEnvFile = createTempFile(
+        alternateEnvContent,
+        ".env.alternate",
+      );
 
       const context: Context = {
         projectName: "test",
