@@ -612,10 +612,6 @@ NODE_ENV=development`;
     });
 
     it("should load alternate environment when activeEnvironment is set", () => {
-      const defaultEnvContent = `
-TEST_VALUE=default_value
-NODE_ENV=development
-      `;
       const alternateEnvContent = `
 TEST_VALUE=alternate_value
 NODE_ENV=staging
