@@ -62,7 +62,7 @@ describe("E2E: Service Aliases", () => {
     // Ensure CLI is built
     if (!fs.existsSync(CLI_PATH)) {
       throw new Error(
-        `CLI not found at ${CLI_PATH}. Run 'pnpm run build' first.`,
+        `CLI not found at ${CLI_PATH}. Run 'npm run build' first.`,
       );
     }
   });
