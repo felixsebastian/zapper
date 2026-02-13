@@ -296,7 +296,10 @@ NODE_ENV=development
       const result = EnvResolver.resolve(config);
 
       expect(result.native!.test.env).toEqual([]);
-      expect(result.native!.test.resolvedEnv).toEqual({});
+      expect(result.native!.test.resolvedEnv).toEqual({
+        APP_ENV: "development",
+        NODE_ENV: "development",
+      });
     });
 
     it("should handle processes with empty envs array", () => {
@@ -321,7 +324,10 @@ NODE_ENV=development
       const result = EnvResolver.resolve(config);
 
       expect(result.native!.test.env).toEqual([]);
-      expect(result.native!.test.resolvedEnv).toEqual({});
+      expect(result.native!.test.resolvedEnv).toEqual({
+        APP_ENV: "development",
+        NODE_ENV: "development",
+      });
     });
 
     it("should handle processes with existing env whitelist", () => {
@@ -370,7 +376,7 @@ LEGACY_VAR=legacy_value
 
       const result = EnvResolver.resolve(config);
 
-      expect(result.native!.test.env).toEqual(["LEGACY_VAR"]);
+      expect(result.native!.test.env).toEqual([]);
       expect(result.native!.test.resolvedEnv).toEqual({
         LEGACY_VAR: "legacy_value",
       });
