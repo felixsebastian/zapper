@@ -5,7 +5,9 @@ export class UpCommand extends CommandHandler {
     const { zapper, service } = context;
 
     if (service) {
-      await zapper.startProcesses([service]);
+      // Handle both single service (string) and multiple services (array)
+      const services = Array.isArray(service) ? service : [service];
+      await zapper.startProcesses(services);
     } else {
       await zapper.startProcesses();
     }
