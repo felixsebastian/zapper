@@ -219,8 +219,19 @@ export class Zapper {
     );
 
     const hasActions = plan.waves.some((w) => w.actions.length > 0);
-    if (canonical && !hasActions) {
-      throw new ServiceNotFoundError(processNames?.join(", ") || "unknown");
+    if (canonical && canonical.length > 0 && !hasActions) {
+      // Only throw error if no services were found at all, not if they're already running
+      const allProcesses = this.getProcesses();
+      const allContainers = this.getContainers();
+      const existingServices = new Set([
+        ...allProcesses.map(p => p.name),
+        ...allContainers.map(([name]) => name)
+      ]);
+
+      const nonExistentServices = canonical.filter(name => !existingServices.has(name));
+      if (nonExistentServices.length > 0) {
+        throw new ServiceNotFoundError(nonExistentServices.join(", "));
+      }
     }
 
     await executeActions(
@@ -246,8 +257,19 @@ export class Zapper {
     );
 
     const hasActions = plan.waves.some((w) => w.actions.length > 0);
-    if (canonical && !hasActions) {
-      throw new ServiceNotFoundError(processNames?.join(", ") || "unknown");
+    if (canonical && canonical.length > 0 && !hasActions) {
+      // Only throw error if no services were found at all, not if they're already stopped
+      const allProcesses = this.getProcesses();
+      const allContainers = this.getContainers();
+      const existingServices = new Set([
+        ...allProcesses.map(p => p.name),
+        ...allContainers.map(([name]) => name)
+      ]);
+
+      const nonExistentServices = canonical.filter(name => !existingServices.has(name));
+      if (nonExistentServices.length > 0) {
+        throw new ServiceNotFoundError(nonExistentServices.join(", "));
+      }
     }
 
     await executeActions(

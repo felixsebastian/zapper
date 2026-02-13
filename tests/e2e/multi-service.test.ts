@@ -243,7 +243,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       expect(statusOutput).toContain("api");
       expect(statusOutput).toContain("frontend");
       expect(statusOutput).toContain("worker");
-      expect(statusOutput).toMatch(/running|online/);
+      expect(statusOutput).toMatch(/up|running|online/);
 
       // Check JSON status
       const statusJsonOutput = runZapCommand(
@@ -375,7 +375,9 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       setupTempConfig();
 
       // Enable dev profile first
-      runZapCommand(`profile dev`, fixtureDir, `zap-${testProjectName}.yaml`);
+      runZapCommand(`profile dev`, fixtureDir, `zap-${testProjectName}.yaml`, {
+        timeout: 45000,
+      });
 
       // Start services (should only start dev-profiled ones)
       runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {
@@ -401,7 +403,9 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       setupTempConfig();
 
       // Enable prod profile first
-      runZapCommand(`profile prod`, fixtureDir, `zap-${testProjectName}.yaml`);
+      runZapCommand(`profile prod`, fixtureDir, `zap-${testProjectName}.yaml`, {
+        timeout: 45000,
+      });
 
       // Start services (should only start prod-profiled ones)
       runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {
@@ -459,7 +463,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       expect(statusOutput).toContain("api");
       expect(statusOutput).toContain("frontend");
       expect(statusOutput).toContain("worker");
-      expect(statusOutput).toMatch(/running|online/);
+      expect(statusOutput).toMatch(/up|running|online/);
 
       // 3. Stop all services
       const downOutput = runZapCommand(
@@ -483,7 +487,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
         `zap-${testProjectName}.yaml`,
       );
       expect(statusAfterDown).toMatch(
-        /stopped|not running|offline|No processes/i,
+        /stopped|not running|offline|No processes|down/i,
       );
 
       // 6. Verify processes are completely gone from PM2

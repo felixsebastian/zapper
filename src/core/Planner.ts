@@ -38,6 +38,45 @@ export class Planner {
     return graph;
   }
 
+  private resolveDependencies(
+    targets: string[],
+    allProcesses: Process[],
+    allContainers: Array<[string, Container]>,
+  ): { processes: Process[]; containers: Array<[string, Container]> } {
+    const resolved = new Set<string>();
+    const toResolve = [...targets];
+
+    // Create a map for quick dependency lookup
+    const dependencyMap = new Map<string, string[]>();
+    for (const process of allProcesses) {
+      dependencyMap.set(process.name as string, process.depends_on ?? []);
+    }
+    for (const [name, container] of allContainers) {
+      dependencyMap.set(name, container.depends_on ?? []);
+    }
+
+    // Recursively resolve dependencies
+    while (toResolve.length > 0) {
+      const current = toResolve.pop()!;
+      if (resolved.has(current)) continue;
+
+      resolved.add(current);
+
+      // Add dependencies to resolve list
+      const deps = dependencyMap.get(current) ?? [];
+      for (const dep of deps) {
+        if (!resolved.has(dep)) {
+          toResolve.push(dep);
+        }
+      }
+    }
+
+    return {
+      processes: allProcesses.filter((p) => resolved.has(p.name as string)),
+      containers: allContainers.filter(([name]) => resolved.has(name)),
+    };
+  }
+
   private filterByProfile(
     processes: Process[],
     containers: Array<[string, Container]>,
@@ -46,11 +85,13 @@ export class Planner {
     return {
       processes: processes.filter((p) => {
         if (!Array.isArray(p.profiles) || p.profiles.length === 0) return true;
-        return activeProfile && p.profiles.includes(activeProfile);
+        if (!activeProfile) return true; // Include all services when no profile is active
+        return p.profiles.includes(activeProfile);
       }),
       containers: containers.filter(([, c]) => {
         if (!Array.isArray(c.profiles) || c.profiles.length === 0) return true;
-        return activeProfile && c.profiles.includes(activeProfile);
+        if (!activeProfile) return true; // Include all services when no profile is active
+        return c.profiles.includes(activeProfile);
       }),
     };
   }
@@ -111,12 +152,13 @@ export class Planner {
       let selectedContainers: Array<[string, Container]>;
 
       if (targets && targets.length > 0) {
-        selectedProcesses = allProcesses.filter((p) =>
-          targets.includes(p.name as string),
+        const resolved = this.resolveDependencies(
+          targets,
+          allProcesses,
+          allContainers,
         );
-        selectedContainers = allContainers.filter(([name]) =>
-          targets.includes(name),
-        );
+        selectedProcesses = resolved.processes;
+        selectedContainers = resolved.containers;
       } else {
         const filtered = this.filterByProfile(
           allProcesses,
