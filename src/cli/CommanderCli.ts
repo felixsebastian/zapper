@@ -114,21 +114,21 @@ export class CommanderCli {
       .alias("start")
       .alias("s")
       .alias("u")
-      .description("Start all processes or a specific process")
-      .argument("[service]", "Service to start")
-      .action(async (service, options, command) => {
-        await this.executeCommand("up", service, command);
+      .description("Start all processes or specific processes")
+      .argument("[services...]", "Services to start (space-separated)")
+      .action(async (services, options, command) => {
+        await this.executeCommand("up", services, command);
       });
 
     this.program
       .command("down")
       .alias("stop")
       .alias("delete")
-      .description("Stop all processes or a specific process")
-      .argument("[service]", "Service to stop")
+      .description("Stop all processes or specific processes")
+      .argument("[services...]", "Services to stop (space-separated)")
       .option("-y, --force", "Force the operation")
-      .action(async (service, options, command) => {
-        await this.executeCommand("down", service, command);
+      .action(async (services, options, command) => {
+        await this.executeCommand("down", services, command);
       });
 
     this.program

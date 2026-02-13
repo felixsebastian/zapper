@@ -5,7 +5,9 @@ export class DownCommand extends CommandHandler {
     const { zapper, service } = context;
 
     if (service) {
-      await zapper.stopProcesses([service]);
+      // Handle both single service (string) and multiple services (array)
+      const services = Array.isArray(service) ? service : [service];
+      await zapper.stopProcesses(services);
     } else {
       await zapper.stopProcesses();
     }
