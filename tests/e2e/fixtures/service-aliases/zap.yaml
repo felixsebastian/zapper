@@ -1,0 +1,49 @@
+project: alias-test
+
+native:
+  # Service with multiple short aliases
+  api-server:
+    aliases: [api, a, backend]
+    cmd: node -e "console.log('API Server running on port 3000'); setInterval(() => {}, 1000)"
+
+  # Service with semantic aliases
+  user-service:
+    aliases: [users, user-svc, ums]
+    cmd: node -e "console.log('User service started'); setInterval(() => {}, 1000)"
+
+  # Service with dependencies on aliased services
+  frontend:
+    aliases: [fe, f, ui]
+    cmd: node -e "console.log('Frontend app started'); setInterval(() => {}, 1000)"
+    depends_on:
+      - api-server
+      - user-service
+
+  # Service with single alias for testing
+  notification-worker:
+    aliases: [notifications]
+    cmd: node -e "console.log('Notification worker started'); setInterval(() => {}, 1000)"
+
+docker:
+  # Container with database aliases
+  postgres-db:
+    aliases: [db, postgres, database]
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: test123
+      POSTGRES_DB: testdb
+
+tasks:
+  # Task with multiple aliases
+  build-all:
+    aliases: [build, b, compile]
+    cmds:
+      - echo "Building frontend..."
+      - echo "Building API..."
+
+  # Task with single alias
+  run-tests:
+    aliases: [test]
+    cmds:
+      - echo "Running unit tests..."
+      - echo "Running integration tests..."
