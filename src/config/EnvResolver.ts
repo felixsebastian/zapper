@@ -26,7 +26,6 @@ export class EnvResolver {
       this.pickDefaultEnvFiles(resolvedConfig.env_files),
     );
 
-
     if (resolvedConfig.native) {
       for (const [name, proc] of Object.entries(resolvedConfig.native)) {
         if (!proc.name) proc.name = name;
@@ -131,7 +130,6 @@ export class EnvResolver {
       const inline = this.splitInlineEnv(proc.env);
       proc.resolvedEnv = { ...local, ...inline.pairs };
 
-
       return;
     }
 
@@ -159,7 +157,6 @@ export class EnvResolver {
 
     proc.resolvedEnv = { ...envSubset, ...inline.pairs };
     if (!Array.isArray(proc.env)) proc.env = whitelist;
-
   }
 
   private static resolveConfigContainerEnv(
@@ -208,7 +205,6 @@ export class EnvResolver {
     mergedEnvFromFiles: Record<string, string>,
     projectRoot: string,
   ): void {
-
     let processEnvFiles: string[] | undefined;
     if (proc.env_files && proc.env_files.length > 0) {
       processEnvFiles = proc.env_files.map((p) =>
@@ -222,7 +218,6 @@ export class EnvResolver {
     if (useLocalOnly) {
       const inline = this.splitInlineEnv(proc.env);
       proc.resolvedEnv = { ...local, ...inline.pairs };
-
 
       return;
     }
@@ -251,7 +246,6 @@ export class EnvResolver {
 
     proc.resolvedEnv = { ...envSubset, ...inline.pairs };
     if (!Array.isArray(proc.env)) proc.env = whitelist;
-
   }
 
   private static resolveContainerEnv(
@@ -338,7 +332,6 @@ export class EnvResolver {
         continue;
       }
       const ext = path.extname(file).toLowerCase();
-      const base = path.basename(file);
 
       try {
         const content = readFileSync(file, "utf8");
