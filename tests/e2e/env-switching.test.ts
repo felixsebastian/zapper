@@ -135,7 +135,7 @@ describe("E2E: Environment Sets and State Persistence", () => {
 
       // Wait for process to start and capture logs to verify default environment
       const logsWithDefault = waitAndCaptureLogs(
-        `logs --config zap-${testProjectName}.yaml echo-service`,
+        `logs --no-follow --config zap-${testProjectName}.yaml echo-service`,
         fixtureDir,
         ["TEST_VALUE=default_value", "NODE_ENV=development"]
       );
@@ -156,7 +156,7 @@ describe("E2E: Environment Sets and State Persistence", () => {
       // Test 4: Verify state file was created and contains correct environment
       const stateAfterSwitch = readStateFile(fixtureDir);
       expect(stateAfterSwitch).not.toBeNull();
-      expect(stateAfterSwitch.environment).toBe("alternate");
+      expect(stateAfterSwitch.activeEnvironment).toBe("alternate");
 
       // Test 5: Start with alternate environment
       const upAlternateOutput = runZapCommand(`up --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
@@ -164,7 +164,7 @@ describe("E2E: Environment Sets and State Persistence", () => {
 
       // Wait for process to start and capture logs to verify alternate environment
       const logsWithAlternate = waitAndCaptureLogs(
-        `logs --config zap-${testProjectName}.yaml echo-service`,
+        `logs --no-follow --config zap-${testProjectName}.yaml echo-service`,
         fixtureDir,
         ["TEST_VALUE=alternate_value", "NODE_ENV=staging"]
       );
@@ -182,13 +182,13 @@ describe("E2E: Environment Sets and State Persistence", () => {
       // Test 8: Verify state file reflects the change
       const stateAfterDisable = readStateFile(fixtureDir);
       expect(stateAfterDisable).toBeDefined();
-      expect(stateAfterDisable.environment).toBeNull() || expect(stateAfterDisable.environment).toBe("default");
+      expect([null, undefined, "default"]).toContain(stateAfterDisable.activeEnvironment);
 
       // Test 9: Start again and verify we're back to default
       runZapCommand(`up --config zap-${testProjectName}.yaml`, fixtureDir, { timeout: 15000 });
 
       const logsBackToDefault = waitAndCaptureLogs(
-        `logs --config zap-${testProjectName}.yaml echo-service`,
+        `logs --no-follow --config zap-${testProjectName}.yaml echo-service`,
         fixtureDir,
         ["TEST_VALUE=default_value", "NODE_ENV=development"]
       );
@@ -205,11 +205,11 @@ describe("E2E: Environment Sets and State Persistence", () => {
       expect(() => {
         const parsedState = JSON.parse(stateOutput);
         expect(typeof parsedState).toBe("object");
-        expect(parsedState).toHaveProperty("environment");
+        expect(parsedState).toHaveProperty("activeEnvironment");
       }).not.toThrow();
 
       const finalState = JSON.parse(stateOutput);
-      expect(finalState.environment).toBeNull() || expect(finalState.environment).toBe("default");
+      expect([null, undefined, "default"]).toContain(finalState.activeEnvironment);
 
     } finally {
       // Ensure cleanup happens
@@ -258,7 +258,7 @@ describe("E2E: Environment Sets and State Persistence", () => {
 
         // Quick log check
         const logs = waitAndCaptureLogs(
-          `logs --config zap-${testProjectName}.yaml echo-service`,
+          `logs --no-follow --config zap-${testProjectName}.yaml echo-service`,
           fixtureDir,
           ["TEST_VALUE=alternate_value"],
           3000
@@ -271,7 +271,7 @@ describe("E2E: Environment Sets and State Persistence", () => {
 
         // Verify state persists
         const state = readStateFile(fixtureDir);
-        expect(state.environment).toBe("alternate");
+        expect(state.activeEnvironment).toBe("alternate");
       }
 
     } finally {

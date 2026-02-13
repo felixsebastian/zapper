@@ -140,15 +140,21 @@ export class EnvResolver {
     const whitelist =
       inline.keys.length > 0
         ? inline.keys
-        : Array.isArray(proc.envs)
-          ? proc.envs
+        : Array.isArray(proc.env)
+          ? proc.env
           : [];
 
     const envSubset: Record<string, string> = {};
 
-    for (const key of whitelist) {
-      const value = mergedEnvFromFiles[key];
-      if (value !== undefined) envSubset[key] = value;
+    // If no whitelist is specified (no env array), inherit all environment variables
+    if (whitelist.length === 0) {
+      Object.assign(envSubset, mergedEnvFromFiles);
+    } else {
+      // Only include whitelisted environment variables
+      for (const key of whitelist) {
+        const value = mergedEnvFromFiles[key];
+        if (value !== undefined) envSubset[key] = value;
+      }
     }
 
     proc.resolvedEnv = { ...envSubset, ...inline.pairs };
@@ -226,15 +232,21 @@ export class EnvResolver {
     const whitelist =
       inline.keys.length > 0
         ? inline.keys
-        : Array.isArray(proc.envs)
-          ? proc.envs
+        : Array.isArray(proc.env)
+          ? proc.env
           : [];
 
     const envSubset: Record<string, string> = {};
 
-    for (const key of whitelist) {
-      const value = mergedEnvFromFiles[key];
-      if (value !== undefined) envSubset[key] = value;
+    // If no whitelist is specified (no env array), inherit all environment variables
+    if (whitelist.length === 0) {
+      Object.assign(envSubset, mergedEnvFromFiles);
+    } else {
+      // Only include whitelisted environment variables
+      for (const key of whitelist) {
+        const value = mergedEnvFromFiles[key];
+        if (value !== undefined) envSubset[key] = value;
+      }
     }
 
     proc.resolvedEnv = { ...envSubset, ...inline.pairs };
@@ -313,11 +325,11 @@ export class EnvResolver {
     files?: string[],
   ): Record<string, string> {
     if (!Array.isArray(files) || files.length === 0) {
-      logger.debug("No env files to load:", { files });
+      logger.debug("No env files to load:", { data: files });
       return {};
     }
 
-    logger.debug("Loading env files:", { files });
+    logger.debug("Loading env files:", { data: files });
     const merged: Record<string, string> = {};
 
     for (const file of files) {
