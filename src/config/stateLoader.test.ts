@@ -211,7 +211,7 @@ describe("stateLoader", () => {
         saveState(testDir, {
           services: {
             test: {
-              startPid: "not a number" as unknown as number, // Invalid type
+              startPid: "not a number" as unknown as number, // Invalid type for testing
             },
           },
         });

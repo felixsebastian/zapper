@@ -103,7 +103,7 @@ export class EnvCommand extends CommandHandler {
   private async showServiceEnv(
     zapperContext: Context,
     serviceName: string,
-    options: Record<string, unknown>,
+    options: { json?: boolean },
   ): Promise<void> {
     const process = zapperContext.processes.find((p) => p.name === serviceName);
     const container = zapperContext.containers.find(
