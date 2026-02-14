@@ -5,6 +5,7 @@ dist/
 .env
 .env.local
 .env.*.local
+!tests/e2e/fixtures/env-precedence/.env.local
 coverage/
 .vitest/
 .eslintcache 
