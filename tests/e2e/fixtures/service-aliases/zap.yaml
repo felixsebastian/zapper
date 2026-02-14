@@ -29,9 +29,7 @@ docker:
   postgres-db:
     aliases: [db, postgres, database]
     image: postgres:15
-    environment:
-      POSTGRES_PASSWORD: test123
-      POSTGRES_DB: testdb
+    env: [POSTGRES_PASSWORD=test123, POSTGRES_DB=testdb]
 
 tasks:
   # Task with multiple aliases

@@ -23,6 +23,12 @@ git checkout -b release/$(date +%Y-%m-%d)
 
 ## 2. Fix any issues
 
+If this machine has not run VM E2E before, set it up first:
+
+```bash
+bash ./etc/e2e_setup.sh
+```
+
 Run verification tasks in this specific order:
 
 ```bash

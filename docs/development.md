@@ -38,7 +38,7 @@ npm install --global @maplab/zapper  # Reinstall from npm
 pnpm test                        # Run all tests
 pnpm test --watch                # Watch mode
 pnpm test yaml-parser.test.ts    # Specific file
-pnpm test:e2e                    # E2E (uses Linux VM on macOS when set up)
+pnpm test:e2e                    # E2E in isolated Linux VM (macOS + Lima)
 ```
 
 For manual testing, use the example projects in `examples/`. After building, cd into one and run `zap up`.
@@ -46,11 +46,16 @@ For manual testing, use the example projects in `examples/`. After building, cd 
 ### E2E in Linux VM (macOS)
 
 ```bash
-bash ./etc/e2e_setup.sh          # One-time Lima VM setup
-pnpm test:e2e                    # Runs inside VM
+bash ./etc/e2e_setup.sh          # One-time: install Lima + provision base VM
+pnpm test:e2e                    # Each run clones an isolated throwaway VM
 ```
 
-If VM setup is missing, `pnpm test:e2e` prints a warning and falls back to local execution.
+Notes:
+
+- `pnpm test:e2e` runs in an ephemeral cloned VM and auto-deletes it on exit.
+- Base VM name defaults to `zapper-e2e-base` (override with `ZAP_E2E_BASE_VM_NAME`).
+- Keep a failed run VM for debugging: `ZAP_E2E_KEEP_VM=1 pnpm test:e2e`.
+- By default, `pnpm test:e2e` is strict and fails if VM setup is missing.
 
 ## Releases
 

@@ -28,3 +28,12 @@ Remember to `pnpm build` and link (usually already linked). Then cd into the exa
 - `pnpm test` — run tests
 - `pnpm build` — build the project
 - `pnpm lint:fix` — fix linting issues
+
+## Verification
+
+Use this verification flow while developing:
+
+- Lint after every small change: `pnpm lint` (or `pnpm lint:fix` to auto-fix).
+- Run focused/unit tests as you go: `pnpm test <path-to-test-file>`.
+- Run the normal test suite before wrapping up: `pnpm test`.
+- Run end-to-end tests once near the end of a big change, when you think the work is done: one-time setup `bash ./etc/e2e_setup.sh`, then `pnpm test:e2e`.
