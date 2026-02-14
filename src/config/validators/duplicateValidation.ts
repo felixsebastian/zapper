@@ -2,53 +2,46 @@
 import { z } from "zod";
 
 export const duplicateValidation = <T extends z.ZodTypeAny>(schema: T) =>
-  schema.refine(
-    (config: any) => {
-      const seen = new Map<string, string>();
+  schema.superRefine((config: any, ctx) => {
+    const seen = new Map<string, string>();
+    const duplicates = new Set<string>();
 
-      const add = (id: string, where: string) => {
-        if (seen.has(id)) {
-          return false;
-        }
-        seen.set(id, where);
-        return true;
-      };
+    const add = (id: string, where: string) => {
+      if (seen.has(id)) {
+        duplicates.add(id);
+        return;
+      }
+      seen.set(id, where);
+    };
 
-      if (config.native) {
-        for (const [name, proc] of Object.entries(config.native)) {
-          if (!add(name, `native['${name}']`)) {
-            return false;
-          }
-          if ((proc as any).aliases) {
-            for (const alias of (proc as any).aliases) {
-              if (!add(alias, `native['${name}'].aliases`)) {
-                return false;
-              }
-            }
+    if (config.native) {
+      for (const [name, proc] of Object.entries(config.native)) {
+        add(name, `native['${name}']`);
+        if ((proc as any).aliases) {
+          for (const alias of (proc as any).aliases) {
+            add(alias, `native['${name}'].aliases`);
           }
         }
       }
+    }
 
-      const containers = config.docker || config.containers;
-      if (containers) {
-        for (const [name, container] of Object.entries(containers)) {
-          if (!add(name, `docker['${name}']`)) {
-            return false;
-          }
-          if ((container as any).aliases) {
-            for (const alias of (container as any).aliases) {
-              if (!add(alias, `docker['${name}'].aliases`)) {
-                return false;
-              }
-            }
+    const containers = config.docker || config.containers;
+    if (containers) {
+      for (const [name, container] of Object.entries(containers)) {
+        add(name, `docker['${name}']`);
+        if ((container as any).aliases) {
+          for (const alias of (container as any).aliases) {
+            add(alias, `docker['${name}'].aliases`);
           }
         }
       }
+    }
 
-      return true;
-    },
-    {
-      message:
-        "Duplicate service identifier. Names and aliases must be globally unique across native and docker",
-    },
-  );
+    if (duplicates.size > 0) {
+      const duplicateList = [...duplicates].sort().join(", ");
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Duplicate service identifier(s): ${duplicateList}. Names and aliases must be globally unique across native and docker`,
+      });
+    }
+  });

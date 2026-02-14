@@ -158,7 +158,31 @@ describe("ZodConfigValidator", () => {
     expect(() => {
       ZodConfigValidator.validate(config);
     }).toThrow(
-      "Configuration validation failed: Duplicate service identifier. Names and aliases must be globally unique across native and docker",
+      "Configuration validation failed: Duplicate service identifier(s): test. Names and aliases must be globally unique across native and docker",
+    );
+  });
+
+  it("should list all duplicated service identifiers", () => {
+    const config = {
+      project: "myproj",
+      native: {
+        app: {
+          cmd: "npm run dev",
+          aliases: ["api", "shared"],
+        },
+      },
+      docker: {
+        app: {
+          image: "nginx",
+          aliases: ["shared", "api"],
+        },
+      },
+    };
+
+    expect(() => {
+      ZodConfigValidator.validate(config);
+    }).toThrow(
+      "Configuration validation failed: Duplicate service identifier(s): api, app, shared. Names and aliases must be globally unique across native and docker",
     );
   });
 
