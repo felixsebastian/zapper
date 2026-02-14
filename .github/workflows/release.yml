@@ -31,6 +31,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install PM2
+        run: npm install -g pm2
+
       - name: Build
         run: pnpm build
 
