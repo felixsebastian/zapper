@@ -61,6 +61,8 @@ docker:
 tasks:
   # ... task definitions
 
+homepage: http://localhost:3000   # Optional default URL for `zap launch`
+
 links:
   # ... quick reference links
 ```
@@ -125,7 +127,10 @@ zap task build --list-params       # Show task parameters as JSON
 zap reset                   # Stop all services and delete .zap folder
 zap clone                   # Clone all repos defined in config
 zap clone --service api     # Clone specific repo
-zap launch <service>        # Open the service's configured link in browser
+zap launch                  # Open homepage (if configured)
+zap launch "API Docs"       # Open a configured link by name
+zap open                    # Alias for: zap launch
+zap o "API Docs"            # Short alias for: zap launch "API Docs"
 ```
 
 ### Profiles
@@ -181,7 +186,6 @@ native:
     healthcheck: 10            # Seconds to wait before considering "up"
     # OR
     healthcheck: http://localhost:3000/health  # URL to poll for readiness
-    link: http://localhost:${PORT}  # URL to open with `zap launch` (supports ${VAR})
 ```
 
 ### Working directory
@@ -245,7 +249,6 @@ docker:
     healthcheck: 10            # Seconds to wait before considering "up"
     # OR
     healthcheck: http://localhost:5432  # URL to poll for readiness
-    link: http://localhost:${PG_PORT}  # URL to open with `zap launch` (supports ${VAR})
 ```
 
 ### Common database setups
@@ -711,6 +714,14 @@ Services with a `profiles` field run only when an active profile matches.
 
 Quick reference links for your project. These are for your own reference and can be displayed by tooling.
 
+You can also set a top-level `homepage` URL as the default target for `zap launch` with no arguments.
+
+### Homepage
+
+```yaml
+homepage: http://localhost:3000
+```
+
 ### Basic usage
 
 ```yaml
@@ -737,20 +748,13 @@ links:
     url: http://localhost:${FRONTEND_PORT}
 ```
 
-This also works for service-level `link` fields:
-
-```yaml
-native:
-  api:
-    cmd: pnpm dev
-    link: http://localhost:${PORT}/docs
-```
-
 ### Opening links
 
 ```bash
+zap launch                     # Open homepage
 zap launch "API Docs"          # Open by link name (quote if spaces)
-zap launch api                 # Open service link by service name
+zap open                       # Alias for: zap launch
+zap o "API Docs"               # Short alias for: zap launch "API Docs"
 ```
 
 ### Properties
@@ -892,6 +896,8 @@ tasks:
     cmds:
       - pnpm eslint . --fix
       - pnpm tsc --noEmit
+
+homepage: http://localhost:5173
 
 links:
   - name: API Docs

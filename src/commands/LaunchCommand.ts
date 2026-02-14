@@ -4,26 +4,21 @@ import { exec } from "child_process";
 
 export class LaunchCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<void> {
-    const { zapper, service } = context;
-
-    if (!service) {
-      throw new Error("Name is required. Usage: zap launch <name>");
-    }
+    const { zapper, service: name } = context;
 
     const zapperContext = zapper.getContext();
     if (!zapperContext) throw new Error("Context not loaded");
 
-    const nativeService = zapperContext.processes.find(
-      (p) => p.name === service,
-    );
-    const dockerService = zapperContext.containers.find(
-      (c) => c.name === service,
-    );
-    const projectLink = zapperContext.links.find((l) => l.name === service);
+    const link = name
+      ? zapperContext.links.find((l) => l.name === name)?.url
+      : zapperContext.homepage;
 
-    const link = nativeService?.link ?? dockerService?.link ?? projectLink?.url;
-
-    if (!link) throw new Error(`No link found for: ${service}`);
+    if (!link) {
+      if (name) throw new Error(`No link found for: ${name}`);
+      throw new Error(
+        "No homepage configured. Set `homepage` in zap.yaml or provide a link name: zap launch <name>",
+      );
+    }
 
     renderer.log.info(`Opening ${link}`);
     const openCmd =

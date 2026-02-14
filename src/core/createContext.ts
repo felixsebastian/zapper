@@ -139,6 +139,7 @@ export function createContext(
     processes,
     containers,
     tasks,
+    homepage: config.homepage,
     links,
     profiles,
     state,

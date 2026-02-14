@@ -467,10 +467,9 @@ TEST_VAR=test_value
   });
 
   describe("link URL interpolation", () => {
-    it("should interpolate ${VAR} in process link URLs", () => {
+    it("should interpolate ${VAR} in homepage URL", () => {
       const envContent = `
 API_PORT=3000
-FRONTEND_PORT=4000
       `;
       const envFile = createTempFile(envContent, ".env");
 
@@ -478,16 +477,10 @@ FRONTEND_PORT=4000
         projectName: "test",
         projectRoot: process.cwd(),
         envFiles: [envFile],
-        processes: [
-          { name: "api", cmd: "echo", link: "http://localhost:${API_PORT}" },
-          {
-            name: "frontend",
-            cmd: "echo",
-            link: "http://localhost:${FRONTEND_PORT}",
-          },
-        ],
+        processes: [],
         containers: [],
         tasks: [],
+        homepage: "http://localhost:${API_PORT}",
         links: [],
         environments: ["default"],
         profiles: [],
@@ -496,8 +489,7 @@ FRONTEND_PORT=4000
 
       const result = EnvResolver.resolveContext(context);
 
-      expect(result.processes[0].link).toBe("http://localhost:3000");
-      expect(result.processes[1].link).toBe("http://localhost:4000");
+      expect(result.homepage).toBe("http://localhost:3000");
     });
 
     it("should interpolate ${VAR} in top-level link URLs", () => {

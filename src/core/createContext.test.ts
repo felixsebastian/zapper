@@ -578,7 +578,22 @@ describe("createContext", () => {
     });
   });
 
-  describe("links passthrough", () => {
+  describe("homepage and links passthrough", () => {
+    it("should pass through homepage from config", () => {
+      const config: ZapperConfig = {
+        project: "test-project",
+        homepage: "http://localhost:3000",
+      };
+
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
+
+      const result = createContext(config, testDir);
+
+      expect(result.homepage).toBe("http://localhost:3000");
+    });
+
     it("should pass through links from config", () => {
       const links = [
         { name: "docs", url: "https://example.com/docs" },
@@ -626,6 +641,20 @@ describe("createContext", () => {
       const result = createContext(config, testDir);
 
       expect(result.links).toEqual([]);
+    });
+
+    it("should handle missing homepage", () => {
+      const config: ZapperConfig = {
+        project: "test-project",
+      };
+
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
+
+      const result = createContext(config, testDir);
+
+      expect(result.homepage).toBeUndefined();
     });
   });
 
@@ -688,6 +717,7 @@ describe("createContext", () => {
         tasks: {
           build: { cmd: "npm run build" },
         },
+        homepage: "http://localhost:3000",
         links: [{ name: "docs", url: "https://docs.example.com" }],
       };
 
@@ -707,6 +737,7 @@ describe("createContext", () => {
       expect(result.processes).toHaveLength(2);
       expect(result.containers).toHaveLength(1);
       expect(result.tasks).toHaveLength(1);
+      expect(result.homepage).toBe("http://localhost:3000");
       expect(result.links).toHaveLength(1);
       expect(result.profiles).toEqual(["db", "web"]);
     });

@@ -344,8 +344,10 @@ export class CommanderCli {
       .command("launch")
       .alias("open")
       .alias("o")
-      .description("Open the configured link for a service")
-      .argument("<service>", "Service to open link for")
+      .description(
+        "Open homepage by default, or open a configured link by name",
+      )
+      .argument("[name]", "Link name to open")
       .action(async (service, options, command) => {
         await this.executeCommand("launch", service, command);
       });
@@ -383,7 +385,10 @@ export class CommanderCli {
     });
 
     const shouldResolveAliases =
-      command !== "env" && command !== "environment" && command !== "isolate";
+      command !== "env" &&
+      command !== "environment" &&
+      command !== "isolate" &&
+      command !== "launch";
     const resolvedService =
       service && shouldResolveAliases
         ? Array.isArray(service)

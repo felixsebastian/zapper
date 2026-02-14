@@ -95,6 +95,28 @@ describe("ZodConfigValidator", () => {
     }).not.toThrow();
   });
 
+  it("should validate top-level homepage and links", () => {
+    const config = {
+      project: "myproj",
+      native: {
+        app: {
+          cmd: "npm run dev",
+        },
+      },
+      homepage: "http://localhost:3000",
+      links: [
+        {
+          name: "Docs",
+          url: "http://localhost:3000/docs",
+        },
+      ],
+    };
+
+    expect(() => {
+      ZodConfigValidator.validate(config);
+    }).not.toThrow();
+  });
+
   it("should reject config without project", () => {
     const config = {
       native: {
@@ -234,6 +256,24 @@ describe("ZodConfigValidator", () => {
       ZodConfigValidator.validate(config);
     }).toThrow(
       'Configuration validation failed: native.app: Unrecognized key: "unknown_field"',
+    );
+  });
+
+  it("should reject service-level link field", () => {
+    const config = {
+      project: "myproj",
+      native: {
+        app: {
+          cmd: "npm run dev",
+          link: "http://localhost:3000",
+        },
+      },
+    };
+
+    expect(() => {
+      ZodConfigValidator.validate(config);
+    }).toThrow(
+      'Configuration validation failed: native.app: Unrecognized key: "link"',
     );
   });
 

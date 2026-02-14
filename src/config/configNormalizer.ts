@@ -19,6 +19,8 @@ export interface RawConfig {
   containers?: Record<string, unknown>;
   processes?: unknown[];
   tasks?: Record<string, unknown>;
+  homepage?: string;
+  links?: Array<{ name: string; url: string }>;
 }
 
 export function normalizeConfig<T extends RawConfig>(config: T): T {

@@ -36,6 +36,7 @@ export interface Context {
   processes: Process[]; // Combines native and processes from config
   containers: Container[]; // Combines docker and containers from config
   tasks: Task[]; // Tasks from config
+  homepage?: string; // Primary app URL for `zap launch` with no args
   links: Link[]; // Project bookmarks/links
   profiles: string[]; // All unique profiles from processes and containers
   state: ZapperState; // Validated state from state.json

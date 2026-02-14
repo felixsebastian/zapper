@@ -67,18 +67,21 @@ export class EnvResolver {
 
     for (const proc of resolvedContext.processes) {
       this.resolveProcessEnv(proc, mergedEnvFromFiles, context.projectRoot);
-      if (proc.link)
-        proc.link = this.expandString(proc.link, mergedEnvFromFiles);
     }
 
     for (const container of resolvedContext.containers) {
       this.resolveContainerEnv(container, mergedEnvFromFiles);
-      if (container.link)
-        container.link = this.expandString(container.link, mergedEnvFromFiles);
     }
 
     for (const task of resolvedContext.tasks) {
       this.resolveTaskEnv(task, mergedEnvFromFiles, context.projectRoot);
+    }
+
+    if (resolvedContext.homepage) {
+      resolvedContext.homepage = this.expandString(
+        resolvedContext.homepage,
+        mergedEnvFromFiles,
+      );
     }
 
     for (const link of resolvedContext.links) {

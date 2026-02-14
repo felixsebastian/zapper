@@ -39,6 +39,7 @@ pnpm test                        # Run all tests
 pnpm test --watch                # Watch mode
 pnpm test yaml-parser.test.ts    # Specific file
 pnpm test:e2e                    # E2E in isolated Linux VM (macOS + Lima)
+pnpm dev:renderer                # Renderer vibe sheet (local development preview)
 ```
 
 For manual testing, use the example projects in `examples/`. After building, cd into one and run `zap up`.

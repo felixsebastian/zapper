@@ -64,7 +64,6 @@ export const ProcessSchema = z
       .optional(),
     healthcheck: HealthcheckSchema,
     depends_on: z.array(validNameSchema).optional(),
-    link: z.string().min(1).optional(),
   })
   .strict();
 
@@ -86,7 +85,6 @@ export const ContainerSchema = z
       .optional(),
     healthcheck: HealthcheckSchema,
     depends_on: z.array(validNameSchema).optional(),
-    link: z.string().min(1).optional(),
   })
   .strict();
 
@@ -155,6 +153,7 @@ export const ZapperConfigSchema = processValidation(
         containers: z.record(validNameSchema, ContainerSchema).optional(),
         processes: z.array(ProcessSchema).optional(),
         tasks: z.record(validNameSchema, TaskSchema).optional(),
+        homepage: z.string().min(1).optional(),
         links: z.array(LinkSchema).optional(),
       })
       .strict(),
