@@ -163,23 +163,26 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
     }
   });
 
-  function setupTempConfig() {
+  function setupTempConfig(options?: { stripProfiles?: boolean }) {
     testProjectName = generateTestProjectName();
     tempConfigPath = path.join(fixtureDir, `zap-${testProjectName}.yaml`);
     const originalConfig = fs.readFileSync(
       path.join(fixtureDir, "zap.yaml"),
       "utf8",
     );
-    const uniqueConfig = originalConfig.replace(
+    let uniqueConfig = originalConfig.replace(
       "project: multi-service-test",
       `project: ${testProjectName}`,
     );
+    if (options?.stripProfiles) {
+      uniqueConfig = uniqueConfig.replace(/\n\s+profiles:\s+\[[^\]]+\]/g, "");
+    }
     fs.writeFileSync(tempConfigPath, uniqueConfig);
   }
 
   describe("Dependency Ordering", () => {
     it("should start all services in dependency order with 'zap up'", async () => {
-      setupTempConfig();
+      setupTempConfig({ stripProfiles: true });
 
       // Start all services
       const upOutput = runZapCommand(
@@ -228,7 +231,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
     }, 45000);
 
     it("should show all services in 'zap status'", async () => {
-      setupTempConfig();
+      setupTempConfig({ stripProfiles: true });
 
       // Start services first
       runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {
@@ -270,7 +273,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
 
   describe("Selective Service Operations", () => {
     it("should start only specified service and its dependencies with 'zap up --service <name>'", async () => {
-      setupTempConfig();
+      setupTempConfig({ stripProfiles: true });
 
       // Start only frontend (should start database, api, and frontend due to dependencies)
       runZapCommand(`up frontend`, fixtureDir, `zap-${testProjectName}.yaml`, {
@@ -293,7 +296,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
     }, 45000);
 
     it("should stop only specified service with 'zap down --service <name>'", async () => {
-      setupTempConfig();
+      setupTempConfig({ stripProfiles: true });
 
       // Start all services first
       runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {
@@ -328,7 +331,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
     }, 45000);
 
     it("should restart specified service correctly with 'zap restart --service <name>'", async () => {
-      setupTempConfig();
+      setupTempConfig({ stripProfiles: true });
 
       // Start all services first
       runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {
@@ -440,7 +443,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
 
   describe("Complete Lifecycle", () => {
     it("should handle complete up -> status -> down lifecycle", async () => {
-      setupTempConfig();
+      setupTempConfig({ stripProfiles: true });
 
       // 1. Start all services
       const upOutput = runZapCommand(
@@ -513,7 +516,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
 
   describe("Naming Convention Validation", () => {
     it("should follow zap.{project}.{service} naming convention consistently", async () => {
-      setupTempConfig();
+      setupTempConfig({ stripProfiles: true });
 
       // Start services
       runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {

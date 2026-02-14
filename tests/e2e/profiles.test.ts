@@ -58,6 +58,23 @@ async function cleanupPm2Processes(projectName: string) {
   }
 }
 
+function getRunningServices(projectName: string): string[] {
+  try {
+    const pm2ListOutput = execSync("pm2 jlist --silent", { encoding: "utf8" });
+    const pm2Processes = JSON.parse(pm2ListOutput);
+
+    return pm2Processes
+      .filter(
+        (proc: { name: string; pm2_env?: { status?: string } }) =>
+          proc.name?.startsWith(`zap.${projectName}.`) &&
+          proc.pm2_env?.status === "online",
+      )
+      .map((proc: { name: string }) => proc.name.split(".").pop());
+  } catch (error) {
+    return [];
+  }
+}
+
 describe("E2E: Profiles Command", () => {
   let testProjectName: string;
   let fixtureDir: string;
@@ -197,6 +214,12 @@ describe("E2E: Profiles Command", () => {
       );
       expect(workerStatusWithoutProfile?.enabled).toBe(false);
       expect(frontendStatusWithoutProfile?.enabled).toBe(false);
+
+      const runningAfterDisable = getRunningServices(testProjectName);
+      expect(runningAfterDisable).toContain("database");
+      expect(runningAfterDisable).toContain("api");
+      expect(runningAfterDisable).not.toContain("frontend");
+      expect(runningAfterDisable).not.toContain("worker");
     } finally {
       try {
         runZapCommand("down", testDir, tempConfigPath, {
@@ -207,4 +230,52 @@ describe("E2E: Profiles Command", () => {
       }
     }
   }, 60000);
+
+  it("should start unprofiled services first, then add profiled services after enabling a profile and restarting", async () => {
+    testProjectName = generateTestProjectName();
+    testDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "zapper-e2e-profiles-fixture-"),
+    );
+    tempConfigPath = path.join(testDir, `zap-${testProjectName}.yaml`);
+
+    const originalConfig = fs.readFileSync(
+      path.join(fixtureDir, "zap.yaml"),
+      "utf8",
+    );
+    const fixtureEnvPath = path.join(fixtureDir, ".env");
+    if (fs.existsSync(fixtureEnvPath)) {
+      fs.copyFileSync(fixtureEnvPath, path.join(testDir, ".env"));
+    }
+    const uniqueConfig = originalConfig.replace(
+      "project: multi-service-test",
+      `project: ${testProjectName}`,
+    );
+    fs.writeFileSync(tempConfigPath, uniqueConfig);
+
+    try {
+      runZapCommand("up", testDir, tempConfigPath, { timeout: 45000 });
+      const runningWithoutProfile = getRunningServices(testProjectName);
+      expect(runningWithoutProfile).toContain("database");
+      expect(runningWithoutProfile).toContain("api");
+      expect(runningWithoutProfile).not.toContain("frontend");
+      expect(runningWithoutProfile).not.toContain("worker");
+
+      runZapCommand("profile dev", testDir, tempConfigPath, { timeout: 45000 });
+      runZapCommand("restart", testDir, tempConfigPath, { timeout: 45000 });
+
+      const runningWithDevProfile = getRunningServices(testProjectName);
+      expect(runningWithDevProfile).toContain("database");
+      expect(runningWithDevProfile).toContain("api");
+      expect(runningWithDevProfile).toContain("frontend");
+      expect(runningWithDevProfile).not.toContain("worker");
+    } finally {
+      try {
+        runZapCommand("down", testDir, tempConfigPath, {
+          timeout: 20000,
+        });
+      } catch (error) {
+        // Ignore cleanup errors
+      }
+    }
+  }, 90000);
 });

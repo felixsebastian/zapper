@@ -131,7 +131,8 @@ zap launch <service>        # Open the service's configured link in browser
 ### Profiles
 
 ```bash
-zap up --profile test       # Start only services matching profile
+zap profile dev             # Enable a profile
+zap profile --disable       # Disable active profile
 ```
 
 ### Environments
@@ -693,14 +694,16 @@ docker:
 ### Using profiles
 
 ```bash
-zap up                     # Starts services with no profile defined
-zap up --profile dev       # Starts services with 'dev' profile
-zap up --profile test      # Starts services with 'test' profile
+zap up                     # Starts only services with no `profiles` field
+zap profile dev            # Enables 'dev' profile and starts matching services
+zap restart                # Restarts all services using active profile filtering
+zap profile --disable      # Disables active profile
 ```
 
 ### Default behavior
 
-Services without a `profiles` field run in all profiles (including when no profile is specified).
+Services without a `profiles` field run regardless of profile state.
+Services with a `profiles` field run only when an active profile matches.
 
 ---
 

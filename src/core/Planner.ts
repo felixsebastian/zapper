@@ -8,6 +8,17 @@ import { buildServiceName } from "../utils/nameBuilder";
 export class Planner {
   constructor(private readonly config: ZapperConfig) {}
 
+  private shouldRunWithProfile(
+    serviceProfiles: string[] | undefined,
+    activeProfile?: string,
+  ): boolean {
+    if (!Array.isArray(serviceProfiles) || serviceProfiles.length === 0) {
+      return true;
+    }
+    if (!activeProfile) return false;
+    return serviceProfiles.includes(activeProfile);
+  }
+
   private getProcesses(): Process[] {
     const { native, processes } = this.config;
 
@@ -83,16 +94,12 @@ export class Planner {
     activeProfile?: string,
   ): { processes: Process[]; containers: Array<[string, Container]> } {
     return {
-      processes: processes.filter((p) => {
-        if (!Array.isArray(p.profiles) || p.profiles.length === 0) return true;
-        if (!activeProfile) return true; // Include all services when no profile is active
-        return p.profiles.includes(activeProfile);
-      }),
-      containers: containers.filter(([, c]) => {
-        if (!Array.isArray(c.profiles) || c.profiles.length === 0) return true;
-        if (!activeProfile) return true; // Include all services when no profile is active
-        return c.profiles.includes(activeProfile);
-      }),
+      processes: processes.filter((p) =>
+        this.shouldRunWithProfile(p.profiles, activeProfile),
+      ),
+      containers: containers.filter(([, c]) =>
+        this.shouldRunWithProfile(c.profiles, activeProfile),
+      ),
     };
   }
 
@@ -184,12 +191,9 @@ export class Planner {
         }
       }
 
-      if (servicesToStart.size === 0) return { waves: [] };
-
-      const waves = graph.computeStartWaves(servicesToStart);
-
+      let stopWaves: ExecutionWave[] = [];
       if (!targets) {
-        const stopWaves = await this.planProfileStops(
+        stopWaves = await this.planProfileStops(
           projectName,
           activeProfile,
           allProcesses,
@@ -197,6 +201,15 @@ export class Planner {
           hasPm2Process,
           isDockerRunning,
         );
+      }
+
+      if (servicesToStart.size === 0) {
+        return { waves: stopWaves };
+      }
+
+      const waves = graph.computeStartWaves(servicesToStart);
+
+      if (!targets) {
         return { waves: [...stopWaves, ...waves] };
       }
 
@@ -243,12 +256,10 @@ export class Planner {
     const stopActions: ExecutionWave[] = [];
 
     for (const process of allProcesses) {
-      const hasProfiles =
-        Array.isArray(process.profiles) && process.profiles.length > 0;
-      const shouldRun =
-        !hasProfiles ||
-        !activeProfile ||
-        (process.profiles && process.profiles.includes(activeProfile));
+      const shouldRun = this.shouldRunWithProfile(
+        process.profiles,
+        activeProfile,
+      );
 
       if (!shouldRun && hasPm2Process(process.name as string)) {
         stopActions.push({
@@ -265,12 +276,10 @@ export class Planner {
     }
 
     for (const [name, container] of allContainers) {
-      const hasProfiles =
-        Array.isArray(container.profiles) && container.profiles.length > 0;
-      const shouldRun =
-        !hasProfiles ||
-        !activeProfile ||
-        (container.profiles && container.profiles.includes(activeProfile));
+      const shouldRun = this.shouldRunWithProfile(
+        container.profiles,
+        activeProfile,
+      );
 
       if (!shouldRun && (await isDockerRunning(name))) {
         stopActions.push({
