@@ -20,6 +20,7 @@ import {
   ConfigCommand,
   EnvCommand,
   LaunchCommand,
+  IsolateCommand,
   CommandContext,
   CommandHandler,
   TaskParams,
@@ -95,6 +96,7 @@ export class CommanderCli {
     this.commandHandlers.set("config", new ConfigCommand());
     this.commandHandlers.set("env", new EnvCommand());
     this.commandHandlers.set("launch", new LaunchCommand());
+    this.commandHandlers.set("isolate", new IsolateCommand());
   }
 
   private setupProgram(): void {
@@ -347,6 +349,13 @@ export class CommanderCli {
       .action(async (service, options, command) => {
         await this.executeCommand("launch", service, command);
       });
+
+    this.program
+      .command("isolate")
+      .description("Enable worktree isolation by creating a local instance ID")
+      .action(async (options, command) => {
+        await this.executeCommand("isolate", undefined, command);
+      });
   }
 
   private async executeCommand(
@@ -373,7 +382,9 @@ export class CommanderCli {
     const shouldResolveAliases = command !== "env" && command !== "environment";
     const resolvedService =
       service && shouldResolveAliases
-        ? zapper.resolveServiceName(service)
+        ? Array.isArray(service)
+          ? (service.map((s: string) => zapper.resolveServiceName(s)) as unknown as string)
+          : zapper.resolveServiceName(service)
         : service;
 
     const handler = this.commandHandlers.get(command);

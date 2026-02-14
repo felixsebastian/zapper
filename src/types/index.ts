@@ -29,7 +29,8 @@ export type Command =
   | "git:stash"
   | "config"
   | "env"
-  | "launch";
+  | "launch"
+  | "isolate";
 
 export interface CliOptions {
   command: Command;

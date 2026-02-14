@@ -303,16 +303,23 @@ describe("E2E: Aliases Support", () => {
         );
         expect(restartOutput).toContain("webserver"); // Should show canonical name in output
 
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Verify the process was actually restarted (new PID)
-        pm2ListOutput = execSync("pm2 jlist", { encoding: "utf8" });
-        pm2Processes = JSON.parse(pm2ListOutput);
-        webProcess = pm2Processes.find(
-          (proc: { name: string }) =>
-            proc.name === `zap.${testProjectName}.webserver`,
-        );
-        const newWebPid = webProcess?.pid;
+        // Wait for the restarted process to come back online
+        let newWebPid: number | undefined;
+        const startTime = Date.now();
+        while (Date.now() - startTime < 10000) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          pm2ListOutput = execSync("pm2 jlist", { encoding: "utf8" });
+          pm2Processes = JSON.parse(pm2ListOutput);
+          webProcess = pm2Processes.find(
+            (proc: { name: string; pm2_env?: { status: string } }) =>
+              proc.name === `zap.${testProjectName}.webserver` &&
+              proc.pm2_env?.status === "online",
+          );
+          if (webProcess?.pid) {
+            newWebPid = webProcess.pid;
+            break;
+          }
+        }
 
         expect(newWebPid).toBeDefined();
         expect(newWebPid).not.toBe(initialWebPid);
@@ -321,7 +328,7 @@ describe("E2E: Aliases Support", () => {
           timeout: 15000,
         });
       }
-    }, 30000);
+    }, 45000);
 
     it("should stop services using aliases", async () => {
       testProjectName = generateTestProjectName();

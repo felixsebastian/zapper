@@ -35,6 +35,22 @@ function runZapCommand(
   }
 }
 
+function stripAnsi(text: string): string {
+  const ansiCodes = [
+    "\u001B[0m",
+    "\u001B[31m",
+    "\u001B[32m",
+    "\u001B[33m",
+    "\u001B[37m",
+    "\u001B[90m",
+  ];
+  return ansiCodes.reduce((output, code) => output.split(code).join(""), text);
+}
+
+function normalizeOutput(text: string): string {
+  return stripAnsi(text).replace(/\r\n/g, "\n").trim();
+}
+
 // Utility function to generate unique project names
 function generateTestProjectName(): string {
   return `e2e-test-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -204,6 +220,82 @@ describe("E2E: Simple Project Flow", () => {
         }
       }
     }, 30000); // 30 second timeout for full test
+
+    it("should keep ps output aligned with status output", async () => {
+      testProjectName = generateTestProjectName();
+      fixtureDir = path.join(FIXTURES_DIR, "simple-project");
+
+      const tempConfigPath = path.join(
+        fixtureDir,
+        `zap-${testProjectName}.yaml`,
+      );
+      const originalConfig = fs.readFileSync(
+        path.join(fixtureDir, "zap.yaml"),
+        "utf8",
+      );
+      const uniqueConfig = originalConfig.replace(
+        "project: simple-test",
+        `project: ${testProjectName}`,
+      );
+      fs.writeFileSync(tempConfigPath, uniqueConfig);
+
+      try {
+        runZapCommand(`up --config zap-${testProjectName}.yaml`, fixtureDir, {
+          timeout: 15000,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        const statusOutput = normalizeOutput(
+          runZapCommand(
+            `status --config zap-${testProjectName}.yaml`,
+            fixtureDir,
+          ),
+        );
+        const psOutput = normalizeOutput(
+          runZapCommand(`ps --config zap-${testProjectName}.yaml`, fixtureDir),
+        );
+        expect(psOutput).toBe(statusOutput);
+        expect(statusOutput).toContain(testProjectName);
+        expect(statusOutput).toContain("Native");
+        expect(statusOutput).toContain("server");
+        expect(statusOutput).toContain("worker");
+
+        const statusJson = JSON.parse(
+          runZapCommand(
+            `status --json --config zap-${testProjectName}.yaml`,
+            fixtureDir,
+          ),
+        );
+        const psJson = JSON.parse(
+          runZapCommand(
+            `ps --json --config zap-${testProjectName}.yaml`,
+            fixtureDir,
+          ),
+        );
+        expect(psJson).toEqual(statusJson);
+
+        runZapCommand(`down --config zap-${testProjectName}.yaml`, fixtureDir, {
+          timeout: 15000,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        const statusAfterDown = normalizeOutput(
+          runZapCommand(
+            `status --config zap-${testProjectName}.yaml`,
+            fixtureDir,
+          ),
+        );
+        const psAfterDown = normalizeOutput(
+          runZapCommand(`ps --config zap-${testProjectName}.yaml`, fixtureDir),
+        );
+        expect(psAfterDown).toBe(statusAfterDown);
+        expect(statusAfterDown).toContain("down");
+      } finally {
+        if (fs.existsSync(tempConfigPath)) {
+          fs.unlinkSync(tempConfigPath);
+        }
+      }
+    }, 30000);
 
     it("should handle minimal project with single service", async () => {
       testProjectName = generateTestProjectName();

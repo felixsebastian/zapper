@@ -1,0 +1,16 @@
+project: env-precedence
+
+native:
+  app:
+    cmd: >
+      node -e "console.log('test process')"
+
+env_files:
+  default:
+    - .env.shared
+    - .env.local
+    - .env.user
+  remote:
+    - .env.shared
+    - .env.remote
+    - .env.user.remote

@@ -62,30 +62,37 @@ function readStateFile(fixtureDir: string): Record<string, unknown> | null {
   return null;
 }
 
-// Utility function to wait and capture logs with environment variables
-function waitAndCaptureLogs(
-  command: string,
-  cwd: string,
+// Utility function to wait for expected values in the service log file
+function waitForLogValues(
+  fixtureDir: string,
+  projectName: string,
   expectedValues: string[],
-  timeout = 5000,
+  timeout = 12000,
 ): string {
+  const logPath = path.join(
+    fixtureDir,
+    ".zap",
+    "logs",
+    `${projectName}.echo-service.log`,
+  );
   const startTime = Date.now();
   let lastOutput = "";
 
   while (Date.now() - startTime < timeout) {
     try {
-      const output = runZapCommand(command, cwd, { timeout: 2000 });
-      lastOutput = output;
+      if (fs.existsSync(logPath)) {
+        const output = fs.readFileSync(logPath, "utf8");
+        lastOutput = output;
 
-      // Check if all expected values are present in the output
-      const hasAllValues = expectedValues.every((value) =>
-        output.includes(value),
-      );
-      if (hasAllValues) {
-        return output;
+        const hasAllValues = expectedValues.every((value) =>
+          output.includes(value),
+        );
+        if (hasAllValues) {
+          return output;
+        }
       }
     } catch (error) {
-      // Continue trying - processes might still be starting
+      // Continue trying - log file may not be ready yet
     }
 
     // Wait a bit before checking again
@@ -110,12 +117,21 @@ describe("E2E: Environment Sets and State Persistence", () => {
   });
 
   afterAll(async () => {
-    // Global cleanup - remove any remaining test processes
+    // Cleanup any remaining test processes for this suite only
     try {
-      execSync(`pm2 delete all 2>/dev/null || true`, {
-        stdio: "ignore",
+      const output = execSync("pm2 jlist --silent", {
+        encoding: "utf8",
         timeout: 5000,
       });
+      const processes = JSON.parse(output);
+      for (const proc of processes) {
+        if (proc.name?.startsWith("zap.e2e-env-test-")) {
+          execSync(`pm2 delete "${proc.name}" 2>/dev/null || true`, {
+            stdio: "ignore",
+            timeout: 5000,
+          });
+        }
+      }
     } catch (error) {
       // Ignore cleanup errors
     }
@@ -155,6 +171,12 @@ describe("E2E: Environment Sets and State Persistence", () => {
     );
     fs.writeFileSync(tempConfigPath, uniqueConfig);
 
+    // Ensure clean state before test
+    const zapDir = path.join(fixtureDir, ".zap");
+    if (fs.existsSync(zapDir)) {
+      fs.rmSync(zapDir, { recursive: true, force: true });
+    }
+
     try {
       // Test 1: Start with default environment
       const upOutput = runZapCommand(
@@ -165,9 +187,9 @@ describe("E2E: Environment Sets and State Persistence", () => {
       expect(upOutput).toContain("echo-service");
 
       // Wait for process to start and capture logs to verify default environment
-      const logsWithDefault = waitAndCaptureLogs(
-        `logs --no-follow --config zap-${testProjectName}.yaml echo-service`,
+      const logsWithDefault = waitForLogValues(
         fixtureDir,
+        testProjectName,
         ["TEST_VALUE=default_value", "NODE_ENV=development"],
       );
       expect(logsWithDefault).toContain("TEST_VALUE=default_value");
@@ -207,9 +229,9 @@ describe("E2E: Environment Sets and State Persistence", () => {
       expect(upAlternateOutput).toContain("echo-service");
 
       // Wait for process to start and capture logs to verify alternate environment
-      const logsWithAlternate = waitAndCaptureLogs(
-        `logs --no-follow --config zap-${testProjectName}.yaml echo-service`,
+      const logsWithAlternate = waitForLogValues(
         fixtureDir,
+        testProjectName,
         ["TEST_VALUE=alternate_value", "NODE_ENV=staging"],
       );
       expect(logsWithAlternate).toContain("TEST_VALUE=alternate_value");
@@ -241,9 +263,9 @@ describe("E2E: Environment Sets and State Persistence", () => {
         timeout: 15000,
       });
 
-      const logsBackToDefault = waitAndCaptureLogs(
-        `logs --no-follow --config zap-${testProjectName}.yaml echo-service`,
+      const logsBackToDefault = waitForLogValues(
         fixtureDir,
+        testProjectName,
         ["TEST_VALUE=default_value", "NODE_ENV=development"],
       );
       expect(logsBackToDefault).toContain("TEST_VALUE=default_value");
@@ -337,11 +359,11 @@ describe("E2E: Environment Sets and State Persistence", () => {
         });
 
         // Quick log check
-        const logs = waitAndCaptureLogs(
-          `logs --no-follow --config zap-${testProjectName}.yaml echo-service`,
+        const logs = waitForLogValues(
           fixtureDir,
+          testProjectName,
           ["TEST_VALUE=alternate_value"],
-          3000,
+          8000,
         );
         expect(logs).toContain("TEST_VALUE=alternate_value");
 

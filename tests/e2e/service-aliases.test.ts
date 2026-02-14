@@ -131,24 +131,36 @@ describe("E2E: Service Aliases", () => {
 
       try {
         // Start service using alias
-        const startOutput = runZapCommand(`up --config zap-${testProjectName}.yaml api`, workingDir, {
-          timeout: 15000,
-        });
+        const startOutput = runZapCommand(
+          `up --config zap-${testProjectName}.yaml api`,
+          workingDir,
+          {
+            timeout: 15000,
+          },
+        );
         expect(startOutput).toContain("api-server");
 
         // Wait for process to stabilize
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // Check status - should show canonical name
-        const statusOutput = runZapCommand(`status --config zap-${testProjectName}.yaml`, workingDir, {
-          timeout: 10000,
-        });
+        const statusOutput = runZapCommand(
+          `status --config zap-${testProjectName}.yaml`,
+          workingDir,
+          {
+            timeout: 10000,
+          },
+        );
         expect(statusOutput).toContain("api-server");
 
         // Stop service using different alias
-        const stopOutput = runZapCommand(`down --config zap-${testProjectName}.yaml backend`, workingDir, {
-          timeout: 15000,
-        });
+        const stopOutput = runZapCommand(
+          `down --config zap-${testProjectName}.yaml backend`,
+          workingDir,
+          {
+            timeout: 15000,
+          },
+        );
         expect(stopOutput).toContain("api-server");
       } catch (error) {
         console.error("Test failed:", error);
@@ -164,22 +176,34 @@ describe("E2E: Service Aliases", () => {
 
         for (const alias of aliases) {
           // Start with alias
-          const startOutput = runZapCommand(`up --config zap-${testProjectName}.yaml ${alias}`, workingDir, {
-            timeout: 15000,
-          });
+          const startOutput = runZapCommand(
+            `up --config zap-${testProjectName}.yaml ${alias}`,
+            workingDir,
+            {
+              timeout: 15000,
+            },
+          );
           expect(startOutput).toContain("user-service");
 
           // Wait for stabilization
           await new Promise((resolve) => setTimeout(resolve, 1000));
 
           // Verify it's running (should show canonical name)
-          const statusOutput = runZapCommand(`status --config zap-${testProjectName}.yaml`, workingDir, {
-            timeout: 10000,
-          });
+          const statusOutput = runZapCommand(
+            `status --config zap-${testProjectName}.yaml`,
+            workingDir,
+            {
+              timeout: 10000,
+            },
+          );
           expect(statusOutput).toContain("user-service");
 
           // Stop with same alias
-          runZapCommand(`down --config zap-${testProjectName}.yaml ${alias}`, workingDir, { timeout: 15000 });
+          runZapCommand(
+            `down --config zap-${testProjectName}.yaml ${alias}`,
+            workingDir,
+            { timeout: 15000 },
+          );
 
           // Wait before next iteration
           await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -206,16 +230,24 @@ describe("E2E: Service Aliases", () => {
         // Wait for processes to stabilize
         await new Promise((resolve) => setTimeout(resolve, 3000));
 
-        const statusOutput = runZapCommand(`status --config zap-${testProjectName}.yaml`, workingDir, {
-          timeout: 10000,
-        });
+        const statusOutput = runZapCommand(
+          `status --config zap-${testProjectName}.yaml`,
+          workingDir,
+          {
+            timeout: 10000,
+          },
+        );
         expect(statusOutput).toContain("api-server");
         expect(statusOutput).toContain("notification-worker");
 
         // Stop with mixed canonical and alias
-        runZapCommand(`down --config zap-${testProjectName}.yaml api notification-worker`, workingDir, {
-          timeout: 15000,
-        });
+        runZapCommand(
+          `down --config zap-${testProjectName}.yaml api notification-worker`,
+          workingDir,
+          {
+            timeout: 15000,
+          },
+        );
       } catch (error) {
         console.error("Test failed:", error);
         throw error;
@@ -229,9 +261,13 @@ describe("E2E: Service Aliases", () => {
 
       try {
         // Start frontend using alias - should start dependencies too
-        const startOutput = runZapCommand(`up --config zap-${testProjectName}.yaml fe`, workingDir, {
-          timeout: 25000,
-        });
+        const startOutput = runZapCommand(
+          `up --config zap-${testProjectName}.yaml fe`,
+          workingDir,
+          {
+            timeout: 25000,
+          },
+        );
 
         // Should start frontend (dependencies may start silently)
         expect(startOutput).toContain("frontend");
@@ -240,9 +276,13 @@ describe("E2E: Service Aliases", () => {
         await new Promise((resolve) => setTimeout(resolve, 4000));
 
         // Verify all are running
-        const statusOutput = runZapCommand(`status --config zap-${testProjectName}.yaml`, workingDir, {
-          timeout: 15000,
-        });
+        const statusOutput = runZapCommand(
+          `status --config zap-${testProjectName}.yaml`,
+          workingDir,
+          {
+            timeout: 15000,
+          },
+        );
         expect(statusOutput).toContain("api-server");
         expect(statusOutput).toContain("user-service");
         expect(statusOutput).toContain("frontend");
@@ -259,22 +299,34 @@ describe("E2E: Service Aliases", () => {
 
       try {
         // Run task using alias
-        const taskOutput = runZapCommand(`task --config zap-${testProjectName}.yaml build`, workingDir, {
-          timeout: 15000,
-        });
+        const taskOutput = runZapCommand(
+          `task --config zap-${testProjectName}.yaml build`,
+          workingDir,
+          {
+            timeout: 15000,
+          },
+        );
         expect(taskOutput).toContain("Building frontend");
         expect(taskOutput).toContain("Building API");
 
         // Run same task using different alias
-        const taskOutput2 = runZapCommand(`task --config zap-${testProjectName}.yaml b`, workingDir, {
-          timeout: 15000,
-        });
+        const taskOutput2 = runZapCommand(
+          `task --config zap-${testProjectName}.yaml b`,
+          workingDir,
+          {
+            timeout: 15000,
+          },
+        );
         expect(taskOutput2).toContain("Building frontend");
 
         // Run task with single alias
-        const testOutput = runZapCommand(`task --config zap-${testProjectName}.yaml test`, workingDir, {
-          timeout: 15000,
-        });
+        const testOutput = runZapCommand(
+          `task --config zap-${testProjectName}.yaml test`,
+          workingDir,
+          {
+            timeout: 15000,
+          },
+        );
         expect(testOutput).toContain("Running unit tests");
       } catch (error) {
         console.error("Test failed:", error);
@@ -289,7 +341,11 @@ describe("E2E: Service Aliases", () => {
 
       try {
         // Try to start non-existent service
-        runZapCommand(`up --config zap-${testProjectName}.yaml nonexistent`, workingDir, { timeout: 10000 });
+        runZapCommand(
+          `up --config zap-${testProjectName}.yaml nonexistent`,
+          workingDir,
+          { timeout: 10000 },
+        );
         // If we get here without error, that's also acceptable (depends on implementation)
       } catch (error) {
         // Should get a reasonable error message

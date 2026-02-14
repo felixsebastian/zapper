@@ -21,8 +21,7 @@ import {
   ContainerNotRunningError,
 } from "../errors";
 import { buildServiceName } from "../utils/nameBuilder";
-import { resolveInstance } from "./instanceResolver";
-import { acquireExclusiveLock } from "../config/exclusiveLock";
+import { resolveInstance, isolateProject } from "./instanceResolver";
 
 export class Zapper {
   private context: Context | null = null;
@@ -55,11 +54,6 @@ export class Zapper {
     // Resolve instance configuration (worktree detection, etc.)
     const instanceResolution = await resolveInstance(projectRoot);
     this.context.instanceId = instanceResolution.instanceId;
-
-    // Handle exclusive mode locking
-    if (instanceResolution.mode === "exclusive") {
-      acquireExclusiveLock(this.context.projectName, projectRoot);
-    }
   }
 
   private applyCliOverrides(
@@ -359,6 +353,14 @@ export class Zapper {
     } else {
       logger.info(".zap directory does not exist.");
     }
+  }
+
+  async isolateInstance(): Promise<string> {
+    if (!this.context) throw new ContextNotLoadedError();
+
+    const instanceId = isolateProject(this.context.projectRoot);
+    this.context.instanceId = instanceId;
+    return instanceId;
   }
 
   async cloneRepos(processNames?: string[]): Promise<void> {

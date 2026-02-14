@@ -226,7 +226,7 @@ describe("Planner - Profile-based StartAll", () => {
   });
 
   describe("startAll without active profile", () => {
-    it("should stop profile services and start no-profile services", async () => {
+    it("should start all services when no profile is active (no filtering)", async () => {
       mockPm2Manager.listProcesses.mockResolvedValue([
         createMockProcessInfo("zap.test-project.api", "stopped"),
         createMockProcessInfo("zap.test-project.frontend", "online"),
@@ -246,41 +246,36 @@ describe("Planner - Profile-based StartAll", () => {
       const plan = await planner.plan("start", undefined, "test-project");
       const actions = flattenActions(plan);
 
+      // With no profile active, all services should be included (no filtering)
+      // api is stopped, so it should be started
       expect(actions).toContainEqual({
         type: "start",
         serviceType: "native",
         name: "api",
       });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "native",
-        name: "frontend",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "native",
-        name: "worker",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "native",
-        name: "monitor",
-      });
+      // cache has no container info, so it should be started
       expect(actions).toContainEqual({
         type: "start",
         serviceType: "docker",
         name: "cache",
       });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "docker",
-        name: "database",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "docker",
-        name: "analytics",
-      });
+      // frontend, worker, monitor are already online - no stop actions
+      expect(actions).not.toContainEqual(
+        expect.objectContaining({ type: "stop", name: "frontend" }),
+      );
+      expect(actions).not.toContainEqual(
+        expect.objectContaining({ type: "stop", name: "worker" }),
+      );
+      expect(actions).not.toContainEqual(
+        expect.objectContaining({ type: "stop", name: "monitor" }),
+      );
+      // database, analytics are already running - no stop actions
+      expect(actions).not.toContainEqual(
+        expect.objectContaining({ type: "stop", name: "database" }),
+      );
+      expect(actions).not.toContainEqual(
+        expect.objectContaining({ type: "stop", name: "analytics" }),
+      );
     });
   });
 

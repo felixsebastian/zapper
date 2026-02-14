@@ -1,6 +1,0 @@
-project: e2e-test-1770948439947-607
-native:
-  server:
-    cmd: node -e "console.log('Server started'); setInterval(() => console.log('Server heartbeat'), 2000)"
-  worker:
-    cmd: node -e "console.log('Worker started'); setInterval(() => console.log('Worker tick'), 1000)"

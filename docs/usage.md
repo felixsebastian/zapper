@@ -403,14 +403,14 @@ zap env api                        # Works if no environment set named 'api'
 
 ## Instances
 
-Instances allow running multiple isolated copies of your project simultaneously using Git worktrees. Each instance gets its own processes and environment isolation through port shifting.
+Instances let you run multiple copies of the same project from Git worktrees without process/container name collisions.
 
 ```bash
-zap instance create feature-auth      # Create new instance from current branch
-zap instance list                     # List all instances
-zap instance switch main              # Switch between instances
-zap instance remove feature-auth      # Clean up instance
+zap isolate                           # Create local instance ID in .zap/instance.json
+zap up                                # Start with instance-aware names
 ```
+
+If you are in a worktree without isolation, Zapper prints a warning but still runs commands. See [Instances](instances.md) for full details.
 
 ---
 

@@ -126,15 +126,18 @@ export class Planner {
     const allContainers = this.getContainers();
 
     const pm2List = await Pm2Manager.listProcesses();
-    const runningPm2 = new Set(
+    const onlinePm2 = new Set(
       pm2List
         .filter((p) => p.status.toLowerCase() === "online")
         .map((p) => p.name as string),
     );
+    const existingPm2 = new Set(pm2List.map((p) => p.name as string));
     const instanceId = (this.config as ZapperConfig & { instanceId?: string })
       .instanceId;
-    const isPm2Running = (name: string) =>
-      runningPm2.has(buildServiceName(projectName, name, instanceId));
+    const isPm2Online = (name: string) =>
+      onlinePm2.has(buildServiceName(projectName, name, instanceId));
+    const hasPm2Process = (name: string) =>
+      existingPm2.has(buildServiceName(projectName, name, instanceId));
 
     const isDockerRunning = async (name: string): Promise<boolean> => {
       const info = await DockerManager.getContainerInfo(
@@ -171,7 +174,7 @@ export class Planner {
 
       const servicesToStart = new Set<string>();
       for (const p of selectedProcesses) {
-        if (forceStart || !isPm2Running(p.name as string)) {
+        if (forceStart || !isPm2Online(p.name as string)) {
           servicesToStart.add(p.name as string);
         }
       }
@@ -191,7 +194,7 @@ export class Planner {
           activeProfile,
           allProcesses,
           allContainers,
-          isPm2Running,
+          hasPm2Process,
           isDockerRunning,
         );
         return { waves: [...stopWaves, ...waves] };
@@ -217,7 +220,7 @@ export class Planner {
 
     const servicesToStop = new Set<string>();
     for (const p of selectedProcesses) {
-      if (isPm2Running(p.name as string)) servicesToStop.add(p.name as string);
+      if (hasPm2Process(p.name as string)) servicesToStop.add(p.name as string);
     }
     for (const [name] of selectedContainers) {
       if (await isDockerRunning(name)) servicesToStop.add(name);
@@ -234,7 +237,7 @@ export class Planner {
     activeProfile: string | undefined,
     allProcesses: Process[],
     allContainers: Array<[string, Container]>,
-    isPm2Running: (name: string) => boolean,
+    hasPm2Process: (name: string) => boolean,
     isDockerRunning: (name: string) => Promise<boolean>,
   ): Promise<ExecutionWave[]> {
     const stopActions: ExecutionWave[] = [];
@@ -244,11 +247,10 @@ export class Planner {
         Array.isArray(process.profiles) && process.profiles.length > 0;
       const shouldRun =
         !hasProfiles ||
-        (activeProfile &&
-          process.profiles &&
-          process.profiles.includes(activeProfile));
+        !activeProfile ||
+        (process.profiles && process.profiles.includes(activeProfile));
 
-      if (!shouldRun && isPm2Running(process.name as string)) {
+      if (!shouldRun && hasPm2Process(process.name as string)) {
         stopActions.push({
           actions: [
             {
@@ -267,9 +269,8 @@ export class Planner {
         Array.isArray(container.profiles) && container.profiles.length > 0;
       const shouldRun =
         !hasProfiles ||
-        (activeProfile &&
-          container.profiles &&
-          container.profiles.includes(activeProfile));
+        !activeProfile ||
+        (container.profiles && container.profiles.includes(activeProfile));
 
       if (!shouldRun && (await isDockerRunning(name))) {
         stopActions.push({

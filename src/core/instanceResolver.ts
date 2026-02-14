@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import readline from "readline";
 import { detectWorktree } from "../utils/worktreeDetector";
 import {
   loadInstanceConfig,
@@ -9,77 +8,57 @@ import {
 
 export interface InstanceResolution {
   instanceId?: string | null;
-  mode: "normal" | "isolate" | "exclusive";
+  mode: "normal" | "isolate";
 }
 
 /**
- * Generate a short instance ID based on the project path
+ * Generate a short random instance ID.
  */
 function generateInstanceId(projectRoot: string): string {
-  const hash = crypto.createHash("sha256").update(projectRoot).digest("hex");
+  const salt = `${projectRoot}:${Date.now()}:${crypto.randomBytes(8).toString("hex")}`;
+  const hash = crypto.createHash("sha256").update(salt).digest("hex");
   return `wt-${hash.substring(0, 6)}`;
 }
 
-/**
- * Prompt the user to choose between isolate and exclusive mode
- */
-async function promptInstanceMode(): Promise<"isolate" | "exclusive"> {
-  const g = globalThis as unknown as {
-    process?: { stdin?: unknown; stdout?: unknown };
+function printUnisolatedWorktreeWarning(): void {
+  console.warn("\n===============================================");
+  console.warn("============== WORKTREE WARNING ===============");
+  console.warn("===============================================");
+  console.warn("This project is running inside a git worktree.");
+  console.warn("No instance isolation is configured for this path.");
+  console.warn("Processes and containers may collide with other copies.");
+  console.warn("Run `zap isolate` to create a local instance ID.");
+  console.warn("===============================================\n");
+}
+
+export function isolateProject(projectRoot: string): string {
+  const existingConfig = loadInstanceConfig(projectRoot);
+  if (existingConfig?.instanceId) {
+    return existingConfig.instanceId;
+  }
+
+  const instanceId = generateInstanceId(projectRoot);
+  const config: InstanceConfig = {
+    instanceId,
+    mode: "isolate",
   };
-
-  const rl = readline.createInterface({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    input: (g.process?.stdin as any) || undefined,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    output: (g.process?.stdout as any) || undefined,
-  });
-
-  console.log("\nThis project is inside a git worktree.");
-  console.log(
-    "Another instance of this project may be running from the main worktree.",
-  );
-  console.log();
-  console.log("How should this instance be handled?");
-  console.log("  1. Isolate (run independently with a separate instance ID)");
-  console.log("  2. Exclusive (only allow one running instance at a time)");
-  console.log();
-
-  const answer: string = await new Promise((resolve) => {
-    rl.question("Choose [1/2]: ", (ans) => resolve(ans.trim()));
-  });
-
-  rl.close();
-
-  const choice = answer.toLowerCase();
-  if (["1", "isolate", "i"].includes(choice)) {
-    return "isolate";
-  }
-  if (["2", "exclusive", "e"].includes(choice)) {
-    return "exclusive";
-  }
-
-  // Default to isolate if unclear
-  console.log("Defaulting to isolate mode.");
-  return "isolate";
+  saveInstanceConfig(projectRoot, config);
+  return instanceId;
 }
 
 /**
  * Resolve instance configuration for the given project.
- * Handles worktree detection, prompting, and config persistence.
+ * Handles worktree detection and warning behavior.
  */
 export async function resolveInstance(
   projectRoot: string,
 ): Promise<InstanceResolution> {
   // 1. Check for existing configuration
   const existingConfig = loadInstanceConfig(projectRoot);
-  if (existingConfig) {
-    if (existingConfig.mode === "exclusive") {
-      return { mode: "exclusive" };
-    }
+  if (existingConfig?.instanceId) {
     return {
       instanceId: existingConfig.instanceId,
-      mode: existingConfig.instanceId ? "isolate" : "normal",
+      mode: "isolate",
     };
   }
 
@@ -89,20 +68,7 @@ export async function resolveInstance(
     return { mode: "normal" };
   }
 
-  // 3. Prompt user for choice
-  const userChoice = await promptInstanceMode();
-
-  // 4. Save the choice and generate config
-  const config: InstanceConfig = {};
-
-  if (userChoice === "isolate") {
-    const instanceId = generateInstanceId(projectRoot);
-    config.instanceId = instanceId;
-    saveInstanceConfig(projectRoot, config);
-    return { instanceId, mode: "isolate" };
-  } else {
-    config.mode = "exclusive";
-    saveInstanceConfig(projectRoot, config);
-    return { mode: "exclusive" };
-  }
+  // 3. Warn and continue in non-isolated mode
+  printUnisolatedWorktreeWarning();
+  return { mode: "normal" };
 }

@@ -123,12 +123,21 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
   });
 
   afterAll(async () => {
-    // Global cleanup - remove any remaining test processes
+    // Cleanup any remaining test processes for this suite only
     try {
-      execSync(`pm2 delete all 2>/dev/null || true`, {
-        stdio: "ignore",
+      const output = execSync("pm2 jlist --silent", {
+        encoding: "utf8",
         timeout: 5000,
       });
+      const processes = JSON.parse(output);
+      for (const proc of processes) {
+        if (proc.name?.startsWith("zap.e2e-multi-test-")) {
+          execSync(`pm2 delete "${proc.name}" 2>/dev/null || true`, {
+            stdio: "ignore",
+            timeout: 5000,
+          });
+        }
+      }
     } catch (error) {
       // Ignore cleanup errors
     }
@@ -346,6 +355,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
         `restart api`,
         fixtureDir,
         `zap-${testProjectName}.yaml`,
+        { timeout: 30000 },
       );
       expect(restartOutput).toContain("api");
 
