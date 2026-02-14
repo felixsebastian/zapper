@@ -147,6 +147,15 @@ This triggers the GitHub Actions workflow which will:
 2. Create a "Version Packages" PR (if there are changesets)
 3. Automatically publish to npm when the Version Packages PR is merged
 
+Immediately monitor the push with GitHub CLI:
+
+```bash
+gh run list --branch main --limit 5
+gh run watch <run-id> --exit-status
+```
+
+If the run fails, treat it as a release blocker, fix the issue, and push again.
+
 ## 8. Merge back to local main
 
 ```bash
@@ -163,7 +172,15 @@ git branch -d release/$(date +%Y-%m-%d)  # Clean up release branch
 
 ## 10. Verify the release
 
-Test the published package:
+Check npm directly with npm CLI:
+
+```bash
+npm view zapper-cli version
+```
+
+Confirm this matches your just-released version from `package.json`.
+
+Then test the published package:
 
 ```bash
 npm install -g zapper-cli@latest
@@ -184,9 +201,22 @@ Check npm to verify the new version was published: https://www.npmjs.com/package
    sleep 180
    ```
 3. Recheck the status:
-   - Go to GitHub Actions and verify the workflow completed successfully
-   - Check that the Version Packages PR was created correctly
+   - Use GitHub CLI to verify the workflow completed successfully:
+     ```bash
+     gh run list --branch main --limit 5
+     gh run watch <run-id> --exit-status
+     ```
+   - Check that the Version Packages PR was created correctly (if changesets are pending):
+     ```bash
+     gh pr list --state open --limit 20
+     ```
    - Verify no CI failures occurred
+4. After release is complete and npm shows the new version, wait 5 more minutes and verify npm again:
+   ```bash
+   sleep 300
+   npm view zapper-cli version
+   ```
+   This confirms the published version is still resolvable via npm registry APIs.
 
 **Common mistakes to watch for:**
 - Forgetting to create or commit the changeset file
