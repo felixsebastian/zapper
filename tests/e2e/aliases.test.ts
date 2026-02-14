@@ -417,6 +417,24 @@ describe("E2E: Aliases Support", () => {
         expect(buildOutput).toContain("Building backend");
         expect(buildOutput).toContain("Build completed successfully");
 
+        // Test 'run' alias for task command
+        const runOutput = runZapCommand(
+          `run b --config zap-${testProjectName}.yaml`,
+          fixtureDir,
+          { timeout: 10000 },
+        );
+        expect(runOutput).toContain("Building frontend");
+        expect(runOutput).toContain("Build completed successfully");
+
+        // Test 'r' short alias for task command
+        const rOutput = runZapCommand(
+          `r b --config zap-${testProjectName}.yaml`,
+          fixtureDir,
+          { timeout: 10000 },
+        );
+        expect(rOutput).toContain("Building frontend");
+        expect(rOutput).toContain("Build completed successfully");
+
         // Test 'compile' alias for 'build' task
         const compileOutput = runZapCommand(
           `task compile --config zap-${testProjectName}.yaml`,

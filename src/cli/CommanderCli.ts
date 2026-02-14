@@ -32,7 +32,9 @@ function parseTaskArgs(rawArgv: string[], taskName: string): TaskParams {
   const rest: string[] = [];
 
   // Find the position of the task command and task name in raw argv
-  const taskIdx = rawArgv.findIndex((arg) => arg === "task" || arg === "t");
+  const taskIdx = rawArgv.findIndex((arg) =>
+    ["task", "t", "run", "r"].includes(arg),
+  );
   if (taskIdx === -1) return { named, rest };
 
   // Get everything after the task name
@@ -135,7 +137,6 @@ export class CommanderCli {
 
     this.program
       .command("restart")
-      .alias("r")
       .description("Restart all processes or a specific process")
       .argument("[service]", "Service to restart")
       .action(async (service, options, command) => {
@@ -192,6 +193,8 @@ export class CommanderCli {
     this.program
       .command("task")
       .alias("t")
+      .alias("run")
+      .alias("r")
       .description(
         "Run a one-off task by name, or list all tasks if no task specified",
       )

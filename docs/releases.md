@@ -134,6 +134,24 @@ zap task verify
 
 **This MUST pass cleanly.** If it fails, fix the issues and repeat until clean.
 
+### 6.1 Documentation contradiction/staleness check (required)
+
+Before pushing, verify docs still match current behavior, especially `zap.yaml` config docs.
+
+Use quick grep checks:
+
+```bash
+rg -n "project|env_files|git_method|task_delimiters|whitelists|native|docker|tasks|homepage|links" src/config/schemas.ts
+rg -n "project|env_files|git_method|task_delimiters|whitelists|native|docker|tasks|homepage|links" docs/usage.md
+```
+
+Then do a manual contradiction pass:
+
+- If config semantics changed, confirm `docs/usage.md` examples and prose match current behavior.
+- Check CLI command names/options in docs against current CLI implementation.
+- Remove or correct stale statements and outdated examples.
+- Treat unresolved doc contradictions as release blockers.
+
 ## 7. Push to main (triggers automated release)
 
 Push directly to main (no PR needed for releases):

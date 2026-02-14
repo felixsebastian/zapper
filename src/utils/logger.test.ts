@@ -12,21 +12,13 @@ describe("Logger", () => {
   beforeEach(() => {
     logger = new Logger();
 
-    // Mock console methods
+    // Mock sink methods
     consoleSpy = {
       log: vi.fn(),
       warn: vi.fn(),
       error: vi.fn(),
     };
-
-    // Replace global console temporarily
-    const originalConsole = globalThis.console;
-    globalThis.console = consoleSpy as unknown as typeof globalThis.console;
-
-    // Restore after test
-    return () => {
-      globalThis.console = originalConsole;
-    };
+    logger.setSink(consoleSpy);
   });
 
   it("should log info messages by default", () => {

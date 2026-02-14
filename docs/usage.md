@@ -115,6 +115,8 @@ zap logs --service api      # Follow logs for specific service
 ```bash
 zap task                           # List all tasks
 zap task <name>                    # Run a task
+zap run <name>                     # Alias for: zap task <name>
+zap r <name>                       # Short alias for: zap task <name>
 zap task seed
 zap task build --target=prod       # Run with named parameters
 zap task test -- --coverage        # Run with pass-through args

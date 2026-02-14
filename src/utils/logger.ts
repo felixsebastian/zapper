@@ -11,6 +11,12 @@ export interface LoggerOptions {
   timestamp?: boolean;
 }
 
+export interface LoggerSink {
+  log: (msg: string) => void;
+  warn: (msg: string) => void;
+  error: (msg: string) => void;
+}
+
 const colors = {
   reset: "\u001B[0m",
   red: "\u001B[31m",
@@ -36,11 +42,13 @@ export class Logger {
   private level: LogLevel;
   private silent: boolean;
   private timestamp: boolean;
+  private sink: LoggerSink | null;
 
   constructor(options: LoggerOptions = {}) {
     this.level = options.level ?? LogLevel.INFO;
     this.silent = options.silent ?? false;
     this.timestamp = options.timestamp ?? false;
+    this.sink = null;
   }
 
   private prefix(): string {
@@ -77,41 +85,31 @@ export class Logger {
   error(message: string, options: Options = {}): void {
     if (!this.shouldLog(LogLevel.ERROR)) return;
     const msg = `${this.withEmojiPrefix("error", message, options.noEmoji)}${this.formatData(options.data)}`;
-    (
-      globalThis as { console?: { error: (msg: string) => void } }
-    ).console?.error(`${colors.red}${msg}${colors.reset}`);
+    this.sink?.error(`${colors.red}${msg}${colors.reset}`);
   }
 
   warn(message: string, options: Options = {}): void {
     if (!this.shouldLog(LogLevel.WARN)) return;
     const msg = `${this.withEmojiPrefix("warn", message, options.noEmoji)}${this.formatData(options.data)}`;
-    (globalThis as { console?: { warn: (msg: string) => void } }).console?.warn(
-      `${colors.yellow}${msg}${colors.reset}`,
-    );
+    this.sink?.warn(`${colors.yellow}${msg}${colors.reset}`);
   }
 
   info(message: string, options: Options = {}): void {
     if (!this.shouldLog(LogLevel.INFO)) return;
     const msg = `${this.withEmojiPrefix("info", message, options.noEmoji)}${this.formatData(options.data)}`;
-    (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
-      `${colors.white}${msg}${colors.reset}`,
-    );
+    this.sink?.log(`${colors.white}${msg}${colors.reset}`);
   }
 
   debug(message: string, options: Options = {}): void {
     if (!this.shouldLog(LogLevel.DEBUG)) return;
     const msg = `${this.withEmojiPrefix("debug", message, options.noEmoji)}${this.formatData(options.data)}`;
-    (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
-      msg,
-    );
+    this.sink?.log(msg);
   }
 
   success(message: string, options: Options = {}): void {
     if (!this.shouldLog(LogLevel.INFO)) return;
     const msg = `${this.withEmojiPrefix("success", message, options.noEmoji)}${this.formatData(options.data)}`;
-    (globalThis as { console?: { log: (msg: string) => void } }).console?.log(
-      `${colors.green}${msg}${colors.reset}`,
-    );
+    this.sink?.log(`${colors.green}${msg}${colors.reset}`);
   }
 
   setLevel(level: LogLevel): void {
@@ -128,6 +126,10 @@ export class Logger {
 
   getLevel(): LogLevel {
     return this.level;
+  }
+
+  setSink(sink: LoggerSink | null): void {
+    this.sink = sink;
   }
 }
 

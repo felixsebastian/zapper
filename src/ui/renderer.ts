@@ -80,12 +80,31 @@ function formatServiceLine(service: ServiceStatus): string {
   return `${name} ${status}`;
 }
 
+function formatStatusContextHeader(context: Context): string {
+  let header = context.projectName;
+  if (context.instanceId) {
+    header += ` (instance: ${context.instanceId})`;
+  }
+  // Keep the trailing newline so section joins preserve the current visual gap.
+  return `${header}\n`;
+}
+
+function formatIsolationEnabledText(instanceId: string): string {
+  return `Isolation enabled with instance ID: ${instanceId}`;
+}
+
 function taskAcceptsRest(task: Task, delimiters: [string, string]): boolean {
   const restPattern = `${delimiters[0]}REST${delimiters[1]}`;
   return task.cmds.some(
     (cmd) => typeof cmd === "string" && cmd.includes(restPattern),
   );
 }
+
+logger.setSink({
+  log: (msg: string) => console.log(msg),
+  warn: (msg: string) => console.warn(msg),
+  error: (msg: string) => console.error(msg),
+});
 
 export const renderer = {
   log: {
@@ -130,17 +149,24 @@ export const renderer = {
     },
   },
 
+  isolation: {
+    enabledText(instanceId: string): string {
+      return formatIsolationEnabledText(instanceId);
+    },
+    printEnabled(instanceId: string): void {
+      renderer.log.success(renderer.isolation.enabledText(instanceId));
+    },
+  },
+
   status: {
+    contextHeaderText(context: Context): string {
+      return formatStatusContextHeader(context);
+    },
     toText(statusResult: StatusResult, context?: Context): string {
       const sections: string[] = [];
 
       if (context) {
-        let header = context.projectName;
-        if (context.instanceId) {
-          header += ` (instance: ${context.instanceId})`;
-        }
-        header += "\n";
-        sections.push(header);
+        sections.push(renderer.status.contextHeaderText(context));
       }
 
       if (statusResult.native.length > 0) {

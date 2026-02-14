@@ -11,6 +11,17 @@ A lightweight dev environment runner. Define your local dev setup in a single `z
 - **[Usage](docs/usage.md)** — Comprehensive docs, keep this up to date
 - **[Development](docs/development.md)** — To see how we run/test/build the app
 
+## Documentation Freshness (Required)
+
+- Any behavior change must include doc updates in the same PR.
+- If `zap.yaml` behavior or supported fields change, update `docs/usage.md` before finishing.
+- If release/development workflow changes, update `docs/releases.md` and `docs/development.md`.
+- Treat `src/config/schemas.ts` as the source of truth for config keys.
+- Before wrapping up, run a docs consistency pass:
+  - Check for contradictions between code and docs.
+  - Check for stale command names, flags, defaults, and examples.
+  - Ensure newly introduced config fields are documented or explicitly marked as legacy/internal.
+
 ## Development
 
 Create example projects for testing:
