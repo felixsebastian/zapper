@@ -1,8 +1,8 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
-import { renderer } from "../ui/renderer";
+import { CommandResult } from "./CommandResult";
 
 export class StateCommand extends CommandHandler {
-  async execute(context: CommandContext): Promise<void> {
+  async execute(context: CommandContext): Promise<CommandResult> {
     const { zapper } = context;
 
     const zapperContext = zapper.getContext();
@@ -10,6 +10,9 @@ export class StateCommand extends CommandHandler {
       throw new Error("Context not loaded");
     }
 
-    renderer.machine.json(zapperContext.state);
+    return {
+      kind: "state",
+      state: zapperContext.state,
+    };
   }
 }

@@ -1,10 +1,10 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
-import { renderer } from "../ui/renderer";
 import { StateManager } from "../core/StateManager";
 import { Process, Container } from "../types/Context";
+import { CommandResult } from "./CommandResult";
 
 export class ProfilesCommand extends CommandHandler {
-  async execute(context: CommandContext): Promise<void> {
+  async execute(context: CommandContext): Promise<CommandResult | void> {
     const { zapper, service, options } = context;
 
     const zapperContext = zapper.getContext();
@@ -19,22 +19,18 @@ export class ProfilesCommand extends CommandHandler {
         zapperContext.projectRoot,
         options.config,
       );
-      await this.disableProfile(
+      return await this.disableProfile(
         stateManager,
         zapperContext.state.activeProfile,
       );
-      return;
     }
 
     // Handle --list flag
     if (options.list) {
-      const json = !!options.json;
-      if (json) {
-        renderer.machine.json(renderer.profiles.toJson(zapperContext.profiles));
-      } else {
-        renderer.log.report(renderer.profiles.toText(zapperContext.profiles));
-      }
-      return;
+      return {
+        kind: "profiles.list",
+        profiles: zapperContext.profiles,
+      };
     }
 
     // Handle specific profile selection
@@ -50,23 +46,21 @@ export class ProfilesCommand extends CommandHandler {
         zapperContext.projectRoot,
         options.config,
       );
-      await this.enableProfile(stateManager, service);
-      return;
+      return await this.enableProfile(stateManager, service);
     }
 
     // Handle interactive picker
-    await this.showInteractivePicker(
-      zapperContext.profiles,
-      zapperContext.state.activeProfile,
-    );
+    return {
+      kind: "profiles.picker",
+      profiles: zapperContext.profiles,
+      activeProfile: zapperContext.state.activeProfile,
+    };
   }
 
   private async enableProfile(
     stateManager: StateManager,
     profileName: string,
-  ): Promise<void> {
-    renderer.log.info(`Enabling profile: ${profileName}`);
-
+  ): Promise<CommandResult> {
     // Update the active profile state (this also reloads config)
     await stateManager.setActiveProfile(profileName);
 
@@ -97,40 +91,34 @@ export class ProfilesCommand extends CommandHandler {
       }
     });
 
-    if (servicesToStart.length === 0) {
-      renderer.log.info(`No services found for profile: ${profileName}`);
-      return;
+    if (servicesToStart.length > 0) {
+      await stateManager.getZapper().startProcesses(servicesToStart);
     }
-
-    renderer.log.info(`Starting services: ${servicesToStart.join(", ")}`);
-    await stateManager.getZapper().startProcesses(servicesToStart);
+    return {
+      kind: "profiles.enabled",
+      profile: profileName,
+      startedServices: servicesToStart,
+    };
   }
 
   private async disableProfile(
     stateManager: StateManager,
     currentActiveProfile?: string,
-  ): Promise<void> {
+  ): Promise<CommandResult> {
     if (!currentActiveProfile) {
-      renderer.log.info("No active profile to disable");
-      return;
+      return {
+        kind: "profiles.disabled",
+      };
     }
-
-    renderer.log.info(`Disabling active profile: ${currentActiveProfile}`);
 
     // Clear the active profile state (this also reloads config)
     await stateManager.clearActiveProfile();
 
-    renderer.log.info("Active profile disabled");
-
     // Run startAll to bring system to good state (stop services that were only running due to the disabled profile)
-    renderer.log.info("Adjusting services to match new state...");
     await stateManager.getZapper().startProcesses(); // This will call startAll with no active profile
-  }
-
-  private async showInteractivePicker(
-    profiles: string[],
-    activeProfile?: string,
-  ): Promise<void> {
-    renderer.log.report(renderer.profiles.pickerText(profiles, activeProfile));
+    return {
+      kind: "profiles.disabled",
+      activeProfile: currentActiveProfile,
+    };
   }
 }

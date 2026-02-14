@@ -1,10 +1,10 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
-import { renderer } from "../ui/renderer";
 import { StateManager } from "../core/StateManager";
 import { Context } from "../types/Context";
+import { CommandResult } from "./CommandResult";
 
 export class EnvCommand extends CommandHandler {
-  async execute(context: CommandContext): Promise<void> {
+  async execute(context: CommandContext): Promise<CommandResult | void> {
     const { zapper, service, options } = context;
 
     const zapperContext = zapper.getContext();
@@ -21,21 +21,17 @@ export class EnvCommand extends CommandHandler {
         zapperContext.projectRoot,
         options.config,
       );
-      await this.disableEnvironment(
+      return await this.disableEnvironment(
         stateManager,
         zapperContext.state.activeEnvironment,
       );
-      return;
     }
 
     if (options.list) {
-      const json = !!options.json;
-      if (json) {
-        renderer.machine.json(renderer.environments.toJson(environments));
-      } else {
-        renderer.log.report(renderer.environments.toText(environments));
-      }
-      return;
+      return {
+        kind: "environments.list",
+        environments,
+      };
     }
 
     const forcedService = options.service as string | undefined;
@@ -51,8 +47,7 @@ export class EnvCommand extends CommandHandler {
       const hasService = this.serviceExists(zapperContext, resolvedServiceName);
 
       if (forcedService) {
-        await this.showServiceEnv(zapperContext, resolvedServiceName, options);
-        return;
+        return await this.showServiceEnv(zapperContext, resolvedServiceName);
       }
 
       if (isEnvironment && hasService) {
@@ -67,13 +62,11 @@ export class EnvCommand extends CommandHandler {
           zapperContext.projectRoot,
           options.config,
         );
-        await this.enableEnvironment(stateManager, targetName);
-        return;
+        return await this.enableEnvironment(stateManager, targetName);
       }
 
       if (hasService) {
-        await this.showServiceEnv(zapperContext, resolvedServiceName, options);
-        return;
+        return await this.showServiceEnv(zapperContext, resolvedServiceName);
       }
 
       throw new Error(
@@ -81,10 +74,11 @@ export class EnvCommand extends CommandHandler {
       );
     }
 
-    await this.showInteractivePicker(
+    return {
+      kind: "environments.picker",
       environments,
-      zapperContext.state.activeEnvironment,
-    );
+      activeEnvironment: zapperContext.state.activeEnvironment,
+    };
   }
 
   private serviceExists(context: Context, serviceName: string): boolean {
@@ -97,8 +91,7 @@ export class EnvCommand extends CommandHandler {
   private async showServiceEnv(
     zapperContext: Context,
     serviceName: string,
-    options: { json?: boolean },
-  ): Promise<void> {
+  ): Promise<CommandResult> {
     const process = zapperContext.processes.find((p) => p.name === serviceName);
     const container = zapperContext.containers.find(
       (c) => c.name === serviceName,
@@ -110,53 +103,37 @@ export class EnvCommand extends CommandHandler {
     }
 
     const resolvedEnv = target.resolvedEnv || {};
-
-    if (options.json) {
-      renderer.machine.json(resolvedEnv);
-    } else {
-      renderer.machine.envMap(resolvedEnv);
-    }
+    return {
+      kind: "env.service",
+      resolvedEnv,
+    };
   }
 
   private async enableEnvironment(
     stateManager: StateManager,
     environmentName: string,
-  ): Promise<void> {
-    renderer.log.info(`Enabling environment: ${environmentName}`);
-
+  ): Promise<CommandResult> {
     await stateManager.setActiveEnvironment(environmentName);
-
-    renderer.log.info(
-      "Environment updated. Restart services to apply new environment variables.",
-    );
+    return {
+      kind: "environments.enabled",
+      environment: environmentName,
+    };
   }
 
   private async disableEnvironment(
     stateManager: StateManager,
     currentActiveEnvironment?: string,
-  ): Promise<void> {
+  ): Promise<CommandResult> {
     if (!currentActiveEnvironment) {
-      renderer.log.info("No active environment to disable");
-      return;
+      return {
+        kind: "environments.disabled",
+      };
     }
 
-    renderer.log.info(
-      `Disabling active environment: ${currentActiveEnvironment}`,
-    );
-
     await stateManager.clearActiveEnvironment();
-
-    renderer.log.info(
-      "Environment reset to default. Restart services to apply new environment variables.",
-    );
-  }
-
-  private async showInteractivePicker(
-    environments: string[],
-    activeEnvironment?: string,
-  ): Promise<void> {
-    renderer.log.report(
-      renderer.environments.pickerText(environments, activeEnvironment),
-    );
+    return {
+      kind: "environments.disabled",
+      activeEnvironment: currentActiveEnvironment,
+    };
   }
 }

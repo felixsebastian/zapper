@@ -95,19 +95,21 @@ zap --verbose --config custom.yaml task build
 
 ```bash
 zap up                      # Start all services
-zap up --service backend    # Start specific service (and its dependencies)
+zap up backend              # Start specific service (and its dependencies)
+zap up --json               # Output command result as JSON
 zap down                    # Stop all services
-zap down --service backend  # Stop specific service
+zap down backend            # Stop specific service
+zap down backend --json     # Output command result as JSON
 zap restart                 # Restart all services
-zap restart --service api   # Restart specific service
+zap restart api             # Restart specific service
+zap r api                   # Short alias for: zap restart api
 ```
 
 ### Status and logs
 
 ```bash
 zap status                  # Show status of all services
-zap logs                    # Follow logs for all services
-zap logs --service api      # Follow logs for specific service
+zap logs api                # Follow logs for specific service
 ```
 
 ### Tasks
@@ -116,7 +118,6 @@ zap logs --service api      # Follow logs for specific service
 zap task                           # List all tasks
 zap task <name>                    # Run a task
 zap run <name>                     # Alias for: zap task <name>
-zap r <name>                       # Short alias for: zap task <name>
 zap task seed
 zap task build --target=prod       # Run with named parameters
 zap task test -- --coverage        # Run with pass-through args
@@ -127,12 +128,16 @@ zap task build --list-params       # Show task parameters as JSON
 
 ```bash
 zap reset                   # Stop all services and delete .zap folder
+zap reset --json            # Output command result as JSON
 zap clone                   # Clone all repos defined in config
-zap clone --service api     # Clone specific repo
+zap clone api               # Clone specific repo
+zap clone --json            # Output command result as JSON
 zap launch                  # Open homepage (if configured)
 zap launch "API Docs"       # Open a configured link by name
+zap launch "API Docs" --json # Output command result as JSON
 zap open                    # Alias for: zap launch
 zap o "API Docs"            # Short alias for: zap launch "API Docs"
+zap isolate --json          # Output isolation result as JSON
 ```
 
 ### Profiles
@@ -140,6 +145,7 @@ zap o "API Docs"            # Short alias for: zap launch "API Docs"
 ```bash
 zap profile dev             # Enable a profile
 zap profile --disable       # Disable active profile
+zap profile dev --json      # Output profile action result as JSON
 ```
 
 ### Environments
@@ -148,6 +154,7 @@ zap profile --disable       # Disable active profile
 zap env --list                    # List available environment sets
 zap env prod_dbs                  # Switch env file set
 zap env --disable                 # Reset to default env set
+zap env prod_dbs --json           # Output environment action result as JSON
 ```
 
 Aliases:
@@ -155,6 +162,18 @@ Aliases:
 ```bash
 zap environment --list
 zap envset prod_dbs
+```
+
+### JSON Output
+
+Most non-streaming commands support `--json` and will print machine-readable JSON to stdout.
+Examples: `up`, `down`, `restart`, `clone`, `reset`, `status`, `task` (list/params), `profile`, `env`, `state`, `config`, `launch`, `isolate`, and git subcommands.
+
+Streaming commands keep stream output and are not JSON-encoded:
+
+```bash
+zap logs <service>
+zap task <name>
 ```
 
 ---
@@ -660,7 +679,7 @@ native:
     depends_on: [api]
 ```
 
-When you run `zap up --service frontend`, Zapper starts: postgres → redis → api → frontend.
+When you run `zap up frontend`, Zapper starts: postgres → redis → api → frontend.
 
 ---
 
@@ -802,7 +821,7 @@ native:
 
 ```bash
 zap clone                  # Clone all repos
-zap clone --service api    # Clone specific repo
+zap clone api              # Clone specific repo
 ```
 
 Repos are cloned to the path specified in `cwd`.

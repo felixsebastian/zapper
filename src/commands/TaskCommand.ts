@@ -1,20 +1,17 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
-import { renderer } from "../ui/renderer";
+import { CommandResult } from "./CommandResult";
 
 export class TaskCommand extends CommandHandler {
-  async execute(context: CommandContext): Promise<void> {
+  async execute(context: CommandContext): Promise<CommandResult | void> {
     const { zapper, service, options, taskParams } = context;
 
     if (!service) {
       const zapperContext = zapper.getContext();
       if (!zapperContext) throw new Error("Context not loaded");
-
-      if (options.json) {
-        renderer.machine.json(renderer.tasks.toJson(zapperContext.tasks));
-      } else {
-        renderer.log.report(renderer.tasks.toText(zapperContext.tasks));
-      }
-      return;
+      return {
+        kind: "tasks.list",
+        tasks: zapperContext.tasks,
+      };
     }
 
     // Handle --list-params option
@@ -24,11 +21,11 @@ export class TaskCommand extends CommandHandler {
 
       const task = zapperContext.tasks.find((t) => t.name === service);
       if (!task) throw new Error(`Task not found: ${service}`);
-
-      renderer.machine.json(
-        renderer.tasks.paramsToJson(task, zapperContext.taskDelimiters),
-      );
-      return;
+      return {
+        kind: "tasks.params",
+        task,
+        delimiters: zapperContext.taskDelimiters,
+      };
     }
 
     await zapper.runTask(service, taskParams);

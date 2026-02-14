@@ -272,7 +272,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
   });
 
   describe("Selective Service Operations", () => {
-    it("should start only specified service and its dependencies with 'zap up --service <name>'", async () => {
+    it("should start only specified service and its dependencies with 'zap up <name>'", async () => {
       setupTempConfig({ stripProfiles: true });
 
       // Start only frontend (should start database, api, and frontend due to dependencies)
@@ -295,7 +295,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       expect(runningServices.length).toBe(3);
     }, 45000);
 
-    it("should stop only specified service with 'zap down --service <name>'", async () => {
+    it("should stop only specified service with 'zap down <name>'", async () => {
       setupTempConfig({ stripProfiles: true });
 
       // Start all services first
@@ -330,7 +330,7 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       expect(runningServices).toContain("worker");
     }, 45000);
 
-    it("should restart specified service correctly with 'zap restart --service <name>'", async () => {
+    it("should restart specified service correctly with 'zap restart <name>'", async () => {
       setupTempConfig({ stripProfiles: true });
 
       // Start all services first

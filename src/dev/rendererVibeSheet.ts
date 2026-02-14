@@ -97,9 +97,6 @@ function main(): void {
   const environments = ["default", "staging", "qa"];
 
   section("Renderer Vibe Sheet");
-  renderer.machine.line(
-    "Stream passthrough output (tail/pm2/docker logs) is intentionally excluded.",
-  );
 
   section("Line Logs");
   renderer.log.info("Starting api service");
@@ -117,7 +114,6 @@ function main(): void {
 
   section("Task Report");
   renderer.log.report(renderer.tasks.toText(tasks));
-  renderer.machine.json(renderer.tasks.paramsToJson(tasks[0], ["{{", "}}"]));
 
   section("Profile Report");
   renderer.log.report(renderer.profiles.toText(profiles));
@@ -128,19 +124,6 @@ function main(): void {
   renderer.log.report(
     renderer.environments.pickerText(environments, "staging"),
   );
-
-  section("Machine Output");
-  renderer.machine.json(renderer.status.toJson(statusResult), true);
-  renderer.machine.envMap({
-    NODE_ENV: "development",
-    API_BASE_URL: "http://localhost:3000",
-    FEATURE_FLAG_EXPERIMENTAL_RENDER: "true",
-  });
-  renderer.machine.lines([
-    "machine-line-one",
-    "machine-line-two",
-    "machine-line-three",
-  ]);
 
   section("Warnings");
   renderer.warnings.printUnisolatedWorktree();

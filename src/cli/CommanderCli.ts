@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { Command as ZapCommand } from "../types/index";
 import { Zapper } from "../core/Zapper";
 import { logger, LogLevel } from "../utils/logger";
+import { renderCommandResult } from "../ui/commandResultRenderer";
 import {
   UpCommand,
   DownCommand,
@@ -33,7 +34,7 @@ function parseTaskArgs(rawArgv: string[], taskName: string): TaskParams {
 
   // Find the position of the task command and task name in raw argv
   const taskIdx = rawArgv.findIndex((arg) =>
-    ["task", "t", "run", "r"].includes(arg),
+    ["task", "t", "run"].includes(arg),
   );
   if (taskIdx === -1) return { named, rest };
 
@@ -120,6 +121,7 @@ export class CommanderCli {
       .alias("u")
       .description("Start all processes or specific processes")
       .argument("[services...]", "Services to start (space-separated)")
+      .option("-j, --json", "Output command result as minified JSON")
       .action(async (services, options, command) => {
         await this.executeCommand("up", services, command);
       });
@@ -131,14 +133,17 @@ export class CommanderCli {
       .description("Stop all processes or specific processes")
       .argument("[services...]", "Services to stop (space-separated)")
       .option("-y, --force", "Force the operation")
+      .option("-j, --json", "Output command result as minified JSON")
       .action(async (services, options, command) => {
         await this.executeCommand("down", services, command);
       });
 
     this.program
       .command("restart")
+      .alias("r")
       .description("Restart all processes or a specific process")
       .argument("[service]", "Service to restart")
+      .option("-j, --json", "Output command result as minified JSON")
       .action(async (service, options, command) => {
         await this.executeCommand("restart", service, command);
       });
@@ -171,6 +176,7 @@ export class CommanderCli {
       .command("reset")
       .description("Stop all processes and delete the .zap directory")
       .option("-y, --force", "Force the operation")
+      .option("-j, --json", "Output command result as minified JSON")
       .action(async (options, command) => {
         await this.executeCommand("reset", undefined, command);
       });
@@ -186,6 +192,7 @@ export class CommanderCli {
         "Use HTTP for git cloning (overrides config git_method)",
       )
       .option("--ssh", "Use SSH for git cloning (overrides config git_method)")
+      .option("-j, --json", "Output command result as minified JSON")
       .action(async (service, options, command) => {
         await this.executeCommand("clone", service, command);
       });
@@ -194,7 +201,6 @@ export class CommanderCli {
       .command("task")
       .alias("t")
       .alias("run")
-      .alias("r")
       .description(
         "Run a one-off task by name, or list all tasks if no task specified",
       )
@@ -245,6 +251,7 @@ export class CommanderCli {
     this.program
       .command("state")
       .description("Show the current state JSON")
+      .option("-j, --json", "Output state as minified JSON")
       .action(async (options, command) => {
         await this.executeCommand("state", undefined, command);
       });
@@ -257,6 +264,7 @@ export class CommanderCli {
       .command("status")
       .alias("gst")
       .description("List branch and dirty/clean for all native repos")
+      .option("-j, --json", "Output command result as minified JSON")
       .action(async (options, command) => {
         await this.executeCommand("git:status", undefined, command);
       });
@@ -265,6 +273,7 @@ export class CommanderCli {
       .command("pull")
       .alias("ggpur")
       .description("Pull latest for all native repos")
+      .option("-j, --json", "Output command result as minified JSON")
       .action(async (options, command) => {
         await this.executeCommand("git:pull", undefined, command);
       });
@@ -273,6 +282,7 @@ export class CommanderCli {
       .command("checkout <branch>")
       .alias("gco")
       .description("Checkout a branch across all native repos")
+      .option("-j, --json", "Output command result as minified JSON")
       .action(async (branch, options, command) => {
         await this.executeCommand("git:checkout", branch, command);
       });
@@ -281,6 +291,7 @@ export class CommanderCli {
       .command("stash")
       .alias("gsta")
       .description("Stash any dirty changes across all native repos")
+      .option("-j, --json", "Output command result as minified JSON")
       .action(async (options, command) => {
         await this.executeCommand("git:stash", undefined, command);
       });
@@ -351,6 +362,7 @@ export class CommanderCli {
         "Open homepage by default, or open a configured link by name",
       )
       .argument("[name]", "Link name to open")
+      .option("-j, --json", "Output command result as minified JSON")
       .action(async (service, options, command) => {
         await this.executeCommand("launch", service, command);
       });
@@ -359,6 +371,7 @@ export class CommanderCli {
       .command("isolate")
       .description("Enable worktree isolation by creating a local instance ID")
       .argument("[instanceId]", "Optional instance ID to use as-is")
+      .option("-j, --json", "Output command result as minified JSON")
       .action(async (instanceId, options, command) => {
         await this.executeCommand("isolate", instanceId, command);
       });
@@ -379,6 +392,11 @@ export class CommanderCli {
     } else if (allOptions.verbose) {
       logger.setLevel(LogLevel.INFO);
     } else if (allOptions.quiet) {
+      logger.setLevel(LogLevel.WARN);
+    }
+
+    // Keep JSON output parseable on stdout by suppressing info/debug line logs.
+    if (allOptions.json) {
       logger.setLevel(LogLevel.WARN);
     }
 
@@ -419,7 +437,12 @@ export class CommanderCli {
       taskParams,
     };
 
-    await handler.execute(context);
+    const result = await handler.execute(context);
+    if (result) {
+      renderCommandResult(result, {
+        json: !!allOptions.json,
+      });
+    }
   }
 
   async parse(args: string[]): Promise<void> {

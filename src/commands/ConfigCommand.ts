@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { CommandHandler, CommandContext } from "./CommandHandler";
-import { renderer } from "../ui/renderer";
+import { CommandResult } from "./CommandResult";
 
 export class ConfigCommand extends CommandHandler {
-  async execute(context: CommandContext): Promise<void> {
+  async execute(context: CommandContext): Promise<CommandResult> {
     const { zapper, options } = context;
 
     const zapperContext = zapper.getContext();
@@ -15,8 +15,11 @@ export class ConfigCommand extends CommandHandler {
     const showEnvs = !!options.showEnvs;
     const pretty = !!options.pretty;
     const filteredConfig = this.createFilteredConfig(zapperContext, showEnvs);
-
-    renderer.machine.json(filteredConfig, pretty);
+    return {
+      kind: "config",
+      filteredConfig,
+      pretty,
+    };
   }
 
   private createFilteredConfig(context: any, showEnvs: boolean): any {

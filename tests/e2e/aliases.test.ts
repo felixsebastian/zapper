@@ -295,9 +295,9 @@ describe("E2E: Aliases Support", () => {
         );
         const initialWebPid = webProcess?.pid;
 
-        // Restart using 'web' alias
+        // Restart using 'r' command shorthand and 'web' service alias
         const restartOutput = runZapCommand(
-          `restart web --config zap-${testProjectName}.yaml`,
+          `r web --config zap-${testProjectName}.yaml`,
           fixtureDir,
           { timeout: 15000 },
         );
@@ -425,15 +425,6 @@ describe("E2E: Aliases Support", () => {
         );
         expect(runOutput).toContain("Building frontend");
         expect(runOutput).toContain("Build completed successfully");
-
-        // Test 'r' short alias for task command
-        const rOutput = runZapCommand(
-          `r b --config zap-${testProjectName}.yaml`,
-          fixtureDir,
-          { timeout: 10000 },
-        );
-        expect(rOutput).toContain("Building frontend");
-        expect(rOutput).toContain("Build completed successfully");
 
         // Test 'compile' alias for 'build' task
         const compileOutput = runZapCommand(

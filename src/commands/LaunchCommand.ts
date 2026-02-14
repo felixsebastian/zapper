@@ -1,9 +1,9 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
-import { renderer } from "../ui/renderer";
+import { CommandResult } from "./CommandResult";
 import { exec } from "child_process";
 
 export class LaunchCommand extends CommandHandler {
-  async execute(context: CommandContext): Promise<void> {
+  async execute(context: CommandContext): Promise<CommandResult> {
     const { zapper, service: name } = context;
 
     const zapperContext = zapper.getContext();
@@ -20,7 +20,6 @@ export class LaunchCommand extends CommandHandler {
       );
     }
 
-    renderer.log.info(`Opening ${link}`);
     const openCmd =
       process.platform === "darwin"
         ? "open"
@@ -28,5 +27,9 @@ export class LaunchCommand extends CommandHandler {
           ? "start"
           : "xdg-open";
     exec(`${openCmd} "${link}"`);
+    return {
+      kind: "launch.opened",
+      url: link,
+    };
   }
 }

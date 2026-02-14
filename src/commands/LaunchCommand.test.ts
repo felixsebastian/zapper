@@ -2,21 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { LaunchCommand } from "./LaunchCommand";
 import type { Zapper } from "../core/Zapper";
 
-const { mockExec, mockInfo } = vi.hoisted(() => ({
+const { mockExec } = vi.hoisted(() => ({
   mockExec: vi.fn(),
-  mockInfo: vi.fn(),
 }));
 
 vi.mock("child_process", () => ({
   exec: mockExec,
-}));
-
-vi.mock("../ui/renderer", () => ({
-  renderer: {
-    log: {
-      info: mockInfo,
-    },
-  },
 }));
 
 function getOpenCommand(): string {
@@ -47,12 +38,15 @@ describe("LaunchCommand", () => {
       }),
     };
 
-    await command.execute({
+    const result = await command.execute({
       zapper: zapper as unknown as Zapper,
       options: {},
     });
 
-    expect(mockInfo).toHaveBeenCalledWith("Opening http://localhost:3000");
+    expect(result).toEqual({
+      kind: "launch.opened",
+      url: "http://localhost:3000",
+    });
     expect(mockExec).toHaveBeenCalledWith(
       `${getOpenCommand()} "http://localhost:3000"`,
     );
@@ -75,13 +69,16 @@ describe("LaunchCommand", () => {
       }),
     };
 
-    await command.execute({
+    const result = await command.execute({
       zapper: zapper as unknown as Zapper,
       service: "docs",
       options: {},
     });
 
-    expect(mockInfo).toHaveBeenCalledWith("Opening http://localhost:3001/docs");
+    expect(result).toEqual({
+      kind: "launch.opened",
+      url: "http://localhost:3001/docs",
+    });
     expect(mockExec).toHaveBeenCalledWith(
       `${getOpenCommand()} "http://localhost:3001/docs"`,
     );
