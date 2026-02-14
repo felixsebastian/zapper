@@ -353,8 +353,9 @@ export class CommanderCli {
     this.program
       .command("isolate")
       .description("Enable worktree isolation by creating a local instance ID")
-      .action(async (options, command) => {
-        await this.executeCommand("isolate", undefined, command);
+      .argument("[instanceId]", "Optional instance ID to use as-is")
+      .action(async (instanceId, options, command) => {
+        await this.executeCommand("isolate", instanceId, command);
       });
   }
 
@@ -377,9 +378,12 @@ export class CommanderCli {
     }
 
     const zapper = new Zapper();
-    await zapper.loadConfig(allOptions.config, allOptions);
+    await zapper.loadConfig(allOptions.config, allOptions, {
+      suppressUnisolatedWorktreeWarning: command === "isolate",
+    });
 
-    const shouldResolveAliases = command !== "env" && command !== "environment";
+    const shouldResolveAliases =
+      command !== "env" && command !== "environment" && command !== "isolate";
     const resolvedService =
       service && shouldResolveAliases
         ? Array.isArray(service)

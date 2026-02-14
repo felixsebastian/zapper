@@ -11,13 +11,22 @@ export interface InstanceResolution {
   mode: "normal" | "isolate";
 }
 
+export interface ResolveInstanceOptions {
+  suppressUnisolatedWorktreeWarning?: boolean;
+}
+
 /**
  * Generate a short random instance ID.
  */
-function generateInstanceId(projectRoot: string): string {
-  const salt = `${projectRoot}:${Date.now()}:${crypto.randomBytes(8).toString("hex")}`;
-  const hash = crypto.createHash("sha256").update(salt).digest("hex");
-  return `wt-${hash.substring(0, 6)}`;
+function generateInstanceId(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let instanceId = "";
+
+  for (let i = 0; i < 6; i += 1) {
+    instanceId += chars[crypto.randomInt(0, chars.length)];
+  }
+
+  return instanceId;
 }
 
 function printUnisolatedWorktreeWarning(): void {
@@ -31,13 +40,25 @@ function printUnisolatedWorktreeWarning(): void {
   console.warn("===============================================\n");
 }
 
-export function isolateProject(projectRoot: string): string {
+export function isolateProject(
+  projectRoot: string,
+  requestedInstanceId?: string,
+): string {
+  if (requestedInstanceId) {
+    const config: InstanceConfig = {
+      instanceId: requestedInstanceId,
+      mode: "isolate",
+    };
+    saveInstanceConfig(projectRoot, config);
+    return requestedInstanceId;
+  }
+
   const existingConfig = loadInstanceConfig(projectRoot);
   if (existingConfig?.instanceId) {
     return existingConfig.instanceId;
   }
 
-  const instanceId = generateInstanceId(projectRoot);
+  const instanceId = generateInstanceId();
   const config: InstanceConfig = {
     instanceId,
     mode: "isolate",
@@ -52,6 +73,7 @@ export function isolateProject(projectRoot: string): string {
  */
 export async function resolveInstance(
   projectRoot: string,
+  options: ResolveInstanceOptions = {},
 ): Promise<InstanceResolution> {
   // 1. Check for existing configuration
   const existingConfig = loadInstanceConfig(projectRoot);
@@ -69,6 +91,9 @@ export async function resolveInstance(
   }
 
   // 3. Warn and continue in non-isolated mode
-  printUnisolatedWorktreeWarning();
+  if (!options.suppressUnisolatedWorktreeWarning) {
+    printUnisolatedWorktreeWarning();
+  }
+
   return { mode: "normal" };
 }

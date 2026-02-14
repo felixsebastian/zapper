@@ -9,13 +9,15 @@ const validNameSchema = z
     "Name must contain only alphanumeric characters, underscores, and hyphens",
   );
 
-export const VolumeSchema = z.object({
-  name: z.string().min(1, "Volume name cannot be empty"),
-  internal_dir: z
-    .string()
-    .min(1, "Internal directory cannot be empty")
-    .startsWith("/", "Internal directory must be an absolute path"),
-});
+export const VolumeSchema = z
+  .object({
+    name: z.string().min(1, "Volume name cannot be empty"),
+    internal_dir: z
+      .string()
+      .min(1, "Internal directory cannot be empty")
+      .startsWith("/", "Internal directory must be an absolute path"),
+  })
+  .strict();
 
 export const ContainerVolumeSchema = z.union([
   VolumeSchema,
@@ -45,103 +47,117 @@ const HealthcheckSchema = z
   .union([z.number(), z.string().url("Healthcheck must be a valid URL")])
   .optional();
 
-export const ProcessSchema = z.object({
-  name: z.string().optional(),
-  cmd: z.string().min(1, "Command cannot be empty"),
-  cwd: z.string().optional(),
-  envs: z.array(z.string()).optional(),
-  env: EnvSchema.optional(),
-  aliases: z.array(validNameSchema).optional(),
-  resolvedEnv: z.record(z.string(), z.string()).optional(),
-  source: z.string().optional(),
-  repo: z.string().optional(),
-  env_files: z.array(z.string()).optional(),
-  profiles: z
-    .array(z.string().min(1, "Profile name cannot be empty"))
-    .optional(),
-  healthcheck: HealthcheckSchema,
-  depends_on: z.array(validNameSchema).optional(),
-  link: z.string().min(1).optional(),
-});
+export const ProcessSchema = z
+  .object({
+    name: z.string().optional(),
+    cmd: z.string().min(1, "Command cannot be empty"),
+    cwd: z.string().optional(),
+    envs: z.array(z.string()).optional(),
+    env: EnvSchema.optional(),
+    aliases: z.array(validNameSchema).optional(),
+    resolvedEnv: z.record(z.string(), z.string()).optional(),
+    source: z.string().optional(),
+    repo: z.string().optional(),
+    env_files: z.array(z.string()).optional(),
+    profiles: z
+      .array(z.string().min(1, "Profile name cannot be empty"))
+      .optional(),
+    healthcheck: HealthcheckSchema,
+    depends_on: z.array(validNameSchema).optional(),
+    link: z.string().min(1).optional(),
+  })
+  .strict();
 
-export const ContainerSchema = z.object({
-  name: z.string().optional(),
-  image: z.string().min(1, "Image cannot be empty"),
-  ports: z.array(z.string().min(1, "Port cannot be empty")).optional(),
-  env: EnvSchema.optional(),
-  volumes: z.array(ContainerVolumeSchema).optional(),
-  networks: z
-    .array(z.string().min(1, "Network name cannot be empty"))
-    .optional(),
-  command: z.string().optional(),
-  aliases: z.array(validNameSchema).optional(),
-  resolvedEnv: z.record(z.string(), z.string()).optional(),
-  profiles: z
-    .array(z.string().min(1, "Profile name cannot be empty"))
-    .optional(),
-  healthcheck: HealthcheckSchema,
-  depends_on: z.array(validNameSchema).optional(),
-  link: z.string().min(1).optional(),
-});
+export const ContainerSchema = z
+  .object({
+    name: z.string().optional(),
+    image: z.string().min(1, "Image cannot be empty"),
+    ports: z.array(z.string().min(1, "Port cannot be empty")).optional(),
+    env: EnvSchema.optional(),
+    volumes: z.array(ContainerVolumeSchema).optional(),
+    networks: z
+      .array(z.string().min(1, "Network name cannot be empty"))
+      .optional(),
+    command: z.string().optional(),
+    aliases: z.array(validNameSchema).optional(),
+    resolvedEnv: z.record(z.string(), z.string()).optional(),
+    profiles: z
+      .array(z.string().min(1, "Profile name cannot be empty"))
+      .optional(),
+    healthcheck: HealthcheckSchema,
+    depends_on: z.array(validNameSchema).optional(),
+    link: z.string().min(1).optional(),
+  })
+  .strict();
 
 export const TaskCmdSchema = z.union([
   z.string(),
-  z.object({
-    task: z.string().min(1, "Task name cannot be empty"),
-  }),
+  z
+    .object({
+      task: z.string().min(1, "Task name cannot be empty"),
+    })
+    .strict(),
 ]);
 
-export const TaskParamSchema = z.object({
-  name: validNameSchema,
-  desc: z.string().optional(),
-  default: z.string().optional(),
-  required: z.boolean().optional(),
-});
+export const TaskParamSchema = z
+  .object({
+    name: validNameSchema,
+    desc: z.string().optional(),
+    default: z.string().optional(),
+    required: z.boolean().optional(),
+  })
+  .strict();
 
-export const TaskSchema = z.object({
-  name: z.string().optional(),
-  desc: z.string().optional(),
-  cmds: z.array(TaskCmdSchema).min(1, "Task must have at least one command"),
-  env: EnvSchema.optional(),
-  cwd: z.string().optional(),
-  aliases: z.array(validNameSchema).optional(),
-  resolvedEnv: z.record(z.string(), z.string()).optional(),
-  env_files: z.array(z.string()).optional(),
-  params: z.array(TaskParamSchema).optional(),
-});
+export const TaskSchema = z
+  .object({
+    name: z.string().optional(),
+    desc: z.string().optional(),
+    cmds: z.array(TaskCmdSchema).min(1, "Task must have at least one command"),
+    env: EnvSchema.optional(),
+    cwd: z.string().optional(),
+    aliases: z.array(validNameSchema).optional(),
+    resolvedEnv: z.record(z.string(), z.string()).optional(),
+    env_files: z.array(z.string()).optional(),
+    params: z.array(TaskParamSchema).optional(),
+  })
+  .strict();
 
 export const TaskDelimitersSchema = z
   .tuple([z.string().min(1), z.string().min(1)])
   .optional();
 
-export const LinkSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Link name cannot be empty")
-    .max(100, "Link name cannot exceed 100 characters"),
-  url: z.string().min(1, "Link URL cannot be empty"),
-});
+export const LinkSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1, "Link name cannot be empty")
+      .max(100, "Link name cannot exceed 100 characters"),
+    url: z.string().min(1, "Link URL cannot be empty"),
+  })
+  .strict();
 
 export const ZapperConfigSchema = processValidation(
   duplicateValidation(
-    z.object({
-      project: validNameSchema,
-      env_files: EnvFilesSchema.optional(),
-      git_method: z.enum(["http", "ssh", "cli"]).optional(),
-      task_delimiters: TaskDelimitersSchema,
-      whitelists: z
-        .record(
-          validNameSchema,
-          z.array(z.string().min(1, "Environment variable cannot be empty")),
-        )
-        .optional(),
-      native: z.record(validNameSchema, ProcessSchema).optional(),
-      docker: z.record(validNameSchema, ContainerSchema).optional(),
-      containers: z.record(validNameSchema, ContainerSchema).optional(),
-      processes: z.array(ProcessSchema).optional(),
-      tasks: z.record(validNameSchema, TaskSchema).optional(),
-      links: z.array(LinkSchema).optional(),
-    }),
+    z
+      .object({
+        project: validNameSchema,
+        env_files: EnvFilesSchema.optional(),
+        git_method: z.enum(["http", "ssh", "cli"]).optional(),
+        task_delimiters: TaskDelimitersSchema,
+        whitelists: z
+          .record(
+            validNameSchema,
+            z.array(z.string().min(1, "Environment variable cannot be empty")),
+          )
+          .optional(),
+        native: z.record(validNameSchema, ProcessSchema).optional(),
+        docker: z.record(validNameSchema, ContainerSchema).optional(),
+        containers: z.record(validNameSchema, ContainerSchema).optional(),
+        processes: z.array(ProcessSchema).optional(),
+        tasks: z.record(validNameSchema, TaskSchema).optional(),
+        links: z.array(LinkSchema).optional(),
+      })
+      .strict(),
   ),
 );
 

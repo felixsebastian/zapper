@@ -30,6 +30,9 @@ export class Zapper {
   async loadConfig(
     configPath?: string,
     cliOptions?: Record<string, any>,
+    options?: {
+      suppressUnisolatedWorktreeWarning?: boolean;
+    },
   ): Promise<void> {
     const resolvedPath = resolveConfigPath(configPath);
     if (!resolvedPath) {
@@ -52,7 +55,10 @@ export class Zapper {
     this.context = EnvResolver.resolveContext(this.context);
 
     // Resolve instance configuration (worktree detection, etc.)
-    const instanceResolution = await resolveInstance(projectRoot);
+    const instanceResolution = await resolveInstance(projectRoot, {
+      suppressUnisolatedWorktreeWarning:
+        options?.suppressUnisolatedWorktreeWarning,
+    });
     this.context.instanceId = instanceResolution.instanceId;
   }
 
@@ -355,10 +361,13 @@ export class Zapper {
     }
   }
 
-  async isolateInstance(): Promise<string> {
+  async isolateInstance(requestedInstanceId?: string): Promise<string> {
     if (!this.context) throw new ContextNotLoadedError();
 
-    const instanceId = isolateProject(this.context.projectRoot);
+    const instanceId = isolateProject(
+      this.context.projectRoot,
+      requestedInstanceId,
+    );
     this.context.instanceId = instanceId;
     return instanceId;
   }

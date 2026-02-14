@@ -38,9 +38,19 @@ npm install --global @maplab/zapper  # Reinstall from npm
 pnpm test                        # Run all tests
 pnpm test --watch                # Watch mode
 pnpm test yaml-parser.test.ts    # Specific file
+pnpm test:e2e                    # E2E (uses Linux VM on macOS when set up)
 ```
 
 For manual testing, use the example projects in `examples/`. After building, cd into one and run `zap up`.
+
+### E2E in Linux VM (macOS)
+
+```bash
+bash ./etc/e2e_setup.sh          # One-time Lima VM setup
+pnpm test:e2e                    # Runs inside VM
+```
+
+If VM setup is missing, `pnpm test:e2e` prints a warning and falls back to local execution.
 
 ## Releases
 

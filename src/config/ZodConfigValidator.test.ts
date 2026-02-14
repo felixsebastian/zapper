@@ -79,6 +79,22 @@ describe("ZodConfigValidator", () => {
     }).not.toThrow();
   });
 
+  it("should allow legacy envs field for backward compatibility", () => {
+    const config = {
+      project: "myproj",
+      native: {
+        app: {
+          cmd: "npm run dev",
+          envs: ["PORT", "API_URL"],
+        },
+      },
+    };
+
+    expect(() => {
+      ZodConfigValidator.validate(config);
+    }).not.toThrow();
+  });
+
   it("should reject config without project", () => {
     const config = {
       native: {
@@ -160,6 +176,40 @@ describe("ZodConfigValidator", () => {
       ZodConfigValidator.validate(config);
     }).toThrow(
       "Configuration validation failed: native.test.cmd: Command cannot be empty",
+    );
+  });
+
+  it("should reject config with unknown top-level field", () => {
+    const config = {
+      project: "myproj",
+      native: {
+        app: {
+          cmd: "npm run dev",
+        },
+      },
+      unknown: "value",
+    };
+
+    expect(() => {
+      ZodConfigValidator.validate(config);
+    }).toThrow('Configuration validation failed: Unrecognized key: "unknown"');
+  });
+
+  it("should reject config with unknown process field", () => {
+    const config = {
+      project: "myproj",
+      native: {
+        app: {
+          cmd: "npm run dev",
+          unknown_field: true,
+        },
+      },
+    };
+
+    expect(() => {
+      ZodConfigValidator.validate(config);
+    }).toThrow(
+      'Configuration validation failed: native.app: Unrecognized key: "unknown_field"',
     );
   });
 

@@ -60,13 +60,49 @@ describe("instanceResolver", () => {
     ).toBe(true);
   });
 
+  it("does not warn when warning is explicitly suppressed", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const gitFile = path.join(testDir, ".git");
+    writeFileSync(gitFile, "gitdir: /tmp/main/.git/worktrees/feature-branch");
+
+    const result = await resolveInstance(testDir, {
+      suppressUnisolatedWorktreeWarning: true,
+    });
+
+    expect(result).toEqual({ mode: "normal" });
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it("creates and persists an instance ID via isolateProject", () => {
     const instanceId = isolateProject(testDir);
     const saved = loadInstanceConfig(testDir);
 
-    expect(instanceId).toMatch(/^wt-[a-f0-9]{6}$/);
+    expect(instanceId).toMatch(/^[a-z0-9]{6}$/);
     expect(saved).toEqual({
       instanceId,
+      mode: "isolate",
+    });
+  });
+
+  it("accepts and persists a provided instance ID via isolateProject", () => {
+    const instanceId = isolateProject(testDir, "feature-123");
+    const saved = loadInstanceConfig(testDir);
+
+    expect(instanceId).toBe("feature-123");
+    expect(saved).toEqual({
+      instanceId: "feature-123",
+      mode: "isolate",
+    });
+  });
+
+  it("overwrites existing instance ID when a new one is explicitly provided", () => {
+    isolateProject(testDir, "first-id");
+    const updated = isolateProject(testDir, "second-id");
+    const saved = loadInstanceConfig(testDir);
+
+    expect(updated).toBe("second-id");
+    expect(saved).toEqual({
+      instanceId: "second-id",
       mode: "isolate",
     });
   });

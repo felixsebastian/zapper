@@ -8,7 +8,7 @@ When the same project exists in multiple directories (typically via git worktree
 
 Zapper detects git worktrees automatically by checking if `.git` is a file (with a `gitdir:` pointer) instead of a directory.
 
-If you run any `zap` command in a worktree and no instance ID is configured, Zapper:
+If you run a `zap` command in a worktree (except `zap isolate`) and no instance ID is configured, Zapper:
 
 1. Prints a large warning
 2. Continues normally (no interactive prompt, no blocking)
@@ -25,11 +25,17 @@ Use `zap isolate` to enable isolation for the current directory:
 zap isolate
 ```
 
-This writes `.zap/instance.json` with a generated instance ID:
+Or provide your own instance ID (used as-is):
+
+```bash
+zap isolate my-feature-123
+```
+
+By default, this writes `.zap/instance.json` with a generated 6-character alphanumeric instance ID:
 
 ```json
 {
-  "instanceId": "wt-a1b2c3",
+  "instanceId": "a1b2c3",
   "mode": "isolate"
 }
 ```
@@ -109,7 +115,7 @@ zap up
 | Scenario | What happens |
 |----------|-------------|
 | Normal repo (no worktree) | Nothing changes |
-| Worktree, no isolation | Startup warning is shown, command still runs |
+| Worktree, no isolation (`zap up`, `zap status`, etc.) | Startup warning is shown, command still runs |
 | Worktree, `zap isolate` run | Instance ID is created in `.zap/instance.json` |
 | Worktree, isolated, `zap up` | Processes/containers are namespaced under instance ID |
 | Automation creates worktree | Prewrite `.zap/instance.json` to avoid warning |
