@@ -48,14 +48,15 @@ describe("instanceResolver", () => {
     expect(
       warnSpy.mock.calls.some((call) =>
         call.some(
-          (arg) =>
-            typeof arg === "string" && arg.includes("WORKTREE WARNING"),
+          (arg) => typeof arg === "string" && arg.includes("WORKTREE WARNING"),
         ),
       ),
     ).toBe(true);
     expect(
       warnSpy.mock.calls.some((call) =>
-        call.some((arg) => typeof arg === "string" && arg.includes("zap isolate")),
+        call.some(
+          (arg) => typeof arg === "string" && arg.includes("zap isolate"),
+        ),
       ),
     ).toBe(true);
   });

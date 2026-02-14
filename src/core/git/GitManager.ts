@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { logger } from "../../utils/logger";
+import { renderer } from "../../ui/renderer";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -48,13 +48,13 @@ export class GitManager {
           stdio: "inherit",
         });
       } catch (e) {
-        logger.warn(`Failed to checkout in ${target.name}: ${e}`);
+        renderer.log.warn(`Failed to checkout in ${target.name}: ${e}`);
         failed.push(target.name);
       }
     }
 
     if (failed.length > 0) {
-      logger.warn(`Failed for repos: ${failed.join(", ")}`);
+      renderer.log.warn(`Failed for repos: ${failed.join(", ")}`);
     }
   }
 
@@ -67,13 +67,13 @@ export class GitManager {
       try {
         execSync(`git pull --ff-only`, { cwd: target.cwd, stdio: "inherit" });
       } catch (e) {
-        logger.warn(`Failed to pull in ${target.name}: ${e}`);
+        renderer.log.warn(`Failed to pull in ${target.name}: ${e}`);
         failed.push(target.name);
       }
     }
 
     if (failed.length > 0) {
-      logger.warn(`Failed for repos: ${failed.join(", ")}`);
+      renderer.log.warn(`Failed for repos: ${failed.join(", ")}`);
     }
   }
 
@@ -93,9 +93,11 @@ export class GitManager {
             .toString()
             .trim().length > 0;
 
-        logger.info(`${target.name}: ${branch}  ${dirty ? "dirty" : "clean"}`);
+        renderer.log.info(
+          `${target.name}: ${branch}  ${dirty ? "dirty" : "clean"}`,
+        );
       } catch (e) {
-        logger.warn(`Failed to get status in ${target.name}: ${e}`);
+        renderer.log.warn(`Failed to get status in ${target.name}: ${e}`);
       }
     }
   }
@@ -113,18 +115,18 @@ export class GitManager {
 
         if (status.length > 0) {
           execSync(`git stash`, { cwd: target.cwd, stdio: "inherit" });
-          logger.info(`Stashed changes in ${target.name}`);
+          renderer.log.info(`Stashed changes in ${target.name}`);
         } else {
-          logger.debug(`No changes to stash in ${target.name}`);
+          renderer.log.debug(`No changes to stash in ${target.name}`);
         }
       } catch (e) {
-        logger.warn(`Failed to stash in ${target.name}: ${e}`);
+        renderer.log.warn(`Failed to stash in ${target.name}: ${e}`);
         failed.push(target.name);
       }
     }
 
     if (failed.length > 0) {
-      logger.warn(`Failed for repos: ${failed.join(", ")}`);
+      renderer.log.warn(`Failed for repos: ${failed.join(", ")}`);
     }
   }
 }

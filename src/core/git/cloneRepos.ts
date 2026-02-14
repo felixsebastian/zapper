@@ -1,7 +1,7 @@
 import { ZapperConfig } from "../../config/schemas";
 import { RepoCloner, CloneTarget, GitMethod } from "./RepoCloner";
 import { buildAliasMap, resolveAliasesToCanonical } from "../../utils";
-import { logger } from "../../utils/logger";
+import { renderer } from "../../ui/renderer";
 import * as path from "path";
 
 export async function cloneRepos(
@@ -32,7 +32,7 @@ export async function cloneRepos(
     : allNative;
 
   if (targets.length === 0) {
-    logger.info("No native services to clone");
+    renderer.log.info("No native services to clone");
     return;
   }
 
@@ -40,7 +40,7 @@ export async function cloneRepos(
 
   for (const process of targets) {
     if (!process.repo) {
-      logger.debug(`Skipping ${process.name}: no repo field`);
+      renderer.log.debug(`Skipping ${process.name}: no repo field`);
       continue;
     }
 

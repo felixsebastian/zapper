@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { logger } from "../../utils/logger";
+import { renderer } from "../../ui/renderer";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -55,17 +55,17 @@ export class RepoCloner {
     const parentIsRepo = this.isGitRepo(dir);
 
     if (!fs.existsSync(dir) || this.isEmptyDir(dir)) {
-      logger.info(`Cloning ${processName} -> ${dir}`);
+      renderer.log.info(`Cloning ${processName} -> ${dir}`);
 
       execSync(`git clone ${url} ${folderName}`, {
         cwd: parent,
         stdio: "inherit",
       });
     } else if (parentIsRepo || this.isGitRepo(dir)) {
-      logger.info(`Pulling ${processName} in ${dir}`);
+      renderer.log.info(`Pulling ${processName} in ${dir}`);
       execSync(`git -C ${dir} pull --ff-only`, { stdio: "inherit" });
     } else {
-      logger.warn(
+      renderer.log.warn(
         `Destination ${dir} exists and is not empty. Skipping ${processName}.`,
       );
     }
@@ -76,13 +76,13 @@ export class RepoCloner {
     this.ensureDir(parent);
 
     if (!fs.existsSync(dir) || this.isEmptyDir(dir)) {
-      logger.info(`Cloning (gh) ${processName} -> ${dir}`);
+      renderer.log.info(`Cloning (gh) ${processName} -> ${dir}`);
       execSync(`gh repo clone ${spec} ${dir}`, { stdio: "inherit" });
     } else if (this.isGitRepo(dir)) {
-      logger.info(`Pulling ${processName} in ${dir}`);
+      renderer.log.info(`Pulling ${processName} in ${dir}`);
       execSync(`git -C ${dir} pull --ff-only`, { stdio: "inherit" });
     } else {
-      logger.warn(
+      renderer.log.warn(
         `Destination ${dir} exists and is not empty. Skipping ${processName}.`,
       );
     }
@@ -109,7 +109,7 @@ export class RepoCloner {
         );
       }
     } catch (e) {
-      logger.warn(`Failed to clone ${target.name}: ${e}`);
+      renderer.log.warn(`Failed to clone ${target.name}: ${e}`);
     }
   }
 

@@ -1,6 +1,6 @@
 import { ZapperConfig } from "../utils";
 import { DockerManager } from "./docker";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 import { Pm2Executor } from "./process/Pm2Executor";
 import { Action, ActionPlan } from "../types";
 import { findProcess } from "./findProcess";
@@ -34,7 +34,7 @@ async function waitForHealth(action: Action): Promise<void> {
       if (await checkHealthUrl(healthcheck)) return;
       await sleep(1000);
     }
-    logger.warn(`Healthcheck timeout for ${action.name}: ${healthcheck}`);
+    renderer.log.warn(`Healthcheck timeout for ${action.name}: ${healthcheck}`);
   }
 }
 
@@ -51,10 +51,10 @@ async function executeAction(
 
     if (action.type === "start") {
       await pm2.startProcess(proc, projectName);
-      logger.info(`Started ${proc.name as string}`);
+      renderer.log.info(`Started ${proc.name as string}`);
     } else {
       await pm2.stopProcess(proc.name as string);
-      logger.info(`Stopped ${proc.name as string}`);
+      renderer.log.info(`Stopped ${proc.name as string}`);
     }
   } else {
     const pair = findContainer(config, action.name);
@@ -110,11 +110,11 @@ async function executeAction(
         startRequestedAt: new Date().toISOString(),
       });
 
-      logger.info(`Starting ${name}`);
+      renderer.log.info(`Starting ${name}`);
     } else {
       await DockerManager.stopContainer(dockerName);
       clearServiceState(configDir, dockerName);
-      logger.info(`Stopped ${name}`);
+      renderer.log.info(`Stopped ${name}`);
     }
   }
 }

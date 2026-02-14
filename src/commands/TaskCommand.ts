@@ -1,10 +1,5 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
-import {
-  formatTasks,
-  formatTasksAsJson,
-  formatTaskParamsAsJson,
-} from "../core/formatTasks";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 
 export class TaskCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<void> {
@@ -15,9 +10,9 @@ export class TaskCommand extends CommandHandler {
       if (!zapperContext) throw new Error("Context not loaded");
 
       if (options.json) {
-        console.log(formatTasksAsJson(zapperContext.tasks));
+        renderer.machine.json(renderer.tasks.toJson(zapperContext.tasks));
       } else {
-        logger.info(formatTasks(zapperContext.tasks), { noEmoji: true });
+        renderer.log.report(renderer.tasks.toText(zapperContext.tasks));
       }
       return;
     }
@@ -30,8 +25,9 @@ export class TaskCommand extends CommandHandler {
       const task = zapperContext.tasks.find((t) => t.name === service);
       if (!task) throw new Error(`Task not found: ${service}`);
 
-      const output = formatTaskParamsAsJson(task, zapperContext.taskDelimiters);
-      console.log(output);
+      renderer.machine.json(
+        renderer.tasks.paramsToJson(task, zapperContext.taskDelimiters),
+      );
       return;
     }
 

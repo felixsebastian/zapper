@@ -10,7 +10,7 @@ import {
   Container as ConfigContainer,
 } from "../config/schemas";
 import { Context, Process, Task, Container } from "../types/Context";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 
 interface RawEnvFile {
   envs?: Array<Record<string, string>>;
@@ -175,7 +175,7 @@ export class EnvResolver {
     container.resolvedEnv = { ...envSubset, ...inline.pairs };
     container.env = Array.isArray(container.env) ? container.env : whitelist;
 
-    logger.debug(`Final resolved env for docker ${container.name}:`, {
+    renderer.log.debug(`Final resolved env for docker ${container.name}:`, {
       data: container.resolvedEnv,
     });
   }
@@ -195,7 +195,7 @@ export class EnvResolver {
 
     task.resolvedEnv = { ...envSubset, ...inline.pairs };
     task.env = Array.isArray(task.env) ? task.env : whitelist;
-    logger.debug(`Final resolved env for task ${task.name}:`, {
+    renderer.log.debug(`Final resolved env for task ${task.name}:`, {
       data: task.resolvedEnv,
     });
   }
@@ -264,7 +264,7 @@ export class EnvResolver {
     container.resolvedEnv = { ...envSubset, ...inline.pairs };
     container.env = Array.isArray(container.env) ? container.env : whitelist;
 
-    logger.debug(`Final resolved env for docker ${container.name}:`, {
+    renderer.log.debug(`Final resolved env for docker ${container.name}:`, {
       data: container.resolvedEnv,
     });
   }
@@ -274,7 +274,7 @@ export class EnvResolver {
     mergedEnvFromFiles: Record<string, string>,
     projectRoot: string,
   ): void {
-    logger.debug(`Processing task: ${task.name}`);
+    renderer.log.debug(`Processing task: ${task.name}`);
 
     let taskEnvFiles: string[] | undefined;
     if (task.env_files && task.env_files.length > 0) {
@@ -290,7 +290,7 @@ export class EnvResolver {
       const inline = this.splitInlineEnv(task.env);
       task.resolvedEnv = { ...local, ...inline.pairs };
 
-      logger.debug(
+      renderer.log.debug(
         `Final resolved env for ${task.name} (local env_files + inline pairs):`,
         { data: task.resolvedEnv },
       );
@@ -310,7 +310,7 @@ export class EnvResolver {
     task.resolvedEnv = { ...envSubset, ...inline.pairs };
     task.env = Array.isArray(task.env) ? task.env : whitelist;
 
-    logger.debug(`Final resolved env for task ${task.name}:`, {
+    renderer.log.debug(`Final resolved env for task ${task.name}:`, {
       data: task.resolvedEnv,
     });
   }
@@ -319,16 +319,16 @@ export class EnvResolver {
     files?: string[],
   ): Record<string, string> {
     if (!Array.isArray(files) || files.length === 0) {
-      logger.debug("No env files to load:", { data: files });
+      renderer.log.debug("No env files to load:", { data: files });
       return {};
     }
 
-    logger.debug("Loading env files:", { data: files });
+    renderer.log.debug("Loading env files:", { data: files });
     const merged: Record<string, string> = {};
 
     for (const file of files) {
       if (!existsSync(file)) {
-        logger.debug(`Env file does not exist: ${file}`);
+        renderer.log.debug(`Env file does not exist: ${file}`);
         continue;
       }
       const ext = path.extname(file).toLowerCase();
@@ -344,7 +344,7 @@ export class EnvResolver {
         } else {
           // Default: treat all other files as dotenv format (KEY=value pairs with expansion)
           const parsed = dotenvParse(content);
-          logger.debug(`Parsed env file ${file}:`, { data: parsed });
+          renderer.log.debug(`Parsed env file ${file}:`, { data: parsed });
           // Merge previous values with new parsed values, with parsed taking precedence
           // This allows variable expansion to reference previously loaded vars
           const combined = { ...merged, ...parsed };
@@ -352,7 +352,7 @@ export class EnvResolver {
           Object.assign(merged, expanded.parsed);
         }
       } catch (e) {
-        logger.debug(`Failed to read env file ${file}: ${e}`);
+        renderer.log.debug(`Failed to read env file ${file}: ${e}`);
       }
     }
     return merged;

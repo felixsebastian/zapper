@@ -2,7 +2,7 @@
 
 import { CommanderCli } from "./cli";
 import { logger, LogLevel } from "./utils/logger";
-import { formatError } from "./errors";
+import { renderer } from "./ui/renderer";
 
 declare const process: {
   argv: string[];
@@ -16,8 +16,7 @@ async function main() {
     await cli.parse(process.argv);
   } catch (error) {
     const showStackTrace = logger.getLevel() === LogLevel.DEBUG;
-    const formattedError = formatError(error, showStackTrace);
-    console.error(formattedError);
+    renderer.errors.print(error, showStackTrace);
     process.exit(1);
   }
 }

@@ -159,9 +159,14 @@ describe("E2E: Profiles Command", () => {
       );
       expect(JSON.parse(listJsonOutput)).toEqual(["dev", "prod"]);
 
-      const enableOutput = runZapCommand("profile dev", testDir, tempConfigPath, {
-        timeout: 45000,
-      });
+      const enableOutput = runZapCommand(
+        "profile dev",
+        testDir,
+        tempConfigPath,
+        {
+          timeout: 45000,
+        },
+      );
       expect(enableOutput).toContain("Enabling profile: dev");
       expect(enableOutput).toContain("Starting services: frontend");
 
@@ -171,11 +176,7 @@ describe("E2E: Profiles Command", () => {
       expect(stateAfterEnable.activeProfile).toBe("dev");
 
       const statusWithDev = JSON.parse(
-        runZapCommand(
-          "status --json",
-          testDir,
-          tempConfigPath,
-        ),
+        runZapCommand("status --json", testDir, tempConfigPath),
       ) as StatusOutput;
       const workerStatusWithDev = statusWithDev.native.find(
         (service) => service.service === "worker",
@@ -200,11 +201,7 @@ describe("E2E: Profiles Command", () => {
       expect(stateAfterDisable.activeProfile).toBeUndefined();
 
       const statusWithoutProfile = JSON.parse(
-        runZapCommand(
-          "status --json",
-          testDir,
-          tempConfigPath,
-        ),
+        runZapCommand("status --json", testDir, tempConfigPath),
       ) as StatusOutput;
       const workerStatusWithoutProfile = statusWithoutProfile.native.find(
         (service) => service.service === "worker",

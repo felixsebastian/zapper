@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { logger } from "../../utils/logger";
+import { renderer } from "../../ui/renderer";
 import * as path from "path";
 import Mustache from "mustache";
 import { TaskParam } from "../../config/schemas";
@@ -98,7 +98,7 @@ export class TaskRunner {
     const knownParams = new Set(taskParams.map((p) => p.name));
     for (const key of Object.keys(this.params.named)) {
       if (!knownParams.has(key) && key !== "json" && key !== "list-params") {
-        logger.warn(`Unknown parameter '${key}' for task '${taskName}'`);
+        renderer.log.warn(`Unknown parameter '${key}' for task '${taskName}'`);
       }
     }
   }
@@ -125,12 +125,14 @@ export class TaskRunner {
     } as NodeJS.ProcessEnv;
 
     const cwd = this.resolveCwd(task.cwd);
-    logger.info(`Running task: ${name}${task.desc ? ` — ${task.desc}` : ""}`);
+    renderer.log.info(
+      `Running task: ${name}${task.desc ? ` — ${task.desc}` : ""}`,
+    );
 
     for (const cmd of task.cmds) {
       if (typeof cmd === "string") {
         const interpolatedCmd = this.interpolate(cmd, task.params);
-        logger.debug(`$ ${interpolatedCmd}`);
+        renderer.log.debug(`$ ${interpolatedCmd}`);
         execSync(interpolatedCmd, { stdio: "inherit", cwd, env });
       } else if (cmd && typeof cmd === "object" && "task" in cmd) {
         this.execTask(cmd.task, [...stack, name]);

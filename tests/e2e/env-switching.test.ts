@@ -187,11 +187,10 @@ describe("E2E: Environment Sets and State Persistence", () => {
       expect(upOutput).toContain("echo-service");
 
       // Wait for process to start and capture logs to verify default environment
-      const logsWithDefault = waitForLogValues(
-        fixtureDir,
-        testProjectName,
-        ["TEST_VALUE=default_value", "NODE_ENV=development"],
-      );
+      const logsWithDefault = waitForLogValues(fixtureDir, testProjectName, [
+        "TEST_VALUE=default_value",
+        "NODE_ENV=development",
+      ]);
       expect(logsWithDefault).toContain("TEST_VALUE=default_value");
       expect(logsWithDefault).toContain("NODE_ENV=development");
 
@@ -229,11 +228,10 @@ describe("E2E: Environment Sets and State Persistence", () => {
       expect(upAlternateOutput).toContain("echo-service");
 
       // Wait for process to start and capture logs to verify alternate environment
-      const logsWithAlternate = waitForLogValues(
-        fixtureDir,
-        testProjectName,
-        ["TEST_VALUE=alternate_value", "NODE_ENV=staging"],
-      );
+      const logsWithAlternate = waitForLogValues(fixtureDir, testProjectName, [
+        "TEST_VALUE=alternate_value",
+        "NODE_ENV=staging",
+      ]);
       expect(logsWithAlternate).toContain("TEST_VALUE=alternate_value");
       expect(logsWithAlternate).toContain("NODE_ENV=staging");
 
@@ -263,11 +261,10 @@ describe("E2E: Environment Sets and State Persistence", () => {
         timeout: 15000,
       });
 
-      const logsBackToDefault = waitForLogValues(
-        fixtureDir,
-        testProjectName,
-        ["TEST_VALUE=default_value", "NODE_ENV=development"],
-      );
+      const logsBackToDefault = waitForLogValues(fixtureDir, testProjectName, [
+        "TEST_VALUE=default_value",
+        "NODE_ENV=development",
+      ]);
       expect(logsBackToDefault).toContain("TEST_VALUE=default_value");
       expect(logsBackToDefault).toContain("NODE_ENV=development");
 

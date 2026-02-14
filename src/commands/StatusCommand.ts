@@ -1,7 +1,6 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
 import { getStatus } from "../core/getStatus";
-import { formatStatus, formatStatusAsJson } from "../core/formatStatus";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 
 export class StatusCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<void> {
@@ -12,11 +11,9 @@ export class StatusCommand extends CommandHandler {
     const statusResult = await getStatus(zapperContext, service, all);
 
     if (json) {
-      const jsonOutput = formatStatusAsJson(statusResult);
-      console.log(jsonOutput);
+      renderer.machine.json(renderer.status.toJson(statusResult));
     } else {
-      const formattedOutput = formatStatus(statusResult, zapperContext);
-      logger.info(formattedOutput, { noEmoji: true });
+      renderer.log.report(renderer.status.toText(statusResult, zapperContext));
     }
   }
 }

@@ -66,7 +66,9 @@ describe("E2E: Alias Deduplication", () => {
 
   beforeAll(() => {
     if (!fs.existsSync(CLI_PATH)) {
-      throw new Error(`CLI not found at ${CLI_PATH}. Run 'npm run build' first.`);
+      throw new Error(
+        `CLI not found at ${CLI_PATH}. Run 'npm run build' first.`,
+      );
     }
   });
 
@@ -98,7 +100,9 @@ describe("E2E: Alias Deduplication", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const running = getProjectProcesses(testProjectName).map((proc) => proc.name);
+    const running = getProjectProcesses(testProjectName).map(
+      (proc) => proc.name,
+    );
     expect(running).toContain(`zap.${testProjectName}.webserver`);
     expect(running).toContain(`zap.${testProjectName}.database`);
     expect(running.length).toBe(2);

@@ -1,5 +1,5 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 
 export class LogsCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<void> {
@@ -10,7 +10,9 @@ export class LogsCommand extends CommandHandler {
     }
 
     const follow = options.follow ?? true;
-    logger.info(`Showing logs for ${service}${follow ? " (following)" : ""}`);
+    renderer.log.info(
+      `Showing logs for ${service}${follow ? " (following)" : ""}`,
+    );
     await zapper.showLogs(service, follow);
   }
 }

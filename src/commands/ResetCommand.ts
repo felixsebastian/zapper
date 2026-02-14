@@ -1,6 +1,6 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
 import { confirm } from "../utils/confirm";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 
 export class ResetCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<void> {
@@ -11,7 +11,7 @@ export class ResetCommand extends CommandHandler {
       { defaultYes: false, force: options.force },
     );
     if (!proceed) {
-      logger.info("Aborted.");
+      renderer.log.info("Aborted.");
       return;
     }
     await zapper.reset();

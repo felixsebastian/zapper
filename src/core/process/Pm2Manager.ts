@@ -9,7 +9,7 @@ import {
 import path from "path";
 import { Process } from "../../config/schemas";
 import { ProcessInfo } from "../../types/index";
-import { logger } from "../../utils/logger";
+import { renderer } from "../../ui/renderer";
 import { buildServiceName, buildPrefix } from "../../utils/nameBuilder";
 
 export class Pm2Manager {
@@ -65,12 +65,12 @@ export class Pm2Manager {
       instanceId,
     );
 
-    logger.debug(
+    renderer.log.debug(
       `Creating ecosystem for ${processConfig.name as string} with env whitelist:`,
       { data: processConfig.env },
     );
 
-    logger.debug(`Final env for PM2 ecosystem:`, {
+    renderer.log.debug(`Final env for PM2 ecosystem:`, {
       data: processConfig.resolvedEnv,
     });
 
@@ -90,7 +90,7 @@ export class Pm2Manager {
               ? processConfig.cwd
               : path.join(configDir, processConfig.cwd);
             if (!existsSync(resolved)) {
-              logger.warn(
+              renderer.log.warn(
                 `cwd path does not exist for ${processConfig.name as string}: ${resolved} (skipping)`,
               );
               return configDir;
@@ -118,10 +118,10 @@ export class Pm2Manager {
     );
 
     const ecosystemJson = JSON.stringify(ecosystem, null, 2);
-    logger.debug(`Ecosystem JSON for ${processConfig.name as string}:`);
-    logger.debug("─".repeat(50));
-    logger.debug(ecosystemJson);
-    logger.debug("─".repeat(50));
+    renderer.log.debug(`Ecosystem JSON for ${processConfig.name as string}:`);
+    renderer.log.debug("─".repeat(50));
+    renderer.log.debug(ecosystemJson);
+    renderer.log.debug("─".repeat(50));
 
     writeFileSync(tempFile, ecosystemJson);
 
@@ -153,11 +153,11 @@ export class Pm2Manager {
       // Try to kill the entire process group (negative PID)
       try {
         globalThis.process.kill(-pid, "SIGTERM");
-        logger.debug(`Killed process group for PID ${pid}`);
+        renderer.log.debug(`Killed process group for PID ${pid}`);
       } catch {
         // Process group kill may fail if the process isn't a group leader.
         // Fall back to finding and killing children individually.
-        logger.debug(
+        renderer.log.debug(
           `Process group kill failed for PID ${pid}, killing children individually`,
         );
       }
@@ -184,7 +184,7 @@ export class Pm2Manager {
         // Already dead – ignore
       }
     } catch (error) {
-      logger.warn(`Error killing process tree for PID ${pid}: ${error}`);
+      renderer.log.warn(`Error killing process tree for PID ${pid}: ${error}`);
     }
   }
 
@@ -198,7 +198,7 @@ export class Pm2Manager {
     try {
       const info = await this.getProcessInfo(prefixedName);
       if (info?.pid && info.pid > 0) {
-        logger.debug(
+        renderer.log.debug(
           `Killing process tree for ${prefixedName} (PID ${info.pid})`,
         );
         this.killProcessTree(info.pid);
@@ -206,7 +206,9 @@ export class Pm2Manager {
         await new Promise((r) => setTimeout(r, 300));
       }
     } catch (error) {
-      logger.debug(`Could not kill process tree for ${prefixedName}: ${error}`);
+      renderer.log.debug(
+        `Could not kill process tree for ${prefixedName}: ${error}`,
+      );
     }
   }
 
@@ -275,11 +277,11 @@ export class Pm2Manager {
       );
 
       if (matchingProcesses.length === 0) {
-        logger.debug(`No processes found matching ${prefixedName}`);
+        renderer.log.debug(`No processes found matching ${prefixedName}`);
         return;
       }
 
-      logger.debug(
+      renderer.log.debug(
         `Deleting ${matchingProcesses.length} process(es) matching ${prefixedName}`,
       );
 
@@ -293,7 +295,7 @@ export class Pm2Manager {
         this.cleanupWrapperScripts(projectName, name, configDir, instanceId);
       }
     } catch (error) {
-      logger.warn(`Error deleting processes: ${error}`);
+      renderer.log.warn(`Error deleting processes: ${error}`);
     }
   }
 
@@ -313,7 +315,7 @@ export class Pm2Manager {
 
       if (existsSync(logPath)) {
         unlinkSync(logPath);
-        logger.debug(`Cleaned up log: ${logPath}`);
+        renderer.log.debug(`Cleaned up log: ${logPath}`);
       }
 
       // Try to remove the logs directory if it's empty
@@ -322,14 +324,14 @@ export class Pm2Manager {
         const remainingFiles = readdirSync(logsDir);
         if (remainingFiles.length === 0) {
           rmSync(logsDir, { recursive: true, force: true });
-          logger.debug(`Cleaned up empty logs directory: ${logsDir}`);
+          renderer.log.debug(`Cleaned up empty logs directory: ${logsDir}`);
         }
       } catch (e) {
         // Directory not empty or other error, that's fine
       }
     } catch (error) {
       // Log cleanup errors but don't fail the operation
-      logger.warn(`Failed to clean up logs: ${error}`);
+      renderer.log.warn(`Failed to clean up logs: ${error}`);
     }
   }
 
@@ -352,14 +354,16 @@ export class Pm2Manager {
           const scriptPath = path.join(zapDir, file);
           try {
             unlinkSync(scriptPath);
-            logger.debug(`Cleaned up wrapper script: ${scriptPath}`);
+            renderer.log.debug(`Cleaned up wrapper script: ${scriptPath}`);
           } catch (e) {
-            logger.warn(`Failed to delete wrapper script ${scriptPath}: ${e}`);
+            renderer.log.warn(
+              `Failed to delete wrapper script ${scriptPath}: ${e}`,
+            );
           }
         }
       }
     } catch (error) {
-      logger.warn(`Failed to clean up wrapper scripts: ${error}`);
+      renderer.log.warn(`Failed to clean up wrapper scripts: ${error}`);
     }
   }
 
@@ -390,7 +394,7 @@ export class Pm2Manager {
       throw new Error(`PM2 process not running: ${name} (${prefixedName})`);
     }
 
-    logger.debug(
+    renderer.log.debug(
       `Showing logs for ${prefixedName}${follow ? " (following)" : ""}`,
     );
 
@@ -481,14 +485,14 @@ export class Pm2Manager {
       const proc = processes.find((p) => p.name === processName);
 
       if (!proc) {
-        logger.warn(`Process not found: ${processName}`);
+        renderer.log.warn(`Process not found: ${processName}`);
         return null;
       }
 
       const pm2Env = proc.pm2_env as Record<string, unknown>;
       return String(pm2Env.pm_log_path || pm2Env.pm_out_log_path || "");
     } catch (error) {
-      logger.warn(`Error getting log file path: ${error}`);
+      renderer.log.warn(`Error getting log file path: ${error}`);
       return null;
     }
   }
@@ -502,7 +506,7 @@ export class Pm2Manager {
       const { existsSync } = await import("fs");
 
       if (!existsSync(logFile)) {
-        logger.warn(`No log file found for this process`);
+        renderer.log.warn(`No log file found for this process`);
         return;
       }
 
@@ -522,7 +526,7 @@ export class Pm2Manager {
         });
 
         child.on("error", (err) => {
-          logger.warn(`tail error for ${logFile}: ${err}`);
+          renderer.log.warn(`tail error for ${logFile}: ${err}`);
         });
 
         await new Promise<void>((resolve) => {
@@ -543,7 +547,7 @@ export class Pm2Manager {
         globalThis.process?.stdout?.write(result);
       }
     } catch (error) {
-      logger.warn(`Error showing logs from file: ${error}`);
+      renderer.log.warn(`Error showing logs from file: ${error}`);
     }
   }
 
@@ -576,7 +580,7 @@ export class Pm2Manager {
 
   private static async runPm2CommandFollow(args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
-      logger.debug(`Running: pm2 ${args.join(" ")}`);
+      renderer.log.debug(`Running: pm2 ${args.join(" ")}`);
       const child = spawn("pm2", args, { stdio: ["pipe", "pipe", "pipe"] });
 
       child.stdout.on("data", (data) => {
@@ -627,7 +631,7 @@ export class Pm2Manager {
 
   private static async runPm2CommandStream(args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
-      logger.debug(`Running: pm2 ${args.join(" ")}`);
+      renderer.log.debug(`Running: pm2 ${args.join(" ")}`);
       const child = spawn("pm2", args, {
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -677,7 +681,7 @@ export class Pm2Manager {
     retryCount = 0,
   ): Promise<string> {
     return new Promise((resolve, reject) => {
-      logger.debug(`Running: pm2 ${args.join(" ")}`);
+      renderer.log.debug(`Running: pm2 ${args.join(" ")}`);
       const child = spawn("pm2", args, {
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -709,7 +713,7 @@ export class Pm2Manager {
 
           // Only retry once on state corruption or version mismatch
           if ((isStateCorruption || isVersionMismatch) && retryCount === 0) {
-            logger.warn(
+            renderer.log.warn(
               `PM2 state corruption detected, resetting PM2 and retrying...`,
             );
 
@@ -723,7 +727,7 @@ export class Pm2Manager {
               resolve(result);
               return;
             } catch (resetError) {
-              logger.warn(`PM2 reset failed: ${resetError}`);
+              renderer.log.warn(`PM2 reset failed: ${resetError}`);
               // Fall through to original error
             }
           }

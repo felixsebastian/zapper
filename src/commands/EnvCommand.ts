@@ -1,9 +1,5 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
-import {
-  formatEnvironments,
-  formatEnvironmentsAsJson,
-} from "../core/formatEnvironments";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 import { StateManager } from "../core/StateManager";
 import { Context } from "../types/Context";
 
@@ -35,11 +31,9 @@ export class EnvCommand extends CommandHandler {
     if (options.list) {
       const json = !!options.json;
       if (json) {
-        const jsonOutput = formatEnvironmentsAsJson(environments);
-        console.log(jsonOutput);
+        renderer.machine.json(renderer.environments.toJson(environments));
       } else {
-        const formattedOutput = formatEnvironments(environments);
-        logger.info(formattedOutput, { noEmoji: true });
+        renderer.log.report(renderer.environments.toText(environments));
       }
       return;
     }
@@ -118,11 +112,9 @@ export class EnvCommand extends CommandHandler {
     const resolvedEnv = target.resolvedEnv || {};
 
     if (options.json) {
-      console.log(JSON.stringify(resolvedEnv));
+      renderer.machine.json(resolvedEnv);
     } else {
-      for (const [key, value] of Object.entries(resolvedEnv)) {
-        console.log(`${key}=${value}`);
-      }
+      renderer.machine.envMap(resolvedEnv);
     }
   }
 
@@ -130,11 +122,11 @@ export class EnvCommand extends CommandHandler {
     stateManager: StateManager,
     environmentName: string,
   ): Promise<void> {
-    logger.info(`Enabling environment: ${environmentName}`);
+    renderer.log.info(`Enabling environment: ${environmentName}`);
 
     await stateManager.setActiveEnvironment(environmentName);
 
-    logger.info(
+    renderer.log.info(
       "Environment updated. Restart services to apply new environment variables.",
     );
   }
@@ -144,15 +136,17 @@ export class EnvCommand extends CommandHandler {
     currentActiveEnvironment?: string,
   ): Promise<void> {
     if (!currentActiveEnvironment) {
-      logger.info("No active environment to disable");
+      renderer.log.info("No active environment to disable");
       return;
     }
 
-    logger.info(`Disabling active environment: ${currentActiveEnvironment}`);
+    renderer.log.info(
+      `Disabling active environment: ${currentActiveEnvironment}`,
+    );
 
     await stateManager.clearActiveEnvironment();
 
-    logger.info(
+    renderer.log.info(
       "Environment reset to default. Restart services to apply new environment variables.",
     );
   }
@@ -161,22 +155,8 @@ export class EnvCommand extends CommandHandler {
     environments: string[],
     activeEnvironment?: string,
   ): Promise<void> {
-    if (environments.length === 0) {
-      logger.info("No environments defined");
-      return;
-    }
-
-    if (activeEnvironment) {
-      logger.info(`Currently active environment: ${activeEnvironment}`);
-      logger.info("");
-    }
-
-    logger.info("Available environments:");
-    environments.forEach((environment, index) => {
-      const isActive = environment === activeEnvironment;
-      const marker = isActive ? " (active)" : "";
-      logger.info(`  ${index + 1}. ${environment}${marker}`);
-    });
-    logger.info("\nTo enable an environment, use: zap env <name>");
+    renderer.log.report(
+      renderer.environments.pickerText(environments, activeEnvironment),
+    );
   }
 }

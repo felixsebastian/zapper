@@ -1,7 +1,7 @@
 import { Zapper } from "./Zapper";
 import { saveState } from "../config/stateLoader";
 import { ZapperState } from "../config/schemas";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 
 /**
  * Centralized state management that handles both state persistence
@@ -27,7 +27,7 @@ export class StateManager {
     // Reload entire config to pick up the updated state
     await this.zapper.loadConfig(this.configPath);
 
-    logger.debug("State updated and config reloaded");
+    renderer.log.debug("State updated and config reloaded");
   }
 
   /**

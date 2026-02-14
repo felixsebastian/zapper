@@ -1,3 +1,5 @@
+import { renderer } from "./ui/renderer";
+
 export class ConfigFileNotFoundError extends Error {
   constructor(
     public configPath: string,
@@ -109,52 +111,6 @@ export class ExclusiveLockError extends Error {
   }
 }
 
-// ANSI color codes
-const colors = {
-  reset: "\u001B[0m",
-  bold: "\u001B[1m",
-  dim: "\u001B[2m",
-  red: "\u001B[31m",
-};
-
 export function formatError(error: unknown, showStackTrace = false): string {
-  const symbol = "✗";
-
-  if (
-    error instanceof ConfigFileNotFoundError ||
-    error instanceof ConfigParseError ||
-    error instanceof ConfigValidationError ||
-    error instanceof ServiceNotFoundError ||
-    error instanceof WhitelistReferenceError ||
-    error instanceof ContainerNotRunningError ||
-    error instanceof ContextNotLoadedError ||
-    error instanceof GitOperationError ||
-    error instanceof ExclusiveLockError
-  ) {
-    const errorType = error.name.replace(/Error$/, "");
-    const message = error.message;
-
-    let output = `${colors.red}${colors.bold}${symbol} ${errorType}${colors.reset}\n`;
-    output += `${colors.dim}${message}${colors.reset}`;
-
-    if (showStackTrace && error.stack) {
-      output += `\n\n${colors.dim}${error.stack}${colors.reset}`;
-    }
-
-    return output;
-  }
-
-  // Unknown error type
-  const errorName =
-    error instanceof Error ? error.constructor.name : typeof error;
-  const errorMessage = error instanceof Error ? error.message : String(error);
-
-  let output = `${colors.red}${colors.bold}${symbol} Unexpected Error: ${errorName}${colors.reset}\n`;
-  output += `${colors.dim}${errorMessage}${colors.reset}`;
-
-  if (showStackTrace && error instanceof Error && error.stack) {
-    output += `\n\n${colors.dim}${error.stack}${colors.reset}`;
-  }
-
-  return output;
+  return renderer.errors.format(error, showStackTrace);
 }

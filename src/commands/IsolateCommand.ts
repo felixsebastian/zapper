@@ -1,10 +1,10 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 
 export class IsolateCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<void> {
     const { zapper, service } = context;
     const instanceId = await zapper.isolateInstance(service);
-    logger.success(`Isolation enabled with instance ID: ${instanceId}`);
+    renderer.log.success(`Isolation enabled with instance ID: ${instanceId}`);
   }
 }

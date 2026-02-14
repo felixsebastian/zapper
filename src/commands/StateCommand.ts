@@ -1,4 +1,5 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
+import { renderer } from "../ui/renderer";
 
 export class StateCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<void> {
@@ -9,7 +10,6 @@ export class StateCommand extends CommandHandler {
       throw new Error("Context not loaded");
     }
 
-    // Output the state JSON in minified format
-    console.log(JSON.stringify(zapperContext.state));
+    renderer.machine.json(zapperContext.state);
   }
 }

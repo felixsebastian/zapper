@@ -36,4 +36,7 @@ Use this verification flow while developing:
 - Lint after every small change: `pnpm lint` (or `pnpm lint:fix` to auto-fix).
 - Run focused/unit tests as you go: `pnpm test <path-to-test-file>`.
 - Run the normal test suite before wrapping up: `pnpm test`.
-- Run end-to-end tests once near the end of a big change, when you think the work is done: one-time setup `bash ./etc/e2e_setup.sh`, then `pnpm test:e2e`.
+- Run end-to-end tests once near the end of a big change, when you think the work is done:
+  - `pnpm test:e2e` runs tests inside an isolated Linux VM via `etc/e2e_run.sh` (macOS + Lima).
+  - One-time setup for that VM flow: `bash ./etc/e2e_setup.sh`.
+  - Then run: `pnpm test:e2e`.

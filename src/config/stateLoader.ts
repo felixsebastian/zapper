@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { ZapperStateSchema, ZapperState, ServiceState } from "./schemas";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 
 export function loadState(projectRoot: string): ZapperState {
   const statePath = path.join(projectRoot, ".zap", "state.json");
@@ -20,10 +20,14 @@ export function loadState(projectRoot: string): ZapperState {
     // Validate with Zod schema
     const validatedState = ZapperStateSchema.parse(rawState);
 
-    logger.debug(`Loaded state from ${statePath}`, { data: validatedState });
+    renderer.log.debug(`Loaded state from ${statePath}`, {
+      data: validatedState,
+    });
     return validatedState;
   } catch (error) {
-    logger.warn(`Failed to load or validate state from ${statePath}: ${error}`);
+    renderer.log.warn(
+      `Failed to load or validate state from ${statePath}: ${error}`,
+    );
     // Return default state on error
     return {
       lastUpdated: new Date().toISOString(),
@@ -56,9 +60,9 @@ export function saveState(
 
   try {
     fs.writeFileSync(statePath, JSON.stringify(validatedState, null, 2));
-    logger.debug(`State saved to ${statePath}`, { data: validatedState });
+    renderer.log.debug(`State saved to ${statePath}`, { data: validatedState });
   } catch (error) {
-    logger.warn(`Failed to save state to ${statePath}: ${error}`);
+    renderer.log.warn(`Failed to save state to ${statePath}: ${error}`);
     throw error;
   }
 }

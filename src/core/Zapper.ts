@@ -7,7 +7,7 @@ import { ZapperConfig } from "../config/schemas";
 import { Context, Process, Container } from "../types/Context";
 import { createContext } from "./createContext";
 import path from "path";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 import * as fs from "fs";
 import { resolveConfigPath } from "../utils/findUp";
 import { Planner } from "./Planner";
@@ -224,11 +224,13 @@ export class Zapper {
       const allProcesses = this.getProcesses();
       const allContainers = this.getContainers();
       const existingServices = new Set([
-        ...allProcesses.map(p => p.name),
-        ...allContainers.map(([name]) => name)
+        ...allProcesses.map((p) => p.name),
+        ...allContainers.map(([name]) => name),
       ]);
 
-      const nonExistentServices = canonical.filter(name => !existingServices.has(name));
+      const nonExistentServices = canonical.filter(
+        (name) => !existingServices.has(name),
+      );
       if (nonExistentServices.length > 0) {
         throw new ServiceNotFoundError(nonExistentServices.join(", "));
       }
@@ -262,11 +264,13 @@ export class Zapper {
       const allProcesses = this.getProcesses();
       const allContainers = this.getContainers();
       const existingServices = new Set([
-        ...allProcesses.map(p => p.name),
-        ...allContainers.map(([name]) => name)
+        ...allProcesses.map((p) => p.name),
+        ...allContainers.map(([name]) => name),
       ]);
 
-      const nonExistentServices = canonical.filter(name => !existingServices.has(name));
+      const nonExistentServices = canonical.filter(
+        (name) => !existingServices.has(name),
+      );
       if (nonExistentServices.length > 0) {
         throw new ServiceNotFoundError(nonExistentServices.join(", "));
       }
@@ -346,7 +350,7 @@ export class Zapper {
         );
 
     if (!proceed) {
-      logger.info("Aborted.");
+      renderer.log.info("Aborted.");
       return;
     }
 
@@ -355,9 +359,9 @@ export class Zapper {
 
     if (fs.existsSync(zapDir)) {
       fs.rmSync(zapDir, { recursive: true, force: true });
-      logger.info("Removed .zap directory.");
+      renderer.log.info("Removed .zap directory.");
     } else {
-      logger.info(".zap directory does not exist.");
+      renderer.log.info(".zap directory does not exist.");
     }
   }
 

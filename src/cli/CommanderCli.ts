@@ -387,7 +387,9 @@ export class CommanderCli {
     const resolvedService =
       service && shouldResolveAliases
         ? Array.isArray(service)
-          ? (service.map((s: string) => zapper.resolveServiceName(s)) as unknown as string)
+          ? (service.map((s: string) =>
+              zapper.resolveServiceName(s),
+            ) as unknown as string)
           : zapper.resolveServiceName(service)
         : service;
 

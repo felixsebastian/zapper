@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { detectWorktree } from "../utils/worktreeDetector";
+import { renderer } from "../ui/renderer";
 import {
   loadInstanceConfig,
   saveInstanceConfig,
@@ -30,14 +31,7 @@ function generateInstanceId(): string {
 }
 
 function printUnisolatedWorktreeWarning(): void {
-  console.warn("\n===============================================");
-  console.warn("============== WORKTREE WARNING ===============");
-  console.warn("===============================================");
-  console.warn("This project is running inside a git worktree.");
-  console.warn("No instance isolation is configured for this path.");
-  console.warn("Processes and containers may collide with other copies.");
-  console.warn("Run `zap isolate` to create a local instance ID.");
-  console.warn("===============================================\n");
+  renderer.warnings.printUnisolatedWorktree();
 }
 
 export function isolateProject(

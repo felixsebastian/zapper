@@ -141,7 +141,10 @@ describe("E2E: Environment File Precedence", () => {
       SECRET_TOKEN: "remote-secret",
     });
 
-    runZapCommand(`env --disable --config zap-${testProjectName}.yaml`, fixtureDir);
+    runZapCommand(
+      `env --disable --config zap-${testProjectName}.yaml`,
+      fixtureDir,
+    );
 
     const resetOutput = runZapCommand(
       `env --service app --json --config zap-${testProjectName}.yaml`,

@@ -1,6 +1,5 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
-import { formatProfiles, formatProfilesAsJson } from "../core/formatProfiles";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 import { StateManager } from "../core/StateManager";
 import { Process, Container } from "../types/Context";
 
@@ -31,11 +30,9 @@ export class ProfilesCommand extends CommandHandler {
     if (options.list) {
       const json = !!options.json;
       if (json) {
-        const jsonOutput = formatProfilesAsJson(zapperContext.profiles);
-        console.log(jsonOutput);
+        renderer.machine.json(renderer.profiles.toJson(zapperContext.profiles));
       } else {
-        const formattedOutput = formatProfiles(zapperContext.profiles);
-        logger.info(formattedOutput, { noEmoji: true });
+        renderer.log.report(renderer.profiles.toText(zapperContext.profiles));
       }
       return;
     }
@@ -68,7 +65,7 @@ export class ProfilesCommand extends CommandHandler {
     stateManager: StateManager,
     profileName: string,
   ): Promise<void> {
-    logger.info(`Enabling profile: ${profileName}`);
+    renderer.log.info(`Enabling profile: ${profileName}`);
 
     // Update the active profile state (this also reloads config)
     await stateManager.setActiveProfile(profileName);
@@ -101,11 +98,11 @@ export class ProfilesCommand extends CommandHandler {
     });
 
     if (servicesToStart.length === 0) {
-      logger.info(`No services found for profile: ${profileName}`);
+      renderer.log.info(`No services found for profile: ${profileName}`);
       return;
     }
 
-    logger.info(`Starting services: ${servicesToStart.join(", ")}`);
+    renderer.log.info(`Starting services: ${servicesToStart.join(", ")}`);
     await stateManager.getZapper().startProcesses(servicesToStart);
   }
 
@@ -114,19 +111,19 @@ export class ProfilesCommand extends CommandHandler {
     currentActiveProfile?: string,
   ): Promise<void> {
     if (!currentActiveProfile) {
-      logger.info("No active profile to disable");
+      renderer.log.info("No active profile to disable");
       return;
     }
 
-    logger.info(`Disabling active profile: ${currentActiveProfile}`);
+    renderer.log.info(`Disabling active profile: ${currentActiveProfile}`);
 
     // Clear the active profile state (this also reloads config)
     await stateManager.clearActiveProfile();
 
-    logger.info("Active profile disabled");
+    renderer.log.info("Active profile disabled");
 
     // Run startAll to bring system to good state (stop services that were only running due to the disabled profile)
-    logger.info("Adjusting services to match new state...");
+    renderer.log.info("Adjusting services to match new state...");
     await stateManager.getZapper().startProcesses(); // This will call startAll with no active profile
   }
 
@@ -134,25 +131,6 @@ export class ProfilesCommand extends CommandHandler {
     profiles: string[],
     activeProfile?: string,
   ): Promise<void> {
-    if (profiles.length === 0) {
-      logger.info("No profiles defined");
-      return;
-    }
-
-    // Show current active profile if any
-    if (activeProfile) {
-      logger.info(`Currently active profile: ${activeProfile}`);
-      logger.info("");
-    }
-
-    // For now, show a simple list and ask user to use the command with a profile name
-    // TODO: Implement proper interactive picker with a library like inquirer
-    logger.info("Available profiles:");
-    profiles.forEach((profile, index) => {
-      const isActive = profile === activeProfile;
-      const marker = isActive ? " (active)" : "";
-      logger.info(`  ${index + 1}. ${profile}${marker}`);
-    });
-    logger.info("\nTo enable a profile, use: zap profile <profile-name>");
+    renderer.log.report(renderer.profiles.pickerText(profiles, activeProfile));
   }
 }

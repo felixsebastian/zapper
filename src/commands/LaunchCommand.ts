@@ -1,5 +1,5 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
-import { logger } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 import { exec } from "child_process";
 
 export class LaunchCommand extends CommandHandler {
@@ -25,7 +25,7 @@ export class LaunchCommand extends CommandHandler {
 
     if (!link) throw new Error(`No link found for: ${service}`);
 
-    logger.info(`Opening ${link}`);
+    renderer.log.info(`Opening ${link}`);
     const openCmd =
       process.platform === "darwin"
         ? "open"

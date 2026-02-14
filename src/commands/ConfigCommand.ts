@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { CommandHandler, CommandContext } from "./CommandHandler";
+import { renderer } from "../ui/renderer";
 
 export class ConfigCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<void> {
@@ -15,12 +16,7 @@ export class ConfigCommand extends CommandHandler {
     const pretty = !!options.pretty;
     const filteredConfig = this.createFilteredConfig(zapperContext, showEnvs);
 
-    // Output as JSON (minified or pretty)
-    const jsonOutput = pretty
-      ? JSON.stringify(filteredConfig, null, 2)
-      : JSON.stringify(filteredConfig);
-
-    console.log(jsonOutput);
+    renderer.machine.json(filteredConfig, pretty);
   }
 
   private createFilteredConfig(context: any, showEnvs: boolean): any {
