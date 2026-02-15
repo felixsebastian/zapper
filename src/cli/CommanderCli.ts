@@ -141,35 +141,35 @@ export class CommanderCli {
     this.program
       .command("restart")
       .alias("r")
-      .description("Restart all processes or a specific process")
-      .argument("[service]", "Service to restart")
+      .description("Restart all processes or specific processes")
+      .argument("[services...]", "Services to restart (space-separated)")
       .option("-j, --json", "Output command result as minified JSON")
-      .action(async (service, options, command) => {
-        await this.executeCommand("restart", service, command);
+      .action(async (services, options, command) => {
+        await this.executeCommand("restart", services, command);
       });
 
     this.program
       .command("status")
       .alias("ps")
       .description(
-        "Show status (PM2 + Docker) filtered to current project by default",
+        "Show status (PM2 + Docker), optionally for specific services",
       )
-      .argument("[service]", "Service to show status for")
+      .argument("[services...]", "Services to show status for")
       .option("-a, --all", "Include processes from all projects")
       .option("-j, --json", "Output status as minified JSON")
-      .action(async (service, options, command) => {
-        await this.executeCommand("status", service, command);
+      .action(async (services, options, command) => {
+        await this.executeCommand("status", services, command);
       });
 
     this.program
       .command("logs")
       .alias("l")
-      .description("Show logs for a specific process")
-      .argument("<service>", "Service to show logs for")
+      .description("Show logs for one or more services")
+      .argument("<services...>", "Services to show logs for")
       .option("-f, --follow", "Follow logs (default)", true)
       .option("--no-follow", "Do not follow logs (print and exit)")
-      .action(async (service, options, command) => {
-        await this.executeCommand("logs", service, command);
+      .action(async (services, options, command) => {
+        await this.executeCommand("logs", services, command);
       });
 
     this.program
@@ -186,15 +186,15 @@ export class CommanderCli {
       .description(
         "Clone all repos defined in native services (respects git_method)",
       )
-      .argument("[service]", "Service to clone")
+      .argument("[services...]", "Services to clone")
       .option(
         "--http",
         "Use HTTP for git cloning (overrides config git_method)",
       )
       .option("--ssh", "Use SSH for git cloning (overrides config git_method)")
       .option("-j, --json", "Output command result as minified JSON")
-      .action(async (service, options, command) => {
-        await this.executeCommand("clone", service, command);
+      .action(async (services, options, command) => {
+        await this.executeCommand("clone", services, command);
       });
 
     this.program
@@ -379,7 +379,7 @@ export class CommanderCli {
 
   private async executeCommand(
     command: ZapCommand,
-    service: string | undefined,
+    service: string | string[] | undefined,
     commandInstance: Command,
   ): Promise<void> {
     const parent = commandInstance.parent!;
@@ -413,11 +413,13 @@ export class CommanderCli {
     const resolvedService =
       service && shouldResolveAliases
         ? Array.isArray(service)
-          ? (service.map((s: string) =>
-              zapper.resolveServiceName(s),
-            ) as unknown as string)
+          ? service.map((s: string) => zapper.resolveServiceName(s))
           : zapper.resolveServiceName(service)
         : service;
+    const normalizedService =
+      Array.isArray(resolvedService) && resolvedService.length === 0
+        ? undefined
+        : resolvedService;
 
     const handler = this.commandHandlers.get(command);
     if (!handler) {
@@ -426,13 +428,13 @@ export class CommanderCli {
 
     // Parse task parameters for the task command
     let taskParams: TaskParams | undefined;
-    if (command === "task" && service) {
-      taskParams = parseTaskArgs(process.argv, service);
+    if (command === "task" && typeof normalizedService === "string") {
+      taskParams = parseTaskArgs(process.argv, normalizedService);
     }
 
     const context: CommandContext = {
       zapper,
-      service: resolvedService,
+      service: normalizedService,
       options: allOptions,
       taskParams,
     };

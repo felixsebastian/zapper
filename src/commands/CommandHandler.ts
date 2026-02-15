@@ -8,9 +8,11 @@ export interface TaskParams {
   rest: string[];
 }
 
+export type CommandTarget = string | string[];
+
 export interface CommandContext {
   zapper: Zapper;
-  service?: string;
+  service?: CommandTarget;
   options: Record<string, any>;
   taskParams?: TaskParams;
 }

@@ -5,6 +5,9 @@ import { exec } from "child_process";
 export class LaunchCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<CommandResult> {
     const { zapper, service: name } = context;
+    if (Array.isArray(name)) {
+      throw new Error("Launch command accepts a single link name");
+    }
 
     const zapperContext = zapper.getContext();
     if (!zapperContext) throw new Error("Context not loaded");

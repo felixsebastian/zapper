@@ -95,22 +95,29 @@ zap --verbose --config custom.yaml task build
 
 ```bash
 zap up                      # Start all services
-zap up backend              # Start specific service (and its dependencies)
+zap up backend              # Start one service (and its dependencies)
+zap up api worker db        # Start multiple services
 zap up --json               # Output command result as JSON
 zap down                    # Stop all services
-zap down backend            # Stop specific service
+zap down backend            # Stop one service
+zap down api worker db      # Stop multiple services
 zap down backend --json     # Output command result as JSON
 zap restart                 # Restart all services
-zap restart api             # Restart specific service
-zap r api                   # Short alias for: zap restart api
+zap restart api             # Restart one service
+zap restart api worker db   # Restart multiple services
+zap r api worker            # Short alias for: zap restart api worker
 ```
 
 ### Status and logs
 
 ```bash
 zap status                  # Show status of all services
-zap logs api                # Follow logs for specific service
+zap status api db           # Show status for specific services
+zap logs api                # Follow logs for one service
+zap logs api worker --no-follow  # Show logs for multiple services and exit
 ```
+
+When passing multiple services to `zap logs`, use `--no-follow`.
 
 ### Tasks
 
@@ -130,7 +137,8 @@ zap task build --list-params       # Show task parameters as JSON
 zap reset                   # Stop all services and delete .zap folder
 zap reset --json            # Output command result as JSON
 zap clone                   # Clone all repos defined in config
-zap clone api               # Clone specific repo
+zap clone api               # Clone one repo
+zap clone api web           # Clone multiple repos
 zap clone --json            # Output command result as JSON
 zap launch                  # Open homepage (if configured)
 zap launch "API Docs"       # Open a configured link by name
@@ -172,7 +180,7 @@ Examples: `up`, `down`, `restart`, `clone`, `reset`, `status`, `task` (list/para
 Streaming commands keep stream output and are not JSON-encoded:
 
 ```bash
-zap logs <service>
+zap logs <service> [more-services...] [--no-follow]
 zap task <name>
 ```
 
@@ -821,7 +829,8 @@ native:
 
 ```bash
 zap clone                  # Clone all repos
-zap clone api              # Clone specific repo
+zap clone api              # Clone one repo
+zap clone api web          # Clone multiple repos
 ```
 
 Repos are cloned to the path specified in `cwd`.

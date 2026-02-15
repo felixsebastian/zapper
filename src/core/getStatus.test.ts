@@ -206,6 +206,25 @@ describe("getStatus", () => {
       expect(result.docker).toHaveLength(0);
     });
 
+    it("should filter by multiple service names when provided", async () => {
+      mockPm2Manager.listProcesses.mockResolvedValue([
+        createMockProcessInfo("zap.project.api", "online"),
+        createMockProcessInfo("zap.project.worker", "online"),
+      ]);
+
+      mockDockerManager.listContainers.mockResolvedValue([
+        createMockDockerContainer("zap.project.database", "running"),
+        createMockDockerContainer("zap.project.cache", "running"),
+      ]);
+
+      const result = await getStatus(undefined, ["api", "cache"]);
+
+      expect(result.native).toHaveLength(1);
+      expect(result.native[0].service).toBe("api");
+      expect(result.docker).toHaveLength(1);
+      expect(result.docker[0].service).toBe("cache");
+    });
+
     it("should handle all flag correctly", async () => {
       mockPm2Manager.listProcesses.mockResolvedValue([
         createMockProcessInfo("system-service", "online"),
@@ -388,6 +407,25 @@ describe("getStatus", () => {
 
       expect(result.native).toHaveLength(1);
       expect(result.native[0].service).toBe("worker");
+    });
+
+    it("should filter by multiple specific service names", async () => {
+      const context = createMockContext("test");
+
+      mockPm2Manager.listProcesses.mockResolvedValue([
+        createMockProcessInfo("zap.test.api", "online"),
+        createMockProcessInfo("zap.test.worker", "online"),
+      ]);
+      mockDockerManager.getContainerInfo.mockResolvedValue(
+        createMockDockerContainer("zap.test.database", "running"),
+      );
+
+      const result = await getStatus(context, ["worker", "database"]);
+
+      expect(result.native).toHaveLength(1);
+      expect(result.native[0].service).toBe("worker");
+      expect(result.docker).toHaveLength(1);
+      expect(result.docker[0].service).toBe("database");
     });
   });
 

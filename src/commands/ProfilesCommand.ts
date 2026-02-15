@@ -6,6 +6,9 @@ import { CommandResult } from "./CommandResult";
 export class ProfilesCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<CommandResult | void> {
     const { zapper, service, options } = context;
+    if (Array.isArray(service)) {
+      throw new Error("Profile command accepts a single profile name");
+    }
 
     const zapperContext = zapper.getContext();
     if (!zapperContext) {

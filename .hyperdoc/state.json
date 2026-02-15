@@ -2,7 +2,8 @@
   "favoriteFiles": [
     "docs/development.md",
     "docs/releases.md",
-    "AGENTS.md"
+    "AGENTS.md",
+    "0:docs%2Ftodo.tasks.json"
   ],
   "favoriteFolders": []
 }

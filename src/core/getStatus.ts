@@ -71,9 +71,22 @@ export interface StatusResult {
 
 export async function getStatus(
   context?: Context,
-  service?: string,
+  service?: string | string[],
   all: boolean = false,
 ): Promise<StatusResult> {
+  const normalizedService =
+    Array.isArray(service) && service.length === 0 ? undefined : service;
+  const serviceSet =
+    normalizedService === undefined
+      ? undefined
+      : new Set(
+          Array.isArray(normalizedService)
+            ? normalizedService
+            : [normalizedService],
+        );
+  const matchesService = (name: string): boolean =>
+    !serviceSet || serviceSet.has(name);
+
   const pm2List = await Pm2Manager.listProcesses();
 
   if (!context) {
@@ -90,7 +103,7 @@ export async function getStatus(
         type: "native" as const,
         enabled: true,
       }))
-      .filter((p) => (!service ? true : p.service === service));
+      .filter((p) => matchesService(p.service));
 
     const allDocker = await DockerManager.listContainers();
     const docker = allDocker
@@ -102,7 +115,7 @@ export async function getStatus(
         enabled: true,
       }))
       .filter((c) => !!c.rawName)
-      .filter((c) => (!service ? true : c.service === service));
+      .filter((c) => matchesService(c.service));
 
     return { native, docker };
   }
@@ -113,7 +126,7 @@ export async function getStatus(
 
   const native: ServiceStatus[] = [];
   for (const proc of context.processes) {
-    if (service && proc.name !== service) continue;
+    if (!matchesService(proc.name)) continue;
 
     const expectedPm2Name = buildServiceName(
       projectName,
@@ -144,7 +157,7 @@ export async function getStatus(
 
   const docker: ServiceStatus[] = [];
   for (const container of context.containers) {
-    if (service && container.name !== service) continue;
+    if (!matchesService(container.name)) continue;
 
     const expectedDockerName = buildServiceName(
       projectName,

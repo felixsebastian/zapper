@@ -35,7 +35,7 @@ export type Command =
 export interface CliOptions {
   command: Command;
   invoked?: string;
-  service?: string;
+  service?: string | string[];
   all?: boolean;
   force?: boolean;
   follow?: boolean;
