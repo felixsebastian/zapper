@@ -4,7 +4,7 @@ import { CommandResult } from "./CommandResult";
 
 export class ListCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<CommandResult> {
-    const { zapper, service } = context;
+    const { zapper, service, options } = context;
     const zapperContext = zapper.getContext();
 
     if (!zapperContext) {
@@ -17,7 +17,9 @@ export class ListCommand extends CommandHandler {
         : [service]
       : undefined;
 
-    const listResult = await getServiceList(zapperContext, services);
+    const listResult = await getServiceList(zapperContext, services, {
+      extended: Boolean(options.extended || options.all),
+    });
 
     return {
       kind: "list",

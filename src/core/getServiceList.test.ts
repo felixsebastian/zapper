@@ -159,13 +159,7 @@ describe("getServiceList", () => {
         cmd: "redis-server --appendonly yes",
       },
     ]);
-    expect(result.resources?.staleVolumes).toEqual([
-      {
-        name: "zap.demo.abc123.vol2",
-        service: "old-db",
-        internalDir: "/data",
-      },
-    ]);
+    expect(result.resources).toBeUndefined();
   });
 
   it("reports project-shaped dangling and alien resources", async () => {
@@ -205,7 +199,9 @@ describe("getServiceList", () => {
       { name: "zap.demo.zz9999.vol1" },
     ]);
 
-    const result = await getServiceList(createContext());
+    const result = await getServiceList(createContext(), undefined, {
+      extended: true,
+    });
 
     expect(result.resources?.dangling).toEqual([
       {
@@ -257,5 +253,6 @@ describe("getServiceList", () => {
       ["api", "db"],
       false,
     );
+    expect(result.resources).toBeUndefined();
   });
 });

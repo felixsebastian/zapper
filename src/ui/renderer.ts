@@ -161,6 +161,26 @@ function keyValueLines(rows: Array<[string, string | number]>): string {
   return rows.map(([key, value]) => `  ${key}: ${value}`).join("\n");
 }
 
+function singleTableView(title: string, subtitle: string, rows: string[][]) {
+  return [header(title, subtitle), "", table(rows)].join("\n");
+}
+
+function multiTableView(
+  title: string,
+  subtitle: string,
+  tables: Array<{ heading: string; rows: string[][] }>,
+  footer?: string,
+): string {
+  const sections = [header(title, subtitle)];
+  for (const tableDef of tables) {
+    sections.push("", bold(tableDef.heading), table(tableDef.rows));
+  }
+  if (footer) {
+    sections.push("", footer);
+  }
+  return sections.join("\n");
+}
+
 /** Simple table renderer (monospace), supports ANSI in cells */
 function table(rows: string[][], padding = 2): string {
   if (rows.length === 0) return "";
@@ -649,10 +669,12 @@ export const renderer = {
         rows.push(listRow(service));
       }
 
-      const sections = [header("Services", subtitle), "", table(rows)];
       const resources = result.resources;
-      if (!resources) return sections.join("\n");
+      if (!resources) return singleTableView("Services", subtitle, rows);
 
+      const tables: Array<{ heading: string; rows: string[][] }> = [
+        { heading: "Services", rows },
+      ];
       if (resources.instances.length > 0) {
         const instanceRows = [
           [
@@ -670,7 +692,7 @@ export const renderer = {
             countLabel(instance.volumes.length, "volume"),
           ]),
         ];
-        sections.push("", bold("Instances"), table(instanceRows));
+        tables.push({ heading: "Instances", rows: instanceRows });
       }
 
       if (resources.dangling.length > 0) {
@@ -682,7 +704,7 @@ export const renderer = {
             entry.reason,
           ]),
         ];
-        sections.push("", bold("Dangling Resources"), table(danglingRows));
+        tables.push({ heading: "Dangling Resources", rows: danglingRows });
       }
 
       if (resources.alien.length > 0) {
@@ -694,19 +716,19 @@ export const renderer = {
             entry.reason,
           ]),
         ];
-        sections.push("", bold("Alien Resources"), table(alienRows));
+        tables.push({ heading: "Alien Resources", rows: alienRows });
       }
 
-      if (resources.staleVolumes.length > 0) {
-        sections.push(
-          "",
-          dim(
-            "Run `zap volume prune` to remove stale generated Docker volumes.",
-          ),
-        );
-      }
-
-      return sections.join("\n");
+      return multiTableView(
+        "Services",
+        subtitle,
+        tables,
+        resources.staleVolumes.length > 0
+          ? dim(
+              "Run `zap volume prune` to remove stale generated Docker volumes.",
+            )
+          : undefined,
+      );
     },
 
     toJson(result: ServiceListResult): ServiceListResult {

@@ -179,10 +179,11 @@ describe("Multi-service command targets", () => {
       options: {},
     });
 
-    expect(mockedGetServiceList).toHaveBeenCalledWith(zapperContext, [
-      "api",
-      "database",
-    ]);
+    expect(mockedGetServiceList).toHaveBeenCalledWith(
+      zapperContext,
+      ["api", "database"],
+      { extended: false },
+    );
     expect(result).toEqual({
       kind: "list",
       listResult,

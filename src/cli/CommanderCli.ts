@@ -199,6 +199,8 @@ export class CommanderCli {
         "List configured services with details (status, ports, volumes, cwd, cmd)",
       )
       .argument("[services...]", "Services to list")
+      .option("-e, --extended", "Show instance and dangling resource inventory")
+      .option("-a, --all", "Alias for --extended")
       .option("-j, --json", "Output list as minified JSON")
       .action(async (services, options, command) => {
         await this.executeCommand("ls", services, command);

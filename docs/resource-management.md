@@ -5,10 +5,10 @@ Zapper names the resources it creates so they can be discovered later:
 - PM2 processes and Docker containers: `zap.<project>.<instanceId>.<service>`
 - Generated Docker volumes: `zap.<project>.<instanceId>.volN`
 
-`zap ls` is the local inventory view. It shows configured services first, then
-summarizes the instance records in this checkout and calls out resources that
-look related to the project but no longer line up with the current config or
-state.
+`zap ls` shows configured services by default. Use `zap ls --extended` (or
+`zap ls --all`) for the local inventory view: configured services first, then
+instance records in this checkout and resources that look related to the project
+but no longer line up with the current config or state.
 
 ## Resource Types
 
@@ -29,8 +29,8 @@ match the current `zap.yaml` or current state. Common causes:
 - A managed volume path changed, leaving the old generated volume assignment
   stale.
 
-Use `zap ls` to see these. The usual repair is to stop/delete the stale
-resources rather than hand-editing state.
+Use `zap ls --extended` to see these. The usual repair is to stop/delete the
+stale resources rather than hand-editing state.
 
 ### Alien resources
 
@@ -66,7 +66,7 @@ pm2 delete <process>
 If a config change leaves old resources around:
 
 ```bash
-zap ls
+zap ls --extended
 zap volume prune
 zap kill
 zap up

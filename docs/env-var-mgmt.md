@@ -1,7 +1,7 @@
 # Environment Variable Management
 
-This document is a design note for Zapper's environment variable model. It is
-not an implementation reference yet.
+This document is a design note for Zapper's future environment variable model.
+It is not an implementation reference yet.
 
 ## Goals
 
@@ -14,245 +14,77 @@ The original model is still sound:
 2. Treat that source as the local source of truth.
 3. Decide what each service receives.
 
-That matters for projects where many variables must line up across services. It
-also matters for security-conscious teams that do not want secrets leaking into
-unrelated services.
-
 The problem is that explicit routing is too much ceremony for many local
 projects. Zapper should support careful routing, but the common path should be
 small enough that most projects can understand it at a glance.
 
 ## Recommended Model
 
-Use one core model that scales across three user personas:
+Use one field: `env`.
 
-1. Global env file stack, plus `env: "*"` for services that can receive
-   everything.
-2. Service-level `env_files` when a service should use a different file stack.
-3. External whitelist files for rare cases where teams need central storage and
-   explicit variable routing.
+At the root level, `env` defines the global environment file stack:
 
-This keeps `zap.yaml` focused on service composition. It avoids putting named
-whitelist definitions into the core YAML spec, while still leaving an advanced
-routing path for projects that need it.
+```yaml
+env: [.env.local, .env.user]
+```
 
-The three personas are:
-
-- The default local developer, who wants everything to run and does not want to
-  think about env routing.
-- The security-conscious power user, who wants direct control over which env
-  files each service receives.
-- The large-team platform owner, who has too many variables to duplicate across
-  files and needs central storage plus explicit routing.
-
-## Simple Default: Global Files and `*`
-
-Most local projects should be able to define one global file stack and pass it
-to each service:
+For backward compatibility, root-level `env_files` should continue to work:
 
 ```yaml
 env_files: [.env.local, .env.user]
-
-native:
-  frontend:
-    cmd: pnpm dev
-    env: "*"
-
-  backend:
-    cmd: pnpm dev
-    env: "*"
 ```
 
-The convention is:
-
-- `.env.local`: committed, non-sensitive local values.
-- `.env.user`: gitignored, user-specific secrets and overrides.
-
-The string value `*` is special. It means "pass the complete resolved
-environment set to this service." It should not refer to a named whitelist.
-
-This is intentionally visible. `env: "*"` reads as broad access, similar to a
-permissive CORS setting, which makes the tradeoff obvious during review.
-
-## Direct File Assignment
-
-Some projects already think in service-specific env files. Zapper should support
-that as a first-class escape hatch through service-level `env_files`:
+At the service level, `env` chooses how that service receives environment
+variables:
 
 ```yaml
-native:
-  frontend:
-    cmd: pnpm dev
-    env_files: [.env.local, .env.user]
-    env: "*"
-
-  backend:
-    cmd: pnpm dev
-    env_files: [.env.local, .env.user]
-    env: "*"
+env: "*"              # Pass all values from the global env stack
+env: [.env.api]       # Replace global env with this service file stack
+env: api.env.yaml     # Route global env through this strict whitelist file
 ```
 
-For a more segmented setup:
+There is no inline whitelist array in `zap.yaml`. Arrays in `zap.yaml` are file
+stacks. Variable allowlists live only in external whitelist files.
 
-```yaml
-native:
-  frontend:
-    cmd: pnpm dev
-    env_files: [.env.common, .env.frontend, .env.user]
-    env: "*"
+This gives Zapper one concept with three levels of power:
 
-  backend:
-    cmd: pnpm dev
-    env_files: [.env.common, .env.db, .env.backend, .env.user]
-    env: "*"
+1. `env: "*"` for the default local developer.
+2. `env: [files...]` for the power user who wants direct file assignment.
+3. `env: whitelist.yaml` for the large-team user who needs central storage plus
+   explicit routing.
 
-  worker:
-    cmd: pnpm worker
-    env_files: [.env.common, .env.db, .env.worker, .env.user]
-    env: "*"
-```
+## Resolution Rules
 
-This is powerful because users can build whatever file structure they want.
-They can keep shared variables in `.env.common`, database variables in
-`.env.db`, and service-specific values in `.env.backend` or `.env.worker`.
+Root `env` and root `env_files` both mean "load these environment files as the
+global stack." If both are present, Zapper should reject the config instead of
+guessing which one wins.
 
-The tradeoff is that file routing is still routing. A broad `.env.user` may
-contain secrets that not every service needs. If that matters, users need
-narrower user files:
+Service-level `env` resolves as follows:
 
-```yaml
-native:
-  frontend:
-    cmd: pnpm dev
-    env_files: [.env.common, .env.frontend, .env.frontend.user]
-    env: "*"
+1. `env: "*"` passes every value from the resolved global env stack.
+2. `env: [files...]` loads those files for that service and exposes every value
+   from that service stack. This replaces the global stack for that service.
+3. `env: path/to/whitelist.yaml` loads a strict whitelist file and exposes only
+   the listed variables from the global env stack.
+4. Missing `env` should probably mean no Zapper-managed env for that service.
+   If we keep current implicit inheritance behavior for compatibility, it should
+   be documented as legacy.
 
-  backend:
-    cmd: pnpm dev
-    env_files: [.env.common, .env.db, .env.backend, .env.backend.user]
-    env: "*"
-```
+The service file-stack rule is an override, not a merge. That keeps precedence
+straightforward:
 
-That is acceptable as an escape hatch. It closely matches how many env systems
-already work, and it does not require Zapper to own every routing decision.
+- Root `env` defines the default source.
+- Service `env: "*"` uses the default source.
+- Service `env: [files...]` replaces the default source.
+- Service `env: whitelist.yaml` filters the default source.
 
-The important naming rule is:
-
-- `env_files` says where values come from.
-- `env` says which loaded values are exposed.
-
-Do not overload `env` with file paths. Arrays under `env` should continue to
-mean variable names and inline assignments, not files.
-
-## Explicit Variable Routing
-
-For security-conscious setups, services can still list the variables they
-receive:
-
-```yaml
-env_files: [.env.common, .env.db, .env.backend, .env.user]
-
-native:
-  frontend:
-    cmd: pnpm dev
-    env:
-      - VITE_API_URL
-      - VITE_FEATURE_FLAGS
-
-  backend:
-    cmd: pnpm dev
-    env:
-      - DATABASE_URL
-      - JWT_SECRET
-
-  worker:
-    cmd: pnpm worker
-    env:
-      - DATABASE_URL
-      - QUEUE_SECRET
-```
-
-This keeps central storage while making access explicit. It is verbose, but
-that verbosity is useful when the goal is preventing accidental exposure.
-
-This model works well for large projects with hundreds or thousands of
-variables. Copying values across service-specific files would be painful, but
-listing which existing variables each service receives is manageable and
-reviewable.
-
-## External Whitelist Files
-
-Named whitelists should move out of the core `zap.yaml` spec. They are an
-advanced routing mechanism, not service composition.
-
-Instead of this:
-
-```yaml
-whitelists:
-  frontend:
-    - VITE_API_URL
-  backend:
-    - DATABASE_URL
-    - JWT_SECRET
-
-native:
-  frontend:
-    cmd: pnpm dev
-    env: frontend
-```
-
-Prefer an external routing file:
-
-```yaml
-env_files: [.env.common, .env.db, .env.user]
-env_whitelists: .zap/env-whitelists.yaml
-
-native:
-  frontend:
-    cmd: pnpm dev
-    env: frontend
-
-  backend:
-    cmd: pnpm dev
-    env: backend
-```
-
-With `.zap/env-whitelists.yaml`:
-
-```yaml
-frontend:
-  - VITE_API_URL
-  - VITE_FEATURE_FLAGS
-
-backend:
-  - DATABASE_URL
-  - JWT_SECRET
-```
-
-This preserves the current useful behavior, but removes whitelist definitions
-from the main config shape. It also gives large teams a place to put routing
-policy without making every small `zap.yaml` carry that concept.
-
-If a service has `env: some-name`, Zapper should resolve it as:
-
-1. If the value is exactly `*`, pass all loaded variables.
-2. Otherwise, treat the string as a whitelist name loaded from the external
-   whitelist file.
-3. If no whitelist file is configured, or the name does not exist, fail with a
-   clear error.
-
-Whitelist names should not use reserved values. In particular, `*` must be
-invalid:
-
-```text
-Whitelist name "*" is reserved. Use env: "*" on a service to pass all variables,
-or choose a different whitelist name.
-```
+Generated Zapper values, such as assigned ports, should be part of the resolved
+environment source before either `*` or whitelist filtering is applied.
 
 ## Persona Stress Test
 
-The proposed model is useful only if it handles the common case without ceremony
-and still has a credible answer for more demanding setups.
+The model is useful only if it handles the common case without ceremony and
+still has credible answers for more demanding setups.
 
 ### Persona 1: Default Local Developer
 
@@ -266,10 +98,12 @@ They want:
 - One gitignored place to put personal overrides.
 - No per-service env bookkeeping.
 
-They should use a global stack and `env: "*"`:
+They should use root `env` and service `env: "*"`:
 
 ```yaml
-env_files: [.env.local, .env.user]
+project: myapp
+
+env: [.env.local, .env.user]
 
 native:
   frontend:
@@ -287,16 +121,16 @@ docker:
 ```
 
 This is intentionally permissive. It is the right default because local dev
-often values alignment more than isolation. The star is still visible enough to
-signal broad access.
+often values alignment more than isolation. The star is visible enough to signal
+broad access.
 
 How the model handles it:
 
 - Strong fit.
 - Small `zap.yaml`.
 - No variable duplication.
-- The user can later move one service to a narrower `env_files` stack without
-  changing the rest of the project.
+- No extra routing files.
+- Easy migration path if one service later needs a custom file stack.
 
 ### Persona 2: Security-Conscious Power User
 
@@ -311,31 +145,27 @@ They want:
 - Separate user secret files for sensitive services.
 - No central whitelist registry in `zap.yaml`.
 
-They should use service-level `env_files` and still use `env: "*"` within each
-service's selected file stack:
+They should use service-level file stacks:
 
 ```yaml
+project: myapp
+
 native:
   frontend:
     cmd: pnpm dev
-    env_files: [.env.common, .env.frontend, .env.frontend.user]
-    env: "*"
+    env: [.env.common, .env.frontend, .env.frontend.user]
 
   backend:
     cmd: pnpm dev
-    env_files: [.env.common, .env.db, .env.backend, .env.backend.user]
-    env: "*"
+    env: [.env.common, .env.db, .env.backend, .env.backend.user]
 
   worker:
     cmd: pnpm worker
-    env_files: [.env.common, .env.db, .env.worker, .env.worker.user]
-    env: "*"
+    env: [.env.common, .env.db, .env.worker, .env.worker.user]
 ```
 
-This gives the user control using files they already understand. It does not
-centralize every variable, so shared subsets like database config may appear in
-named files such as `.env.db`, but that is an acceptable tradeoff for this
-persona.
+This is direct file assignment. The service's `env` array is the source stack
+for that service, and all values from that stack are exposed to that service.
 
 How the model handles it:
 
@@ -357,50 +187,42 @@ They want:
 
 - Central env files as the source of truth.
 - Explicit routing so services receive only what they need.
-- Reusable route names.
 - Routing policy outside the core service config.
+- A strict schema for routing files.
 
-They should use global `env_files` plus an external whitelist file:
+They should use a global stack and service-level whitelist files:
 
 ```yaml
-env_files: [.env.company, .env.local, .env.user]
-env_whitelists: .zap/env-whitelists.yaml
+project: enterprise-app
+
+env: [.env.company, .env.local, .env.user]
 
 native:
   frontend:
     cmd: pnpm dev
-    env: frontend
+    env: .zap/env/frontend.yaml
 
   backend:
     cmd: pnpm dev
-    env: backend
+    env: .zap/env/backend.yaml
 
   worker:
     cmd: pnpm worker
-    env: worker
+    env: .zap/env/worker.yaml
 ```
 
-With `.zap/env-whitelists.yaml`:
+With `.zap/env/backend.yaml`:
 
 ```yaml
-frontend:
-  - VITE_API_URL
-  - VITE_FEATURE_FLAGS
-
-backend:
+vars:
   - DATABASE_URL
   - REDIS_URL
   - JWT_SECRET
-
-worker:
-  - DATABASE_URL
-  - REDIS_URL
-  - QUEUE_SECRET
 ```
 
 This is the most complex setup, but it earns that complexity. The environment
-values remain centralized, while routing policy moves into a dedicated file
-that can be reviewed separately from service definitions.
+values remain centralized, while routing policy moves into dedicated files that
+can be reviewed separately from service definitions.
 
 How the model handles it:
 
@@ -409,41 +231,168 @@ How the model handles it:
 - Keeps `zap.yaml` from being polluted by long whitelist definitions.
 - The complexity is isolated to projects that actually need it.
 
+## Whitelist Files
+
+A service string other than `*` should be interpreted as a whitelist file path,
+not a named whitelist embedded in `zap.yaml`.
+
+Whitelist files should have a strict schema. A minimal schema could be:
+
+```yaml
+vars:
+  - DATABASE_URL
+  - REDIS_URL
+  - JWT_SECRET
+```
+
+Rules:
+
+- The top level must be an object.
+- `vars` must be an array of non-empty variable names.
+- Unknown keys should be rejected.
+- `*` is not a valid whitelist file path or variable name.
+- Whitelist files require a global env stack. If root `env` or `env_files` is
+  missing, service `env: some-whitelist.yaml` should error because there is no
+  central source to filter.
+
+The last rule is important: a whitelist does not load values. It only selects
+values from the global env source.
+
+## Weird Cases
+
+### Root `env` and Root `env_files`
+
+Invalid:
+
+```yaml
+env: [.env.local]
+env_files: [.env.local]
+```
+
+Both fields mean the same thing. Supporting both at once creates unnecessary
+precedence rules, so this should be a validation error.
+
+### Service `env: "*"` Without Global Env
+
+Probably invalid:
+
+```yaml
+native:
+  api:
+    cmd: pnpm dev
+    env: "*"
+```
+
+Because `*` means "all values from the global env stack", it should require a
+global env source. If we decide an empty global source is acceptable, this
+should be explicit and consistent with whitelist behavior.
+
+### Service File Stack With Global Env
+
+Valid:
+
+```yaml
+env: [.env.local, .env.user]
+
+native:
+  api:
+    cmd: pnpm dev
+    env: [api/.env.local, api/.env.user]
+```
+
+The service stack replaces the global stack for this service. It does not merge
+with the global stack. Users who want shared values can include the shared file
+directly:
+
+```yaml
+native:
+  api:
+    cmd: pnpm dev
+    env: [.env.common, api/.env.local, api/.env.user]
+```
+
+### Inline Variable Arrays
+
+Invalid:
+
+```yaml
+env:
+  - DATABASE_URL
+  - JWT_SECRET
+```
+
+There is no inline whitelist array in `zap.yaml`. A service `env` array is a
+file stack, so entries must be env file paths. Explicit variable routing belongs
+in a whitelist file:
+
+```yaml
+native:
+  api:
+    cmd: pnpm dev
+    env: .zap/env/api.yaml
+```
+
+With `.zap/env/api.yaml`:
+
+```yaml
+vars:
+  - DATABASE_URL
+  - JWT_SECRET
+```
+
+### Mixing File Stacks and Whitelist Files
+
+Invalid:
+
+```yaml
+native:
+  api:
+    cmd: pnpm dev
+    env: [.env.common, .zap/env/api.yaml]
+```
+
+An `env` array is a file stack. A string is a whitelist file path. Mixing those
+concepts in one value makes resolution unclear and should be rejected.
+
 ## Why This Is the Middle Ground
 
 This is technically three capabilities, but only one needs to be common:
 
-- Common path: global `env_files`, `env: "*"` per service.
-- Power-user path: service-level `env_files` for direct file assignment.
-- Large-team path: external whitelist files for central storage plus explicit
-  routing.
+- Common path: root `env`, service `env: "*"`.
+- Power-user path: service `env: [files...]`.
+- Large-team path: root `env`, service `env: whitelist.yaml`.
 
-The benefit is that the capabilities compose without making `zap.yaml` feel like
-it has three competing env systems.
+The benefit is that all three use one field and one idea:
 
-The core ideas stay consistent:
-
-- File stacks define available values.
-- `env: "*"` exposes all loaded values.
-- `env: [NAME, OTHER=value]` exposes explicit variables and inline values.
-- `env: name` is advanced routing through an external whitelist file.
+- Root `env` defines the default source.
+- Service `env` defines how the service receives env.
+- `*` is shorthand for "all values from the default source."
+- A service file stack is an explicit source override.
+- A whitelist file filters the default source.
 
 ## Migration Direction
 
-Keep existing inline `whitelists` support for compatibility, but mark it as
-legacy once external whitelist files exist.
+Keep existing root `env_files` support for compatibility, but document root
+`env` as the preferred field.
+
+Inline whitelist arrays are not part of the target design. Existing
+implementation support should be migrated away from, not carried forward as a
+documented mode.
 
 The likely migration path is:
 
-1. Add `env: "*"` and reserve `*` as a whitelist name.
-2. Normalize service-level `env_files` across native processes, Docker
-   services, and tasks.
-3. Add external whitelist files.
-4. Deprecate inline `whitelists` in `zap.yaml`.
+1. Add root `env` as an alias for root `env_files`.
+2. Add service `env: "*"` and reserve `*`.
+3. Add service `env: [files...]` as the direct file assignment model.
+4. Add strict service whitelist files for `env: path.yaml`.
+5. Deprecate inline `whitelists` in `zap.yaml`.
+6. Remove service inline variable arrays from the documented config model.
 
 The desired end state is:
 
-- Most projects use global `env_files` and `env: "*"`.
-- Projects with existing env-file conventions use service-level `env_files`.
-- Security-conscious projects use explicit arrays or external whitelist files.
-- Inline `whitelists` disappear from the core YAML spec.
+- Most projects use root `env` and service `env: "*"`.
+- Projects with existing env-file conventions use service `env: [files...]`.
+- Security-conscious large projects use service `env: whitelist.yaml`.
+- Root `env_files` remains a compatibility alias.
+- Inline `whitelists` and inline service variable arrays disappear from the
+  core YAML spec.

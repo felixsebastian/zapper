@@ -232,6 +232,7 @@ async function getResourceInventory(
 export async function getServiceList(
   context: Context,
   service?: string | string[],
+  options: { extended?: boolean } = {},
 ): Promise<ServiceListResult> {
   const statusResult = await getStatus(context, service, false);
 
@@ -286,5 +287,10 @@ export async function getServiceList(
     serviceSet ? serviceSet.has(item.service) : true,
   );
 
-  return { services, resources: await getResourceInventory(context) };
+  return {
+    services,
+    resources: options.extended
+      ? await getResourceInventory(context)
+      : undefined,
+  };
 }

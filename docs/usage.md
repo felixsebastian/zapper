@@ -126,6 +126,8 @@ zap r api worker            # Short alias for: zap restart api worker
 zap status                  # Show status of all services
 zap status api db           # Show status for specific services
 zap ls                      # List services/containers with details (status, ports, volumes, cwd, cmd)
+zap ls --extended           # Include instance, dangling, and alien resource inventory
+zap ls --all                # Alias for: zap ls --extended
 zap ls api db               # List details for specific services
 zap ls --json               # Output detailed list as JSON
 zap logs api                # Follow logs for one service
