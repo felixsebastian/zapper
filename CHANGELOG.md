@@ -1,5 +1,11 @@
 # @mp-lb/zapper
 
+## 0.14.0
+
+### Minor Changes
+
+- 794bc6f: Env var mgmt, volume isolation, ls
+
 ## 0.13.0
 
 ### Minor Changes
