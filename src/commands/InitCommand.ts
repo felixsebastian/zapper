@@ -2,9 +2,11 @@ import { CommandHandler, CommandContext } from "./CommandHandler";
 import { CommandResult } from "./CommandResult";
 import { initializePorts, getPortsPath } from "../config/portsManager";
 import {
-  createInstance,
-  DEFAULT_INSTANCE_KEY,
-} from "../core/instanceResolver";
+  collectManagedVolumeSpecs,
+  initializeManagedVolumes,
+  loadVolumesForInstance,
+} from "../config/volumeManager";
+import { createInstance, DEFAULT_INSTANCE_KEY } from "../core/instanceResolver";
 
 export class InitCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<CommandResult> {
@@ -33,10 +35,18 @@ export class InitCommand extends CommandHandler {
         randomizeAll: randomize,
       },
     );
+    initializeManagedVolumes(
+      ctx.projectRoot,
+      ctx.projectName,
+      selectedInstanceKey,
+      instanceId,
+      collectManagedVolumeSpecs(ctx.containers),
+    );
     ctx.instance = {
       key: selectedInstanceKey,
       id: instanceId,
       ports: scopedPorts,
+      volumes: loadVolumesForInstance(ctx.projectRoot, selectedInstanceKey),
     };
 
     if (ctx.initTask) {

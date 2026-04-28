@@ -6,6 +6,8 @@ import { Action, ActionPlan, ExecutionWave } from "../types";
 import { findProcess } from "./findProcess";
 import { findContainer } from "./findContainer";
 import { buildServiceName } from "../utils/nameBuilder";
+import { DEFAULT_INSTANCE_KEY } from "./instanceResolver";
+import { resolveContainerVolumes } from "../config/volumeManager";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -87,29 +89,25 @@ async function executeAction(
     const pair = findContainer(config, action.name);
     if (!pair) throw new Error(`Docker service not found: ${action.name}`);
     const [name, c] = pair;
-    const instanceId = (config as ZapperConfig & { instanceId?: string })
-      .instanceId;
+    const runtimeConfig = config as ZapperConfig & {
+      instanceId?: string;
+      instanceKey?: string;
+    };
+    const instanceId = runtimeConfig.instanceId;
     const dockerName = buildServiceName(projectName, name, instanceId);
 
     if (action.type === "start") {
       const ports = Array.isArray(c.ports) ? c.ports : [];
-      const volumeBindings: string[] = [];
-      const ensureVolumeNames: string[] = [];
+      const resolvedVolumes = resolveContainerVolumes({
+        projectRoot: configDir || ".",
+        projectName,
+        instanceKey: runtimeConfig.instanceKey || DEFAULT_INSTANCE_KEY,
+        instanceId: instanceId || DEFAULT_INSTANCE_KEY,
+        serviceName: name,
+        volumes: c.volumes,
+      });
 
-      if (Array.isArray(c.volumes)) {
-        for (const v of c.volumes) {
-          if (typeof v === "string") {
-            const [volName, internal] = v.split(":");
-            ensureVolumeNames.push(volName);
-            volumeBindings.push(`${volName}:${internal}`);
-          } else {
-            ensureVolumeNames.push(v.name);
-            volumeBindings.push(`${v.name}:${v.internal_dir}`);
-          }
-        }
-      }
-
-      for (const vol of ensureVolumeNames) {
+      for (const vol of resolvedVolumes.namedVolumesToCreate) {
         await DockerManager.createVolume(vol);
       }
 
@@ -127,7 +125,7 @@ async function executeAction(
         {
           image: c.image,
           ports,
-          volumes: volumeBindings,
+          volumes: resolvedVolumes.bindings,
           networks: c.networks,
           environment: envMap,
           command: c.command,

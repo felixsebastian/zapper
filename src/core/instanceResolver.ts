@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { StoredVolume } from "../config/schemas";
 import { loadState, saveState } from "../config/stateLoader";
 
 export interface InstanceResolution {
@@ -12,6 +13,7 @@ const INSTANCE_KEY_PATTERN = /^[a-z]+(?:-[a-z]+)*$/;
 interface InstanceEntry {
   id: string;
   ports?: Record<string, string>;
+  volumes?: Record<string, StoredVolume>;
 }
 
 function resolveDefaultInstanceKey(
@@ -58,7 +60,10 @@ export function createInstance(
   projectRoot: string,
   instanceKey: string = DEFAULT_INSTANCE_KEY,
 ): string {
-  const resolvedInstanceKey = resolveDefaultInstanceKey(instanceKey, projectRoot);
+  const resolvedInstanceKey = resolveDefaultInstanceKey(
+    instanceKey,
+    projectRoot,
+  );
   validateInstanceKey(resolvedInstanceKey);
   const existingState = loadState(projectRoot);
   const existing = existingState.instances?.[resolvedInstanceKey];
@@ -125,7 +130,10 @@ export function ensureInstance(
   projectRoot: string,
   instanceKey: string = DEFAULT_INSTANCE_KEY,
 ): { id: string; created: boolean } {
-  const resolvedInstanceKey = resolveDefaultInstanceKey(instanceKey, projectRoot);
+  const resolvedInstanceKey = resolveDefaultInstanceKey(
+    instanceKey,
+    projectRoot,
+  );
   validateInstanceKey(resolvedInstanceKey);
   const existing = loadState(projectRoot).instances?.[resolvedInstanceKey];
   if (existing?.id) {
@@ -143,7 +151,10 @@ export async function resolveInstance(
   instanceKey?: string,
   options: { autoCreate?: boolean } = {},
 ): Promise<InstanceResolution> {
-  const resolvedInstanceKey = resolveDefaultInstanceKey(instanceKey, projectRoot);
+  const resolvedInstanceKey = resolveDefaultInstanceKey(
+    instanceKey,
+    projectRoot,
+  );
   validateInstanceKey(resolvedInstanceKey);
   const state = loadState(projectRoot);
 

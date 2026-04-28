@@ -28,6 +28,7 @@ import {
   HomeCommand,
   NotesCommand,
   InitCommand,
+  VolumeCommand,
   GlobalCommand,
   CommandContext,
   CommandHandler,
@@ -113,6 +114,7 @@ export class CommanderCli {
     this.commandHandlers.set("home", new HomeCommand());
     this.commandHandlers.set("notes", new NotesCommand());
     this.commandHandlers.set("init", new InitCommand());
+    this.commandHandlers.set("volume", new VolumeCommand());
     this.commandHandlers.set("global", new GlobalCommand());
   }
 
@@ -232,7 +234,7 @@ export class CommanderCli {
 
     this.program
       .command("init")
-      .description("Initialize local zap state (instance + ports)")
+      .description("Initialize local zap state (instance + ports + volumes)")
       .option(
         "-i, --instance [name]",
         "Create/select an instance for initialization (default: default)",
@@ -244,6 +246,15 @@ export class CommanderCli {
       .option("-j, --json", "Output command result as minified JSON")
       .action(async (options, command) => {
         await this.executeCommand("init", undefined, command);
+      });
+
+    this.program
+      .command("volume <subcommand>")
+      .description("Manage Zapper-generated Docker volumes (prune, reset)")
+      .option("-y, --force", "Force the operation")
+      .option("-j, --json", "Output command result as minified JSON")
+      .action(async (subcommand, options, command) => {
+        await this.executeCommand("volume", subcommand, command);
       });
 
     this.program
@@ -557,6 +568,7 @@ export class CommanderCli {
       "kill",
       "notes",
       "profile",
+      "volume",
     ]);
     const shouldResolveAliases = !noAliasCommands.has(command);
     const resolvedService =

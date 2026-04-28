@@ -110,6 +110,17 @@ function toJsonPayload(result: CommandResult): unknown {
         randomized: result.randomized,
         warningShown: result.warningShown,
       };
+    case "volume.reset":
+      return {
+        instanceKey: result.instanceKey,
+        volumes: result.volumes,
+      };
+    case "volume.prune":
+      return {
+        status: result.status,
+        instanceKey: result.instanceKey,
+        volumes: result.volumes,
+      };
   }
 }
 
@@ -316,6 +327,20 @@ export function renderCommandResult(
       for (const [name, value] of Object.entries(result.ports)) {
         renderer.log.report(renderer.command.envAssignmentText(name, value));
       }
+      return;
+    case "volume.reset":
+      renderer.log.info(
+        `Reset ${Object.keys(result.volumes).length} managed volume assignment(s) for instance "${result.instanceKey}".`,
+      );
+      return;
+    case "volume.prune":
+      if (result.status === "aborted") {
+        renderer.log.info(renderer.command.abortedText());
+        return;
+      }
+      renderer.log.info(
+        `Pruned ${Object.keys(result.volumes).length} stale managed volume(s) for instance "${result.instanceKey}".`,
+      );
       return;
     case "services.action":
     case "clone.completed":

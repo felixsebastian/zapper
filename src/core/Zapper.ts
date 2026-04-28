@@ -29,6 +29,11 @@ import {
 } from "./instanceResolver";
 import { initializePorts, loadPortsForInstance } from "../config/portsManager";
 import { loadState } from "../config/stateLoader";
+import {
+  collectManagedVolumeSpecs,
+  initializeManagedVolumes,
+  loadVolumesForInstance,
+} from "../config/volumeManager";
 
 export interface ProjectKillTargets {
   projectName: string;
@@ -92,6 +97,15 @@ export class Zapper {
         this.context.ports || [],
         instanceResolution.instanceKey,
       );
+      if (commandName !== "volume") {
+        initializeManagedVolumes(
+          projectRoot,
+          this.context.projectName,
+          instanceResolution.instanceKey,
+          instanceResolution.instanceId,
+          collectManagedVolumeSpecs(this.context.containers),
+        );
+      }
     }
 
     // Refresh state after any implicit initialization so commands like `state`
@@ -102,6 +116,10 @@ export class Zapper {
       key: instanceResolution.instanceKey,
       id: instanceResolution.instanceId,
       ports: loadPortsForInstance(projectRoot, instanceResolution.instanceKey),
+      volumes: loadVolumesForInstance(
+        projectRoot,
+        instanceResolution.instanceKey,
+      ),
     };
 
     // Resolve environment variables with proper path resolution
@@ -238,6 +256,7 @@ export class Zapper {
       docker,
       tasks,
       instanceId: this.context.instanceId,
+      instanceKey: this.context.instanceKey,
     } as ZapperConfig & { instanceId?: string | null };
   }
 
@@ -501,6 +520,10 @@ export class Zapper {
       key: this.context.instanceKey,
       id: instanceId,
       ports: loadPortsForInstance(
+        this.context.projectRoot,
+        this.context.instanceKey,
+      ),
+      volumes: loadVolumesForInstance(
         this.context.projectRoot,
         this.context.instanceKey,
       ),

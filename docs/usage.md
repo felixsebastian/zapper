@@ -52,15 +52,15 @@ native:
 ### Full config structure
 
 ```yaml
-project: myapp                    # Required. Used as PM2/Docker namespace
-env_files:                        # Load env vars from these files
+project: myapp # Required. Used as PM2/Docker namespace
+env_files: # Load env vars from these files
   default: [.env.base, .env]
   prod_dbs: [.env.base, .env.prod-dbs]
-ports:                            # Port names to assign random values
+ports: # Port names to assign random values
   - FRONTEND_PORT
   - BACKEND_PORT
-init_task: seed                   # Optional task to run after `zap init`
-git_method: ssh                   # ssh | http | cli (for repo cloning)
+init_task: seed # Optional task to run after `zap init`
+git_method: ssh # ssh | http | cli (for repo cloning)
 
 native:
   # ... process definitions
@@ -71,7 +71,7 @@ docker:
 tasks:
   # ... task definitions
 
-homepage: http://localhost:3000   # Optional default URL for `zap launch`
+homepage: http://localhost:3000 # Optional default URL for `zap launch`
 notes: "API: http://localhost:${API_PORT}" # Optional note text for `zap notes`
 
 links:
@@ -167,6 +167,8 @@ zap init                    # Ensure local state exists for the default instance
 zap init --instance e2e     # Initialize/create a named instance
 zap init -R                 # Force full port re-randomization
 zap init --json             # Output as JSON
+zap volume prune            # Delete stale generated Docker volumes for the selected instance
+zap volume reset            # Forget generated volume assignments for the selected instance
 zap launch                  # Open homepage (if configured)
 zap launch "API Docs"       # Open a configured link by name
 zap launch "API Docs" --json # Output command result as JSON
@@ -258,7 +260,7 @@ native:
 native:
   frontend:
     cmd: pnpm dev
-    cwd: ./packages/frontend   # Relative to project root
+    cwd: ./packages/frontend # Relative to project root
 ```
 
 ### Multiple processes
@@ -306,7 +308,8 @@ docker:
       - POSTGRES_DB=myapp
       - POSTGRES_PASSWORD=dev
     volumes:                   # Volume mounts
-      - postgres-data:/var/lib/postgresql/data
+      - /var/lib/postgresql/data
+      - postgres-logs:/var/log/postgresql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     depends_on: [other]        # Start dependencies first
     profiles: [dev]            # Profile filtering
@@ -330,7 +333,7 @@ docker:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - /var/lib/postgresql/data
 ```
 
 #### MongoDB
@@ -342,8 +345,37 @@ docker:
     ports:
       - 27017:27017
     volumes:
-      - mongodb-data:/data/db
+      - /data/db
 ```
+
+### Docker volumes
+
+Zapper supports Compose-style volume mounts and adds a higher-level managed
+volume form.
+
+```yaml
+docker:
+  postgres:
+    image: postgres:15
+    volumes:
+      - /var/lib/postgresql/data # Zapper-managed volume
+      - /var/lib/postgresql/wal:ro # Zapper-managed volume with mode
+      - postgres-logs:/var/log/postgresql # Explicit named Docker volume
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql # Bind mount
+      - internal_dir: /var/lib/postgresql/wal # Zapper-managed volume
+        mode: ro
+      - name: postgres-config
+        internal_dir: /etc/postgresql # Explicit named Docker volume
+```
+
+When a volume entry is only a container path, or an object without `name`,
+Zapper generates a Docker volume name and stores it under the selected instance
+in `.zap/state.json`. Each instance gets its own generated volume name for the
+same service/path pair, using names like `zap.myapp.a1b2c3.vol1`. Explicit
+names keep Compose-style behavior and are shared anywhere that name is reused.
+Use `zap volume prune` to delete generated Docker volumes that are still in
+state but no longer appear in `zap.yaml`. Use `zap volume reset` to forget the
+generated assignments for the selected instance without deleting Docker volumes.
 
 #### Redis
 
@@ -442,9 +474,9 @@ native:
   api:
     cmd: pnpm dev
     env:
-      - PORT=3000                    # Hardcoded value
-      - DATABASE_URL                  # From env_files
-      - DEBUG=true                    # Override
+      - PORT=3000 # Hardcoded value
+      - DATABASE_URL # From env_files
+      - DEBUG=true # Override
 ```
 
 ### Port assignment
@@ -475,8 +507,8 @@ native:
 Then run:
 
 ```bash
-zap init                        # Ensures ports/state exist for default instance
-zap init --instance e2e         # Ensures ports/state exist for named instance
+zap init                        # Ensures ports/volumes/state exist for default instance
+zap init --instance e2e         # Ensures ports/volumes/state exist for named instance
 zap init -R                     # Re-randomizes all configured ports in selected instance
 ```
 
@@ -515,8 +547,8 @@ docker:
   postgres:
     image: postgres:15
     env:
-      - POSTGRES_PASSWORD=dev        # Hardcoded
-      - POSTGRES_DB                   # From env_files
+      - POSTGRES_PASSWORD=dev # Hardcoded
+      - POSTGRES_DB # From env_files
 ```
 
 Docker `ports` mappings also support interpolation, including values initialized by `ports:`:
@@ -543,12 +575,13 @@ zap env api                        # Works if no environment set named 'api'
 
 ## Instances
 
-Instances let you run multiple stacks for the same project without name or port collisions.
+Instances let you run multiple stacks for the same project without name, port,
+or managed-volume collisions.
 
 ```bash
 zap up                                # Ensures default instance exists on first run
 zap up --instance e2e                 # Run a named instance
-zap init --instance e2e               # Explicitly create/init named instance
+zap init --instance e2e               # Explicitly create/init named instance state
 ```
 
 If you omit `--instance`, Zapper targets `default`. Instance keys must use lowercase letters and hyphens only. See [Instances](instances.md) for full details.
@@ -573,20 +606,20 @@ tasks:
 ```yaml
 tasks:
   seed:
-    desc: Seed the database          # Description (shown in help)
-    cwd: ./backend                   # Working directory
-    env:                             # Env vars to pass
+    desc: Seed the database # Description (shown in help)
+    cwd: ./backend # Working directory
+    env: # Env vars to pass
       - DATABASE_URL
-    params:                          # Named parameters
+    params: # Named parameters
       - name: count
         default: "10"
         desc: Number of records
       - name: env
         required: true
         desc: Target environment
-    cmds:                            # Commands to run (in order)
+    cmds: # Commands to run (in order)
       - pnpm db:migrate
-      - 'pnpm db:seed --count={{count}}'
+      - "pnpm db:seed --count={{count}}"
 ```
 
 ### Running tasks
@@ -631,7 +664,7 @@ tasks:
         desc: Enable minification
     cmds:
       - 'echo "Building for {{target}}"'
-      - 'npm run build -- --env={{target}}'
+      - "npm run build -- --env={{target}}"
 ```
 
 Run with parameters:
@@ -652,7 +685,7 @@ tasks:
         required: true
         desc: Deployment environment
     cmds:
-      - 'deploy.sh {{env}}'
+      - "deploy.sh {{env}}"
 ```
 
 ```bash
@@ -669,7 +702,7 @@ tasks:
   test:
     desc: Run tests with optional args
     cmds:
-      - 'pnpm vitest {{REST}}'
+      - "pnpm vitest {{REST}}"
 ```
 
 Everything after `--` is passed through:
@@ -707,7 +740,12 @@ Output:
 {
   "name": "build",
   "params": [
-    { "name": "target", "default": "development", "required": false, "desc": "Build target" }
+    {
+      "name": "target",
+      "default": "development",
+      "required": false,
+      "desc": "Build target"
+    }
   ],
   "acceptsRest": false
 }
@@ -782,7 +820,7 @@ docker:
 native:
   api:
     cmd: pnpm dev
-    depends_on: [postgres]     # Postgres starts first
+    depends_on: [postgres] # Postgres starts first
 ```
 
 ### Dependency chain
@@ -802,7 +840,7 @@ native:
 
   worker:
     cmd: pnpm worker
-    depends_on: [api]          # API (and its deps) start first
+    depends_on: [api] # API (and its deps) start first
 
   frontend:
     cmd: pnpm dev
@@ -919,10 +957,10 @@ zap o "API Docs"               # Short alias for: zap launch "API Docs"
 
 ### Properties
 
-| Property | Required | Description |
-|----------|----------|-------------|
-| `name` | Yes | Display name (max 100 characters) |
-| `url` | Yes | URL (supports `${VAR}` interpolation) |
+| Property | Required | Description                           |
+| -------- | -------- | ------------------------------------- |
+| `name`   | Yes      | Display name (max 100 characters)     |
+| `url`    | Yes      | URL (supports `${VAR}` interpolation) |
 
 ---
 
@@ -957,7 +995,7 @@ For multi-repo setups, Zapper can clone repositories.
 
 ```yaml
 project: myapp
-git_method: ssh              # ssh | http | cli
+git_method: ssh # ssh | http | cli
 
 native:
   api:
@@ -973,11 +1011,11 @@ native:
 
 ### Git methods
 
-| Method | URL Format | Notes |
-|--------|-----------|-------|
-| `ssh` | `git@github.com:myorg/repo.git` | Requires SSH key |
+| Method | URL Format                          | Notes               |
+| ------ | ----------------------------------- | ------------------- |
+| `ssh`  | `git@github.com:myorg/repo.git`     | Requires SSH key    |
 | `http` | `https://github.com/myorg/repo.git` | May prompt for auth |
-| `cli` | Uses `gh repo clone` | Requires GitHub CLI |
+| `cli`  | Uses `gh repo clone`                | Requires GitHub CLI |
 
 ### Cloning
 
@@ -1037,7 +1075,7 @@ docker:
       - POSTGRES_DB=myapp
       - POSTGRES_PASSWORD=dev
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - /var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
@@ -1059,13 +1097,13 @@ tasks:
         default: "10"
         desc: Number of seed records
     cmds:
-      - 'pnpm --filter api prisma db seed --count={{count}}'
+      - "pnpm --filter api prisma db seed --count={{count}}"
 
   test:
     desc: Run tests with optional args
     env: [DATABASE_URL]
     cmds:
-      - 'pnpm vitest {{REST}}'
+      - "pnpm vitest {{REST}}"
 
   deploy:
     desc: Deploy to environment
@@ -1074,7 +1112,7 @@ tasks:
         required: true
         desc: Target environment (staging, production)
     cmds:
-      - 'deploy.sh {{env}}'
+      - "deploy.sh {{env}}"
 
   lint:
     cmds:

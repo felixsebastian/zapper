@@ -300,6 +300,16 @@ export class DockerManager {
     }
   }
 
+  static async removeVolume(name: string): Promise<void> {
+    await ensureDockerAvailable();
+
+    try {
+      await runDocker(["volume", "rm", name]);
+    } catch (error) {
+      // ignore if missing or still in use
+    }
+  }
+
   static async showLogs(name: string, follow: boolean = false): Promise<void> {
     await ensureDockerAvailable();
 

@@ -11,11 +11,12 @@ const validNameSchema = z
 
 export const VolumeSchema = z
   .object({
-    name: z.string().min(1, "Volume name cannot be empty"),
+    name: z.string().min(1, "Volume name cannot be empty").optional(),
     internal_dir: z
       .string()
       .min(1, "Internal directory cannot be empty")
       .startsWith("/", "Internal directory must be an absolute path"),
+    mode: z.string().min(1, "Volume mode cannot be empty").optional(),
   })
   .strict();
 
@@ -23,9 +24,25 @@ export const ContainerVolumeSchema = z.union([
   VolumeSchema,
   z
     .string()
-    .regex(
-      /^[^:]+:[^:]+$/,
-      "Volume string must be in 'name:/container/path' form",
+    .min(1, "Volume cannot be empty")
+    .refine(
+      (value) => {
+        const parts = value.split(":");
+        if (parts.length === 1) return value.startsWith("/");
+        if (parts.length === 2 && parts[0].startsWith("/")) {
+          return parts[1].length > 0 && !parts[1].startsWith("/");
+        }
+        if (parts.length < 2 || parts.length > 3) return false;
+        return (
+          parts[0].length > 0 &&
+          parts[1].startsWith("/") &&
+          (parts.length === 2 || parts[2].length > 0)
+        );
+      },
+      {
+        message:
+          "Volume string must be an absolute container path or 'source:/container/path' form",
+      },
     ),
 ]);
 
@@ -177,6 +194,13 @@ export const ServiceStateSchema = z.object({
   startRequestedAt: z.string().optional(),
 });
 
+export const StoredVolumeSchema = z
+  .object({
+    service: z.string().min(1),
+    internal_dir: z.string().min(1).startsWith("/"),
+  })
+  .strict();
+
 export const ZapperStateSchema = z.object({
   activeProfile: z.string().optional(),
   activeEnvironment: z.string().optional(),
@@ -187,6 +211,7 @@ export const ZapperStateSchema = z.object({
       z.object({
         id: z.string(),
         ports: z.record(z.string(), z.string()).optional(),
+        volumes: z.record(z.string(), StoredVolumeSchema).optional(),
       }),
     )
     .optional(),
@@ -204,6 +229,7 @@ export type TaskParam = z.infer<typeof TaskParamSchema>;
 export type Link = z.infer<typeof LinkSchema>;
 export type ZapperConfig = z.infer<typeof ZapperConfigSchema>;
 export type ServiceState = z.infer<typeof ServiceStateSchema>;
+export type StoredVolume = z.infer<typeof StoredVolumeSchema>;
 export type ZapperState = z.infer<typeof ZapperStateSchema>;
 
 // Resolved types after whitelist resolution - env fields are guaranteed to be arrays

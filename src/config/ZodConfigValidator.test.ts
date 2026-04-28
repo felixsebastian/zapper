@@ -40,6 +40,31 @@ describe("ZodConfigValidator", () => {
     }).not.toThrow();
   });
 
+  it("should validate docker volumes with generated and explicit names", () => {
+    const config = {
+      project: "myproj",
+      docker: {
+        database: {
+          image: "postgres:15",
+          volumes: [
+            "/var/lib/postgresql/data",
+            "/var/lib/postgresql/wal:ro",
+            {
+              internal_dir: "/var/lib/postgresql/config",
+              mode: "ro",
+            },
+            "postgres_logs:/var/log/postgresql:ro",
+            "./init.sql:/docker-entrypoint-initdb.d/init.sql",
+          ],
+        },
+      },
+    };
+
+    expect(() => {
+      ZodConfigValidator.validate(config);
+    }).not.toThrow();
+  });
+
   it("should validate correct config with both native and docker", () => {
     const config = {
       project: "myproj",
@@ -315,6 +340,24 @@ describe("ZodConfigValidator", () => {
       ZodConfigValidator.validate(config);
     }).toThrow(
       "Configuration validation failed: docker.test.volumes.0.internal_dir: Internal directory must be an absolute path",
+    );
+  });
+
+  it("should reject path-only generated volumes with relative container paths", () => {
+    const config = {
+      project: "myproj",
+      docker: {
+        test: {
+          image: "nginx",
+          volumes: ["data"],
+        },
+      },
+    };
+
+    expect(() => {
+      ZodConfigValidator.validate(config);
+    }).toThrow(
+      "Configuration validation failed: docker.test.volumes.0: Volume string must be an absolute container path or 'source:/container/path' form",
     );
   });
 

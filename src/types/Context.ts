@@ -5,6 +5,7 @@ import {
   TaskParam,
   Link,
   ZapperState,
+  StoredVolume,
 } from "../config/schemas";
 
 export type { TaskParam, Link };
@@ -38,6 +39,7 @@ export interface Context {
     key: string;
     id: string;
     ports: Record<string, string>;
+    volumes?: Record<string, StoredVolume>;
   };
 
   // Services organized by type with names included

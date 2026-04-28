@@ -1,4 +1,4 @@
-import { ZapperState } from "../config/schemas";
+import { StoredVolume, ZapperState } from "../config/schemas";
 import { StatusResult } from "../core/getStatus";
 import { ServiceListResult } from "../core/getServiceList";
 import { Context, Task } from "../types/Context";
@@ -157,4 +157,15 @@ export type CommandResult =
       path: string;
       randomized: boolean;
       warningShown: boolean;
+    }
+  | {
+      kind: "volume.reset";
+      instanceKey: string;
+      volumes: Record<string, StoredVolume>;
+    }
+  | {
+      kind: "volume.prune";
+      status: "aborted" | "completed";
+      instanceKey: string;
+      volumes: Record<string, StoredVolume>;
     };

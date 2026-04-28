@@ -12,6 +12,15 @@ vi.mock("./docker");
 vi.mock("./findProcess");
 vi.mock("./findContainer");
 vi.mock("../config/stateLoader", () => ({
+  loadState: vi.fn(() => ({
+    instances: {
+      default: {
+        id: "default",
+        volumes: {},
+      },
+    },
+  })),
+  saveState: vi.fn(),
   updateServiceState: vi.fn(),
   clearServiceState: vi.fn(),
 }));
@@ -373,6 +382,98 @@ describe("executeActions", () => {
         "zap.test-project.test",
         expect.objectContaining({
           volumes: ["simple_volume:/data", "complex_volume:/app/data"],
+        }),
+        {
+          projectName: "test-project",
+          serviceName: "test",
+          configDir: "/config/dir",
+        },
+      );
+    });
+
+    it("should generate instance-scoped volumes for path-only mounts", async () => {
+      const mockContainer = {
+        image: "test:latest",
+        volumes: ["/data:ro", { internal_dir: "/cache", mode: "rw" }],
+      };
+
+      vi.mocked(findContainer).mockReturnValue(["test", mockContainer]);
+
+      const plan: ActionPlan = {
+        waves: [
+          {
+            actions: [
+              {
+                type: "start",
+                serviceType: "docker",
+                name: "test",
+                healthcheck: 0,
+              },
+            ],
+          },
+        ],
+      };
+
+      await executeActions(
+        {
+          ...mockConfig,
+          instanceId: "inst123",
+          instanceKey: "default",
+        } as ZapperConfig & { instanceId: string; instanceKey: string },
+        "test-project",
+        "/config/dir",
+        plan,
+      );
+
+      expect(DockerManager.createVolume).toHaveBeenCalledWith(
+        "zap.test-project.inst123.vol1",
+      );
+      expect(DockerManager.startContainerAsync).toHaveBeenCalledWith(
+        "zap.test-project.inst123.test",
+        expect.objectContaining({
+          volumes: [
+            "zap.test-project.inst123.vol1:/data:ro",
+            "zap.test-project.inst123.vol2:/cache:rw",
+          ],
+        }),
+        {
+          projectName: "test-project",
+          serviceName: "test",
+          configDir: "/config/dir",
+        },
+      );
+    });
+
+    it("should pass bind mounts through without creating Docker volumes", async () => {
+      const mockContainer = {
+        image: "test:latest",
+        volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql"],
+      };
+
+      vi.mocked(findContainer).mockReturnValue(["test", mockContainer]);
+
+      const plan: ActionPlan = {
+        waves: [
+          {
+            actions: [
+              {
+                type: "start",
+                serviceType: "docker",
+                name: "test",
+                healthcheck: 0,
+              },
+            ],
+          },
+        ],
+      };
+
+      await executeActions(mockConfig, "test-project", "/config/dir", plan);
+
+      expect(DockerManager.createVolume).not.toHaveBeenCalled();
+      expect(DockerManager.startContainerAsync).toHaveBeenCalledWith(
+        "zap.test-project.test",
+        expect.objectContaining({
+          volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql"],
         }),
         {
           projectName: "test-project",
