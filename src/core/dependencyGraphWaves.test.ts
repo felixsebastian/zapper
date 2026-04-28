@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { DependencyGraph } from "./DependencyGraph";
-import { Process, Container } from "../config/schemas";
+import { Process } from "../config/schemas";
 
 describe("DependencyGraph Wave Generation", () => {
   let graph: DependencyGraph;

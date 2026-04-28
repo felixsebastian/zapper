@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { executeActions } from "./executeActions";
 import { Pm2Executor } from "./process/Pm2Executor";
-import { DockerManager } from "./docker";
-import { ActionPlan, Action } from "../types";
+import { ActionPlan } from "../types";
 import { ZapperConfig } from "../utils";
 
 vi.mock("./docker");
@@ -68,7 +67,9 @@ describe("Wave Execution", () => {
       }),
     };
 
-    vi.mocked(Pm2Executor).mockImplementation(() => mockPm2Executor as any);
+    vi.mocked(Pm2Executor).mockImplementation(
+      () => mockPm2Executor as unknown as Pm2Executor,
+    );
 
     // Mock findProcess to return a process
     const { findProcess } = await import("./findProcess");

@@ -1,19 +1,25 @@
 import { ProfilesCommand } from "./ProfilesCommand";
 import { Zapper } from "../core/Zapper";
 import { vi, describe, it, expect } from "vitest";
+import { Context } from "../types";
 
 describe("ProfilesCommand", () => {
   it("should validate profile exists in available profiles list", async () => {
     const zapper = new Zapper();
-    const mockContext = {
+    const mockContext: Context = {
+      projectName: "test",
       profiles: ["admin", "production"],
       processes: [],
       containers: [],
+      tasks: [],
+      environments: [],
+      links: [],
+      instanceKey: "default",
       state: { activeProfile: undefined },
       projectRoot: "/test",
     };
 
-    vi.spyOn(zapper, "getContext").mockReturnValue(mockContext as any);
+    vi.spyOn(zapper, "getContext").mockReturnValue(mockContext);
 
     const command = new ProfilesCommand();
     const context = {
@@ -30,15 +36,20 @@ describe("ProfilesCommand", () => {
 
   it("should throw error when profile is not found", async () => {
     const zapper = new Zapper();
-    const mockContext = {
+    const mockContext: Context = {
+      projectName: "test",
       profiles: ["production", "development"],
       processes: [],
       containers: [],
+      tasks: [],
+      environments: [],
+      links: [],
+      instanceKey: "default",
       state: { activeProfile: undefined },
       projectRoot: "/test",
     };
 
-    vi.spyOn(zapper, "getContext").mockReturnValue(mockContext as any);
+    vi.spyOn(zapper, "getContext").mockReturnValue(mockContext);
 
     const command = new ProfilesCommand();
     const context = {

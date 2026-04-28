@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Action, ActionPlan, ExecutionWave } from "../types";
+import { describe, it, expect } from "vitest";
+import { ActionPlan, ExecutionWave } from "../types";
 
 /**
  * This test file documents the expected output format for wave-based execution.

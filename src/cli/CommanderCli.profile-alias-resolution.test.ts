@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CommanderCli } from "./CommanderCli";
 import { Zapper } from "../core/Zapper";
+import { Context } from "../types";
 
 describe("CommanderCli - Profile Alias Resolution", () => {
   let cli: CommanderCli;
@@ -14,15 +15,20 @@ describe("CommanderCli - Profile Alias Resolution", () => {
     // - There's a service "admin-app" with alias "admin"
     // - There's a profile named "admin"
     // - When user types "admin", it should NOT be resolved to "admin-app"
-    const mockContext = {
+    const mockContext: Context = {
+      projectName: "test",
       profiles: ["admin", "production"],
       processes: [],
       containers: [],
+      tasks: [],
+      environments: [],
+      links: [],
+      instanceKey: "default",
       state: { activeProfile: undefined },
       projectRoot: "/test",
     };
 
-    vi.spyOn(mockZapper, "getContext").mockReturnValue(mockContext as any);
+    vi.spyOn(mockZapper, "getContext").mockReturnValue(mockContext);
     vi.spyOn(mockZapper, "loadConfig").mockResolvedValue();
     vi.spyOn(mockZapper, "resolveServiceName").mockImplementation(
       (name: string) => {
@@ -49,12 +55,12 @@ describe("CommanderCli - Profile Alias Resolution", () => {
 
       // If we reach here, the command succeeded, which means our fix worked
       // and "admin" was found as a valid profile
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If alias resolution was incorrectly applied, we'd see:
       // "Profile not found: admin-app"
       // But with our fix, we should either succeed or see a different error
 
-      if (error.message === "process.exit called") {
+      if (error instanceof Error && error.message === "process.exit called") {
         // Check what error was logged
         const errorCalls = consoleErrorSpy.mock.calls;
         if (errorCalls.length > 0) {

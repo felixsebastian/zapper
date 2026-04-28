@@ -72,6 +72,9 @@ export function updateServiceState(
   _serviceName: string,
   _serviceState: Record<string, unknown>,
 ): void {
+  void _projectRoot;
+  void _serviceName;
+  void _serviceState;
   // Service lifecycle should not be persisted in state.json.
 }
 
@@ -79,5 +82,7 @@ export function clearServiceState(
   _projectRoot: string,
   _serviceName: string,
 ): void {
+  void _projectRoot;
+  void _serviceName;
   // Service lifecycle should not be persisted in state.json.
 }
