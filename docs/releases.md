@@ -25,6 +25,7 @@ Before attempting a release, make sure npm publishing auth is configured correct
 Important details:
 
 - A regular token that still requires 2FA will fail in CI with `EOTP This operation requires a one-time password`.
+- The release workflow passes `secrets.NPM_TOKEN` to Changesets when that secret exists; if it is absent, Changesets can fall back to OIDC trusted publishing.
 - npm trusted publishing currently requires Node `22.14.0+` and npm CLI `11.5.1+`.
 - For GitHub-based trusted publishing, npm also requires `package.json` `repository.url` to exactly match the GitHub repository URL.
 - Once trusted publishing is working, remove or revoke old write tokens when possible.
@@ -288,7 +289,7 @@ npm publish         # Publish to npm
 - Ensure no duplicate version exists on npm
 - Check if there are publishing restrictions
 - If CI shows `EOTP`, replace `NPM_TOKEN` with a granular write token that has **Bypass two-factor authentication** enabled, or finish migrating to npm trusted publishing for `.github/workflows/release.yml`
-- If you are using trusted publishing, remove `NPM_TOKEN` from the release workflow and repository secrets for this job; otherwise `changesets/action` will create `.npmrc` and force token-based publish instead of OIDC
+- If you are using trusted publishing only, remove the `NPM_TOKEN` repository secret for this job; otherwise `changesets/action` will create `.npmrc` and force token-based publish instead of OIDC
 - If trusted publishing is configured but publish still fails, confirm these values match exactly on npm:
   - GitHub org/user: `mp-lb`
   - Repository: `zapper`
