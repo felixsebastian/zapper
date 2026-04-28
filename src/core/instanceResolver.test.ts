@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, rmSync, existsSync } from "fs";
+import { mkdirSync, rmSync, existsSync, writeFileSync } from "fs";
 import path from "path";
 import {
   isolateProject,
@@ -48,6 +48,20 @@ describe("instanceResolver", () => {
     expect(instanceId).toMatch(/^[a-z0-9]{6}$/);
     expect(result.instanceKey).toBe(DEFAULT_INSTANCE_KEY);
     expect(result.instanceId).toBe(instanceId);
+  });
+
+  it("migrates legacy top-level ports into the default instance without rewriting them at the top level", () => {
+    mkdirSync(path.join(testDir, ".zap"), { recursive: true });
+    writeFileSync(
+      path.join(testDir, ".zap", "state.json"),
+      JSON.stringify({ ports: { API_PORT: "54321" } }),
+    );
+
+    isolateProject(testDir);
+
+    const state = loadState(testDir);
+    expect(state.instances?.default?.ports).toEqual({ API_PORT: "54321" });
+    expect(state.ports).toBeUndefined();
   });
 
   it("reuses existing instance id", () => {

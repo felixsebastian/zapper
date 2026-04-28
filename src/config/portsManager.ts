@@ -56,8 +56,7 @@ export function savePortsForInstance(
         ports,
       },
     },
-    // Legacy compatibility for default instance readers.
-    ports: instanceKey === DEFAULT_INSTANCE_KEY ? ports : refreshed.ports,
+    ports: undefined,
   });
 }
 

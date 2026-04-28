@@ -13,6 +13,7 @@ Complete reference for `zap.yaml` syntax and all CLI commands.
 - [Docker Services](#docker-services)
 - [Environment Variables](#environment-variables)
 - [Instances](#instances)
+- [Resource Management](resource-management.md)
 - [Tasks](#tasks)
 - [Dependencies](#dependencies)
 - [Profiles](#profiles)
@@ -124,7 +125,7 @@ zap r api worker            # Short alias for: zap restart api worker
 ```bash
 zap status                  # Show status of all services
 zap status api db           # Show status for specific services
-zap ls                      # List services/containers with details (status, ports, cwd, cmd)
+zap ls                      # List services/containers with details (status, ports, volumes, cwd, cmd)
 zap ls api db               # List details for specific services
 zap ls --json               # Output detailed list as JSON
 zap logs api                # Follow logs for one service

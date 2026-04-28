@@ -49,8 +49,6 @@ export function saveInstanceConfig(
     instances: nextInstances,
     instanceId: config.instanceId ?? undefined,
     mode: config.instanceId ? "isolate" : "normal",
-    ports: config.instanceId
-      ? nextInstances[DEFAULT_INSTANCE_KEY]?.ports || {}
-      : existing.ports,
+    ports: undefined,
   });
 }

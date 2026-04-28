@@ -341,3 +341,53 @@ export function resolveContainerVolumes({
     namedVolumesToCreate: Array.from(new Set(namedVolumesToCreate)),
   };
 }
+
+export function getContainerVolumeBindings(
+  serviceName: string,
+  volumes: Container["volumes"] | undefined,
+  managedVolumes: Record<string, StoredVolume>,
+): string[] {
+  const bindings: string[] = [];
+
+  for (const volume of volumes || []) {
+    if (typeof volume === "string") {
+      const parsed = parseVolumeString(volume);
+      if (parsed.source) {
+        bindings.push(volume);
+        continue;
+      }
+
+      const volumeName = Object.entries(managedVolumes).find(
+        ([, stored]) =>
+          stored.service === serviceName &&
+          stored.internal_dir === parsed.internalDir,
+      )?.[0];
+      bindings.push(
+        volumeName
+          ? appendMode(`${volumeName}:${parsed.internalDir}`, parsed.suffix)
+          : appendMode(parsed.internalDir, parsed.suffix),
+      );
+      continue;
+    }
+
+    if (volume.name) {
+      bindings.push(
+        appendMode(`${volume.name}:${volume.internal_dir}`, volume.mode),
+      );
+      continue;
+    }
+
+    const volumeName = Object.entries(managedVolumes).find(
+      ([, stored]) =>
+        stored.service === serviceName &&
+        stored.internal_dir === volume.internal_dir,
+    )?.[0];
+    bindings.push(
+      volumeName
+        ? appendMode(`${volumeName}:${volume.internal_dir}`, volume.mode)
+        : appendMode(volume.internal_dir, volume.mode),
+    );
+  }
+
+  return bindings;
+}

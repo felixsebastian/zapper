@@ -95,11 +95,7 @@ export function createInstance(
     // Remove legacy top-level instance identity to avoid dual sources of truth.
     instanceId: undefined,
     mode: undefined,
-    // Keep legacy top-level ports for backward compatibility readers.
-    ports:
-      resolvedInstanceKey === DEFAULT_INSTANCE_KEY
-        ? nextInstances[resolvedInstanceKey].ports || {}
-        : existingState.ports,
+    ports: undefined,
   });
   return id;
 }
@@ -122,7 +118,7 @@ export function clearIsolation(projectRoot: string): void {
     instances: nextInstances,
     instanceId: undefined,
     mode: undefined,
-    ports: state.ports,
+    ports: undefined,
   });
 }
 

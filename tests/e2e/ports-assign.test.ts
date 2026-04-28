@@ -63,7 +63,9 @@ describe("E2E: init ports", () => {
 
   beforeAll(() => {
     if (!fs.existsSync(CLI_PATH)) {
-      throw new Error(`CLI not found at ${CLI_PATH}. Run 'npm run build' first.`);
+      throw new Error(
+        `CLI not found at ${CLI_PATH}. Run 'npm run build' first.`,
+      );
     }
   });
 
@@ -122,7 +124,8 @@ native:
     expect(fs.existsSync(statePath)).toBe(true);
 
     const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
-    expect(state.ports).toEqual(ports);
+    expect(state.instances.default.ports).toEqual(ports);
+    expect(state.ports).toBeUndefined();
   });
 
   it("is idempotent and only assigns ports for new keys", () => {
@@ -145,10 +148,16 @@ native:
     );
 
     const first = parseJsonFromOutput(
-      runZapCommand(`init --json --config zap-${testProjectName}.yaml`, fixtureDir),
+      runZapCommand(
+        `init --json --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      ),
     );
     const second = parseJsonFromOutput(
-      runZapCommand(`init --json --config zap-${testProjectName}.yaml`, fixtureDir),
+      runZapCommand(
+        `init --json --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      ),
     );
     expect(second.ports).toEqual(first.ports);
 
@@ -167,7 +176,10 @@ native:
     );
 
     const third = parseJsonFromOutput(
-      runZapCommand(`init --json --config zap-${testProjectName}.yaml`, fixtureDir),
+      runZapCommand(
+        `init --json --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      ),
     );
 
     const firstPorts = first.ports as Record<string, string>;
@@ -198,7 +210,10 @@ native:
     );
 
     const first = parseJsonFromOutput(
-      runZapCommand(`init --json --config zap-${testProjectName}.yaml`, fixtureDir),
+      runZapCommand(
+        `init --json --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      ),
     );
 
     fs.writeFileSync(
@@ -214,9 +229,14 @@ native:
     );
 
     const reduced = parseJsonFromOutput(
-      runZapCommand(`init --json --config zap-${testProjectName}.yaml`, fixtureDir),
+      runZapCommand(
+        `init --json --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      ),
     );
-    expect(reduced.ports).toEqual({ PORT_B: (reduced.ports as Record<string, string>).PORT_B });
+    expect(reduced.ports).toEqual({
+      PORT_B: (reduced.ports as Record<string, string>).PORT_B,
+    });
 
     fs.writeFileSync(
       tempConfigPath,
@@ -232,7 +252,10 @@ native:
     );
 
     const randomized = parseJsonFromOutput(
-      runZapCommand(`init -R --json --config zap-${testProjectName}.yaml`, fixtureDir),
+      runZapCommand(
+        `init -R --json --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      ),
     );
 
     expect(randomized.ports).not.toEqual(first.ports);
@@ -272,7 +295,10 @@ native:
     fs.writeFileSync(tempConfigPath, configContent);
 
     const initResult = parseJsonFromOutput(
-      runZapCommand(`init --json --config zap-${testProjectName}.yaml`, fixtureDir),
+      runZapCommand(
+        `init --json --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      ),
     );
     const initializedPorts = initResult.ports as Record<string, string>;
 
@@ -311,7 +337,10 @@ docker:
     fs.writeFileSync(tempConfigPath, configContent);
 
     const initResult = parseJsonFromOutput(
-      runZapCommand(`init --json --config zap-${testProjectName}.yaml`, fixtureDir),
+      runZapCommand(
+        `init --json --config zap-${testProjectName}.yaml`,
+        fixtureDir,
+      ),
     );
     const initializedPorts = initResult.ports as Record<string, string>;
 
@@ -325,7 +354,9 @@ docker:
       ports?: string[];
     }>;
 
-    const mongodb = containers.find((container) => container.name === "mongodb");
+    const mongodb = containers.find(
+      (container) => container.name === "mongodb",
+    );
     expect(mongodb).toBeDefined();
     expect(mongodb?.ports).toEqual([`${initializedPorts.MONGO_PORT}:27017`]);
   });

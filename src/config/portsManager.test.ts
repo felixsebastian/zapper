@@ -33,7 +33,20 @@ describe("portsManager", () => {
     savePorts(tempDir, ports);
 
     expect(loadPorts(tempDir)).toEqual(ports);
-    expect(loadState(tempDir).ports).toEqual(ports);
+    const state = loadState(tempDir);
+    expect(state.instances?.default?.ports).toEqual(ports);
+    expect(state.ports).toBeUndefined();
+  });
+
+  it("loads legacy top-level ports for the default instance", () => {
+    const ports = { PORT_1: "1234" };
+    fs.mkdirSync(path.join(tempDir, ".zap"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tempDir, ".zap", "state.json"),
+      JSON.stringify({ ports }),
+    );
+
+    expect(loadPorts(tempDir)).toEqual(ports);
   });
 
   it("clearPorts removes assigned ports", () => {
@@ -82,6 +95,8 @@ describe("portsManager", () => {
   });
 
   it("returns the state.json path", () => {
-    expect(getPortsPath(tempDir)).toBe(path.join(tempDir, ".zap", "state.json"));
+    expect(getPortsPath(tempDir)).toBe(
+      path.join(tempDir, ".zap", "state.json"),
+    );
   });
 });

@@ -137,6 +137,7 @@ function listRow(entry: ServiceListEntry): string[] {
     entry.service,
     entry.status.toUpperCase(),
     entry.ports.join(", "),
+    entry.volumes.join(", "),
     entry.cwd || "",
     entry.cmd,
   ];
@@ -150,6 +151,10 @@ function labeledList(
     [bold(headers[0]), bold(headers[1])],
     ...rows.map(([left, right]) => [left, right]),
   ]);
+}
+
+function countLabel(count: number, label: string): string {
+  return `${count} ${label}${count === 1 ? "" : "s"}`;
 }
 
 function keyValueLines(rows: Array<[string, string | number]>): string {
@@ -634,6 +639,7 @@ export const renderer = {
           bold("SERVICE"),
           bold("STATUS"),
           bold("PORTS"),
+          bold("VOLUMES"),
           bold("CWD"),
           bold("CMD"),
         ],
@@ -643,7 +649,64 @@ export const renderer = {
         rows.push(listRow(service));
       }
 
-      return [header("Services", subtitle), "", table(rows)].join("\n");
+      const sections = [header("Services", subtitle), "", table(rows)];
+      const resources = result.resources;
+      if (!resources) return sections.join("\n");
+
+      if (resources.instances.length > 0) {
+        const instanceRows = [
+          [
+            bold("INSTANCE"),
+            bold("ID"),
+            bold("PM2"),
+            bold("CONTAINERS"),
+            bold("VOLUMES"),
+          ],
+          ...resources.instances.map((instance) => [
+            instance.instanceKey,
+            instance.instanceId,
+            countLabel(instance.pm2.length, "process"),
+            countLabel(instance.containers.length, "container"),
+            countLabel(instance.volumes.length, "volume"),
+          ]),
+        ];
+        sections.push("", bold("Instances"), table(instanceRows));
+      }
+
+      if (resources.dangling.length > 0) {
+        const danglingRows = [
+          [bold("TYPE"), bold("NAME"), bold("WHY")],
+          ...resources.dangling.map((entry) => [
+            entry.type,
+            entry.name,
+            entry.reason,
+          ]),
+        ];
+        sections.push("", bold("Dangling Resources"), table(danglingRows));
+      }
+
+      if (resources.alien.length > 0) {
+        const alienRows = [
+          [bold("TYPE"), bold("NAME"), bold("WHY")],
+          ...resources.alien.map((entry) => [
+            entry.type,
+            entry.name,
+            entry.reason,
+          ]),
+        ];
+        sections.push("", bold("Alien Resources"), table(alienRows));
+      }
+
+      if (resources.staleVolumes.length > 0) {
+        sections.push(
+          "",
+          dim(
+            "Run `zap volume prune` to remove stale generated Docker volumes.",
+          ),
+        );
+      }
+
+      return sections.join("\n");
     },
 
     toJson(result: ServiceListResult): ServiceListResult {

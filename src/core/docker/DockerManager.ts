@@ -25,6 +25,10 @@ export interface DockerContainer {
   startedAt?: string;
 }
 
+export interface DockerVolume {
+  name: string;
+}
+
 interface DockerLogContext {
   projectName: string;
   serviceName: string;
@@ -307,6 +311,27 @@ export class DockerManager {
       await runDocker(["volume", "rm", name]);
     } catch (error) {
       // ignore if missing or still in use
+    }
+  }
+
+  static async listVolumes(): Promise<DockerVolume[]> {
+    try {
+      const result = await runDocker([
+        "volume",
+        "ls",
+        "--format",
+        "{{json .}}",
+      ]);
+      const lines = result
+        .trim()
+        .split("\n")
+        .filter((l) => l.trim().length > 0);
+      return lines.map((line) => {
+        const raw = JSON.parse(line) as Record<string, unknown>;
+        return { name: (raw["Name"] as string) || "" };
+      });
+    } catch (error) {
+      return [];
     }
   }
 

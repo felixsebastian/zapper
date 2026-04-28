@@ -2,12 +2,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getServiceList } from "./getServiceList";
 import { getStatus } from "./getStatus";
 import type { Context } from "../types/Context";
+import { Pm2Manager } from "./process/Pm2Manager";
+import { DockerManager } from "./docker";
 
 vi.mock("./getStatus", () => ({
   getStatus: vi.fn(),
 }));
+vi.mock("./process/Pm2Manager");
+vi.mock("./docker");
 
 const mockedGetStatus = vi.mocked(getStatus);
+const mockedPm2Manager = vi.mocked(Pm2Manager);
+const mockedDockerManager = vi.mocked(DockerManager);
 
 function createContext(): Context {
   return {
@@ -16,6 +22,23 @@ function createContext(): Context {
     envFiles: [],
     environments: [],
     instanceKey: "default",
+    instance: {
+      key: "default",
+      id: "abc123",
+      ports: {
+        DB_PORT: "15432",
+      },
+      volumes: {
+        "zap.demo.abc123.vol1": {
+          service: "db",
+          internal_dir: "/var/lib/postgresql/data",
+        },
+        "zap.demo.abc123.vol2": {
+          service: "old-db",
+          internal_dir: "/data",
+        },
+      },
+    },
     ports: ["API_PORT", "WEB_PORT"],
     processes: [
       {
@@ -34,6 +57,7 @@ function createContext(): Context {
         name: "db",
         image: "postgres:16",
         ports: ["$DB_PORT:5432"],
+        volumes: ["/var/lib/postgresql/data:ro", "db-logs:/var/log/postgresql"],
       },
       {
         name: "cache",
@@ -45,8 +69,20 @@ function createContext(): Context {
     links: [],
     profiles: [],
     state: {
-      ports: {
-        DB_PORT: "15432",
+      instances: {
+        default: {
+          id: "abc123",
+          volumes: {
+            "zap.demo.abc123.vol1": {
+              service: "db",
+              internal_dir: "/var/lib/postgresql/data",
+            },
+            "zap.demo.abc123.vol2": {
+              service: "old-db",
+              internal_dir: "/data",
+            },
+          },
+        },
       },
     },
   };
@@ -55,6 +91,9 @@ function createContext(): Context {
 describe("getServiceList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedPm2Manager.listProcesses.mockResolvedValue([]);
+    mockedDockerManager.listContainers.mockResolvedValue([]);
+    mockedDockerManager.listVolumes.mockResolvedValue([]);
   });
 
   it("returns native and docker entries with details", async () => {
@@ -87,6 +126,7 @@ describe("getServiceList", () => {
         service: "api",
         status: "up",
         ports: ["API_PORT=3001"],
+        volumes: [],
         cwd: "./apps/api",
         cmd: "pnpm dev",
       },
@@ -95,6 +135,7 @@ describe("getServiceList", () => {
         service: "worker",
         status: "down",
         ports: [],
+        volumes: [],
         cwd: undefined,
         cmd: "pnpm worker",
       },
@@ -103,6 +144,10 @@ describe("getServiceList", () => {
         service: "db",
         status: "pending",
         ports: ["15432:5432"],
+        volumes: [
+          "zap.demo.abc123.vol1:/var/lib/postgresql/data:ro",
+          "db-logs:/var/log/postgresql",
+        ],
         cmd: "postgres:16",
       },
       {
@@ -110,7 +155,90 @@ describe("getServiceList", () => {
         service: "cache",
         status: "down",
         ports: [],
+        volumes: [],
         cmd: "redis-server --appendonly yes",
+      },
+    ]);
+    expect(result.resources?.staleVolumes).toEqual([
+      {
+        name: "zap.demo.abc123.vol2",
+        service: "old-db",
+        internalDir: "/data",
+      },
+    ]);
+  });
+
+  it("reports project-shaped dangling and alien resources", async () => {
+    mockedGetStatus.mockResolvedValue({ native: [], docker: [] });
+    mockedPm2Manager.listProcesses.mockResolvedValue([
+      {
+        name: "zap.demo.abc123.old-api",
+        pid: 1,
+        status: "online",
+        uptime: 0,
+        memory: 0,
+        cpu: 0,
+        restarts: 0,
+      },
+      {
+        name: "zap.demo.zz9999.api",
+        pid: 2,
+        status: "online",
+        uptime: 0,
+        memory: 0,
+        cpu: 0,
+        restarts: 0,
+      },
+    ]);
+    mockedDockerManager.listContainers.mockResolvedValue([
+      {
+        id: "1",
+        name: "zap.demo.abc123.old-db",
+        status: "Up",
+        ports: [],
+        networks: [],
+        created: "",
+      },
+    ]);
+    mockedDockerManager.listVolumes.mockResolvedValue([
+      { name: "zap.demo.abc123.vol99" },
+      { name: "zap.demo.zz9999.vol1" },
+    ]);
+
+    const result = await getServiceList(createContext());
+
+    expect(result.resources?.dangling).toEqual([
+      {
+        type: "pm2",
+        name: "zap.demo.abc123.old-api",
+        reason: 'service "old-api" is not in current zap.yaml',
+      },
+      {
+        type: "container",
+        name: "zap.demo.abc123.old-db",
+        reason: 'service "old-db" is not in current zap.yaml',
+      },
+      {
+        type: "volume",
+        name: "zap.demo.abc123.vol2",
+        reason: "old-db:/data is not in current zap.yaml",
+      },
+      {
+        type: "volume",
+        name: "zap.demo.abc123.vol99",
+        reason: "Docker volume is not tracked in current repo state",
+      },
+    ]);
+    expect(result.resources?.alien).toEqual([
+      {
+        type: "pm2",
+        name: "zap.demo.zz9999.api",
+        reason: "instance not in this repo state",
+      },
+      {
+        type: "volume",
+        name: "zap.demo.zz9999.vol1",
+        reason: "instance not in this repo state",
       },
     ]);
   });
@@ -124,6 +252,10 @@ describe("getServiceList", () => {
       "api",
       "db",
     ]);
-    expect(mockedGetStatus).toHaveBeenCalledWith(createContext(), ["api", "db"], false);
+    expect(mockedGetStatus).toHaveBeenCalledWith(
+      createContext(),
+      ["api", "db"],
+      false,
+    );
   });
 });

@@ -1,0 +1,81 @@
+# Resource Management
+
+Zapper names the resources it creates so they can be discovered later:
+
+- PM2 processes and Docker containers: `zap.<project>.<instanceId>.<service>`
+- Generated Docker volumes: `zap.<project>.<instanceId>.volN`
+
+`zap ls` is the local inventory view. It shows configured services first, then
+summarizes the instance records in this checkout and calls out resources that
+look related to the project but no longer line up with the current config or
+state.
+
+## Resource Types
+
+### Current resources
+
+Current resources belong to the selected instance and still match a service or
+managed volume path in the current `zap.yaml`.
+
+### Dangling resources
+
+Dangling resources belong to an instance recorded in this repo, but no longer
+match the current `zap.yaml` or current state. Common causes:
+
+- A service was renamed or removed while its PM2 process or Docker container
+  still exists.
+- A generated Docker volume exists but is no longer tracked in
+  `.zap/state.json`.
+- A managed volume path changed, leaving the old generated volume assignment
+  stale.
+
+Use `zap ls` to see these. The usual repair is to stop/delete the stale
+resources rather than hand-editing state.
+
+### Alien resources
+
+Alien resources match the current project name but do not belong to any instance
+recorded in this checkout's `.zap/state.json`. They usually come from another
+checkout, older state, or manual resource creation.
+
+Use `zap global list <project>` or `zap global kill <project>` when you want a
+project-wide view or cleanup across checkouts.
+
+## Cleanup Commands
+
+- `zap down` stops resources for the selected instance and current config.
+- `zap kill` deletes all PM2 processes and Docker containers for the current
+  project across instances.
+- `zap global kill <project>` deletes PM2 processes and Docker containers for a
+  named project.
+- `zap volume prune` deletes stale generated Docker volumes for the selected
+  instance.
+- `zap volume reset` forgets generated volume assignments in `.zap/state.json`
+  without deleting Docker volumes.
+
+For one-off cleanup, Docker and PM2 commands are still valid escape hatches:
+
+```bash
+docker rm -f <container>
+docker volume rm <volume>
+pm2 delete <process>
+```
+
+## Practical Recovery
+
+If a config change leaves old resources around:
+
+```bash
+zap ls
+zap volume prune
+zap kill
+zap up
+```
+
+If generated volume state is confusing but you want to keep the Docker volumes
+for manual inspection:
+
+```bash
+zap volume reset
+zap init
+```

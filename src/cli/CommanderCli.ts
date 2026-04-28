@@ -196,7 +196,7 @@ export class CommanderCli {
     this.program
       .command("ls")
       .description(
-        "List configured services with details (status, ports, cwd, cmd)",
+        "List configured services with details (status, ports, volumes, cwd, cmd)",
       )
       .argument("[services...]", "Services to list")
       .option("-j, --json", "Output list as minified JSON")
