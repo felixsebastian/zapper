@@ -1,0 +1,4 @@
+vars:
+  - NODE_ENV
+  - LOG_LEVEL
+  - PORT

@@ -1,7 +1,7 @@
 # Environment Variable Management
 
-This document is a design note for Zapper's future environment variable model.
-It is not an implementation reference yet.
+This document explains the environment variable model and the reasoning behind
+it. For concise syntax reference, see [usage.md](usage.md).
 
 ## Goals
 
@@ -28,7 +28,7 @@ At the root level, `env` defines the global environment file stack:
 env: [.env.local, .env.user]
 ```
 
-For backward compatibility, root-level `env_files` should continue to work:
+Root-level `env_files` remains as a compatibility alias:
 
 ```yaml
 env_files: [.env.local, .env.user]
@@ -56,7 +56,7 @@ This gives Zapper one concept with three levels of power:
 ## Resolution Rules
 
 Root `env` and root `env_files` both mean "load these environment files as the
-global stack." If both are present, Zapper should reject the config instead of
+global stack." If both are present, Zapper rejects the config instead of
 guessing which one wins.
 
 Service-level `env` resolves as follows:
@@ -66,9 +66,7 @@ Service-level `env` resolves as follows:
    from that service stack. This replaces the global stack for that service.
 3. `env: path/to/whitelist.yaml` loads a strict whitelist file and exposes only
    the listed variables from the global env stack.
-4. Missing `env` should probably mean no Zapper-managed env for that service.
-   If we keep current implicit inheritance behavior for compatibility, it should
-   be documented as legacy.
+4. Missing `env` means no Zapper-managed env for that service.
 
 The service file-stack rule is an override, not a merge. That keeps precedence
 straightforward:
@@ -78,7 +76,7 @@ straightforward:
 - Service `env: [files...]` replaces the default source.
 - Service `env: whitelist.yaml` filters the default source.
 
-Generated Zapper values, such as assigned ports, should be part of the resolved
+Generated Zapper values, such as assigned ports, are part of the resolved
 environment source before either `*` or whitelist filtering is applied.
 
 ## Persona Stress Test
@@ -236,7 +234,7 @@ How the model handles it:
 A service string other than `*` should be interpreted as a whitelist file path,
 not a named whitelist embedded in `zap.yaml`.
 
-Whitelist files should have a strict schema. A minimal schema could be:
+Whitelist files have a strict schema:
 
 ```yaml
 vars:
@@ -249,10 +247,10 @@ Rules:
 
 - The top level must be an object.
 - `vars` must be an array of non-empty variable names.
-- Unknown keys should be rejected.
+- Unknown keys are rejected.
 - `*` is not a valid whitelist file path or variable name.
 - Whitelist files require a global env stack. If root `env` or `env_files` is
-  missing, service `env: some-whitelist.yaml` should error because there is no
+  missing, service `env: some-whitelist.yaml` errors because there is no
   central source to filter.
 
 The last rule is important: a whitelist does not load values. It only selects
@@ -274,7 +272,7 @@ precedence rules, so this should be a validation error.
 
 ### Service `env: "*"` Without Global Env
 
-Probably invalid:
+Valid, but usually empty unless generated values such as assigned ports exist:
 
 ```yaml
 native:
@@ -283,9 +281,9 @@ native:
     env: "*"
 ```
 
-Because `*` means "all values from the global env stack", it should require a
-global env source. If we decide an empty global source is acceptable, this
-should be explicit and consistent with whitelist behavior.
+Because `*` means "all currently available values", this produces an empty env
+when there is no root env source and no generated values. Whitelist files are
+stricter: they require a root env source because they filter central values.
 
 ### Service File Stack With Global Env
 
@@ -370,25 +368,9 @@ The benefit is that all three use one field and one idea:
 - A service file stack is an explicit source override.
 - A whitelist file filters the default source.
 
-## Migration Direction
+## Current State
 
-Keep existing root `env_files` support for compatibility, but document root
-`env` as the preferred field.
-
-Inline whitelist arrays are not part of the target design. Existing
-implementation support should be migrated away from, not carried forward as a
-documented mode.
-
-The likely migration path is:
-
-1. Add root `env` as an alias for root `env_files`.
-2. Add service `env: "*"` and reserve `*`.
-3. Add service `env: [files...]` as the direct file assignment model.
-4. Add strict service whitelist files for `env: path.yaml`.
-5. Deprecate inline `whitelists` in `zap.yaml`.
-6. Remove service inline variable arrays from the documented config model.
-
-The desired end state is:
+The implemented model is:
 
 - Most projects use root `env` and service `env: "*"`.
 - Projects with existing env-file conventions use service `env: [files...]`.

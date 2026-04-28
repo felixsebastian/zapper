@@ -1,5 +1,5 @@
 project: myproj
-env_files: [.env]
+env: [.env]
 git_method: ssh
 native:
   frontend:
@@ -7,20 +7,20 @@ native:
     repo: myorg/frontend
     cmd: npm run dev
     cwd: ./frontend
-    env: [PORT, API_URL]
+    env: "*"
   api:
     aliases: [a]
     repo: myorg/api
     cmd: npm run dev
     cwd: ./api
-    env: [PORT, DATABASE_URL]
+    env: "*"
 docker:
   database:
     aliases: [db]
     image: postgres:15
     ports:
       - "5432:5432"
-    env: [POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD]
+    env: "*"
     volumes:
       - name: postgres_data
         internal_dir: /var/lib/postgresql/data
@@ -32,7 +32,7 @@ docker:
 tasks:
   build:
     desc: Build both services
-    env: [NODE_ENV]
+    env: "*"
     cmds:
       - npm ci --prefix ./frontend
       - npm run build --prefix ./frontend

@@ -1,11 +1,10 @@
 project: test-ports-env
 ports:
   - PORT_A
-env_files:
+env:
   - .env
 
 native:
   myservice:
     cmd: echo "hello"
-    env:
-      - PORT_B
+    env: "*"

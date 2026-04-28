@@ -4,8 +4,9 @@ native:
   app:
     cmd: >
       node -e "console.log('test process')"
+    env: "*"
 
-env_files:
+env:
   default:
     - .env.shared
     - .env.local

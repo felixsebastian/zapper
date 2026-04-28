@@ -1,0 +1,3 @@
+vars:
+  - MONITORING_URL
+  - ALERT_WEBHOOK

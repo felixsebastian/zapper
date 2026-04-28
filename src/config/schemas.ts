@@ -46,19 +46,44 @@ export const ContainerVolumeSchema = z.union([
     ),
 ]);
 
-// Union type for env - can be array of strings or string reference to whitelist
-const EnvSchema = z.union([
-  z.array(z.string()),
-  z.string().min(1, "Environment whitelist reference cannot be empty"),
-]);
+const looksLikeEnvVarName = (value: string): boolean =>
+  /^[A-Z_][A-Z0-9_]*$/.test(value);
 
-const EnvFilesArraySchema = z.array(
-  z.string().min(1, "Environment file path cannot be empty"),
-);
+const looksLikeFilePath = (value: string): boolean =>
+  value.startsWith(".") ||
+  value.startsWith("/") ||
+  value.includes("/") ||
+  value.includes("\\") ||
+  value.includes(".");
+
+const EnvFilePathSchema = z
+  .string()
+  .min(1, "Environment file path cannot be empty")
+  .refine((value) => !looksLikeEnvVarName(value), {
+    message:
+      "Service env arrays define env file stacks, not variable whitelists. Move variable allowlists into a whitelist file and reference it with env: path/to/file.yaml.",
+  })
+  .refine((value) => !value.includes("="), {
+    message:
+      "Service env arrays define env file stacks and cannot contain inline KEY=value entries.",
+  })
+  .refine(looksLikeFilePath, {
+    message:
+      "Environment file paths must look like file paths, such as .env, config/.env, or service.env.",
+  });
+
+const EnvFilesArraySchema = z.array(EnvFilePathSchema);
 
 const EnvFilesMapSchema = z.record(validNameSchema, EnvFilesArraySchema);
 
 const EnvFilesSchema = z.union([EnvFilesArraySchema, EnvFilesMapSchema]);
+
+// Service env: pass-all, service file stack, or strict whitelist file path.
+const EnvSchema = z.union([
+  z.literal("*"),
+  z.array(EnvFilePathSchema),
+  EnvFilePathSchema,
+]);
 
 // Port name schema: uppercase letters, numbers, and underscores only
 const PortNameSchema = z
@@ -84,7 +109,6 @@ export const ProcessSchema = z
     resolvedEnv: z.record(z.string(), z.string()).optional(),
     source: z.string().optional(),
     repo: z.string().optional(),
-    env_files: z.array(z.string()).optional(),
     profiles: z
       .array(z.string().min(1, "Profile name cannot be empty"))
       .optional(),
@@ -141,7 +165,6 @@ export const TaskSchema = z
     cwd: z.string().optional(),
     aliases: z.array(validNameSchema).optional(),
     resolvedEnv: z.record(z.string(), z.string()).optional(),
-    env_files: z.array(z.string()).optional(),
     params: z.array(TaskParamSchema).optional(),
   })
   .strict();
@@ -165,17 +188,12 @@ export const ZapperConfigSchema = processValidation(
     z
       .object({
         project: validNameSchema,
+        env: EnvFilesSchema.optional(),
         env_files: EnvFilesSchema.optional(),
         ports: z.array(PortNameSchema).optional(),
         init_task: validNameSchema.optional(),
         git_method: z.enum(["http", "ssh", "cli"]).optional(),
         task_delimiters: TaskDelimitersSchema,
-        whitelists: z
-          .record(
-            validNameSchema,
-            z.array(z.string().min(1, "Environment variable cannot be empty")),
-          )
-          .optional(),
         native: z.record(validNameSchema, ProcessSchema).optional(),
         docker: z.record(validNameSchema, ContainerSchema).optional(),
         containers: z.record(validNameSchema, ContainerSchema).optional(),
@@ -185,7 +203,11 @@ export const ZapperConfigSchema = processValidation(
         notes: z.string().min(1).optional(),
         links: z.array(LinkSchema).optional(),
       })
-      .strict(),
+      .strict()
+      .refine((config) => !(config.env && config.env_files), {
+        message: "Use either root env or env_files, not both",
+        path: ["env"],
+      }),
   ),
 );
 

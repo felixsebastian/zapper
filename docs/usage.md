@@ -54,7 +54,7 @@ native:
 
 ```yaml
 project: myapp # Required. Used as PM2/Docker namespace
-env_files: # Load env vars from these files
+env: # Load env vars from these files
   default: [.env.base, .env]
   prod_dbs: [.env.base, .env.prod-dbs]
 ports: # Port names to assign random values
@@ -245,10 +245,7 @@ native:
   api:
     cmd: pnpm dev              # Required. Command to run
     cwd: ./backend             # Working directory (relative to zap.yaml)
-    env:                       # Env vars to pass (whitelist)
-      - PORT
-      - DATABASE_URL
-      - DEBUG=true             # Inline override
+    env: "*"                   # Pass all values from the root env stack
     depends_on: [postgres]     # Start these first
     profiles: [dev, test]      # Only start when profile matches
     repo: myorg/api-repo       # Git repo (for zap clone)
@@ -307,9 +304,7 @@ docker:
     image: postgres:15         # Required. Docker image
     ports:                     # Port mappings (host:container)
       - 5432:5432
-    env:                       # Env vars for container
-      - POSTGRES_DB=myapp
-      - POSTGRES_PASSWORD=dev
+    env: .zap/env/postgres.yaml # Strict whitelist file for root env values
     volumes:                   # Volume mounts
       - /var/lib/postgresql/data
       - postgres-logs:/var/log/postgresql
@@ -331,10 +326,7 @@ docker:
     image: postgres:15
     ports:
       - 5432:5432
-    env:
-      - POSTGRES_DB=myapp
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+    env: .env.postgres
     volumes:
       - /var/lib/postgresql/data
 ```
@@ -398,9 +390,7 @@ docker:
     image: mysql:8
     ports:
       - 3306:3306
-    env:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=myapp
+    env: .env.mysql
     volumes:
       - mysql-data:/var/lib/mysql
 ```
@@ -409,14 +399,24 @@ docker:
 
 ## Environment Variables
 
-Zapper uses a **whitelist approach**: define where vars come from, then each service declares which ones it needs.
+Zapper uses one `env` field for environment variable source and routing:
+
+- Root `env` defines the global env file stack.
+- Service `env: "*"` passes all values from the root env stack.
+- Service `env: [files...]` uses a service-specific env file stack instead.
+- Service `env: path/to/whitelist.yaml` filters the root env stack through a strict whitelist file.
+
+Inline variable whitelists are not supported in `zap.yaml`. Arrays under
+service `env` are file stacks.
 
 ### Loading from files
 
 ```yaml
-env_files: [.env]                    # Single file
-env_files: [.env.base, .env]         # Multiple files (later files override)
+env: [.env]                    # Single file
+env: [.env.base, .env]         # Multiple files (later files override)
 ```
+
+Root `env_files` is still accepted as a compatibility alias for root `env`.
 
 ### Environment sets (recommended)
 
@@ -425,12 +425,12 @@ You can define multiple env file sets and switch between them with
 environment is active, no env files are loaded.
 
 ```yaml
-env_files:
+env:
   default: [.env.base, .env]
   prod_dbs: [.env.base, .env.prod-dbs]
 ```
 
-Legacy array syntax is still supported:
+Compatibility alias:
 
 ```yaml
 env_files: [.env.base, .env]
@@ -444,42 +444,63 @@ Split into two files:
 - `.env` — secrets (API keys, passwords), **gitignored**
 
 ```yaml
-env_files: [.env.base, .env]
+env: [.env.base, .env]
 ```
 
-### Whitelisting per service
+### Passing all env to a service
 
-Each service only receives the vars it explicitly lists:
+Use `env: "*"` when a service can receive every value from the root env stack:
 
 ```yaml
+env: [.env.base, .env]
+
 native:
   backend:
     cmd: pnpm dev
-    env:
-      - PORT
-      - DATABASE_URL
-      - JWT_SECRET
+    env: "*"
 
   frontend:
     cmd: pnpm dev
-    env:
-      - VITE_API_URL
+    env: "*"
 ```
 
-Backend sees `PORT`, `DATABASE_URL`, `JWT_SECRET`. Frontend only sees `VITE_API_URL`. No leakage.
+### Service-specific file stacks
 
-### Inline values
-
-Override or hardcode values inline:
+Use a service-level env file stack when a service should not use the global
+stack:
 
 ```yaml
 native:
+  frontend:
+    cmd: pnpm dev
+    env: [.env.common, .env.frontend, .env.frontend.user]
+
+  backend:
+    cmd: pnpm dev
+    env: [.env.common, .env.db, .env.backend, .env.backend.user]
+```
+
+The service stack replaces the root stack for that service.
+
+### Whitelist files
+
+Use a whitelist file when you want central env files but explicit routing:
+
+```yaml
+env: [.env.common, .env.db, .env.user]
+
+native:
   api:
     cmd: pnpm dev
-    env:
-      - PORT=3000 # Hardcoded value
-      - DATABASE_URL # From env_files
-      - DEBUG=true # Override
+    env: .zap/env/api.yaml
+```
+
+`.zap/env/api.yaml`:
+
+```yaml
+vars:
+  - DATABASE_URL
+  - JWT_SECRET
 ```
 
 ### Port assignment
@@ -493,18 +514,15 @@ ports:
   - BACKEND_PORT
   - DB_PORT
 
-env_files: [.env]
+env: [.env]
 
 native:
   frontend:
     cmd: pnpm dev
-    env:
-      - FRONTEND_PORT
+    env: "*"
   backend:
     cmd: pnpm dev
-    env:
-      - BACKEND_PORT
-      - DB_PORT
+    env: "*"
 ```
 
 Then run:
@@ -549,9 +567,7 @@ Docker services can use env vars too:
 docker:
   postgres:
     image: postgres:15
-    env:
-      - POSTGRES_PASSWORD=dev # Hardcoded
-      - POSTGRES_DB # From env_files
+    env: "*"
 ```
 
 Docker `ports` mappings also support interpolation, including values initialized by `ports:`:
@@ -611,8 +627,7 @@ tasks:
   seed:
     desc: Seed the database # Description (shown in help)
     cwd: ./backend # Working directory
-    env: # Env vars to pass
-      - DATABASE_URL
+    env: .zap/env/backend.yaml # Strict whitelist file
     params: # Named parameters
       - name: count
         default: "10"
@@ -762,19 +777,19 @@ Output:
 tasks:
   db:migrate:
     desc: Run database migrations
-    env: [DATABASE_URL]
+    env: .zap/env/database.yaml
     cmds:
       - pnpm prisma migrate dev
 
   db:seed:
     desc: Seed the database
-    env: [DATABASE_URL]
+    env: .zap/env/database.yaml
     cmds:
       - pnpm prisma db seed
 
   db:reset:
     desc: Reset and reseed database
-    env: [DATABASE_URL]
+    env: .zap/env/database.yaml
     cmds:
       - pnpm prisma migrate reset --force
 ```
@@ -793,7 +808,7 @@ tasks:
       - pnpm tsc --noEmit
 
   test:
-    env: [DATABASE_URL]
+    env: .zap/env/database.yaml
     cmds:
       - pnpm vitest run
 
@@ -887,8 +902,7 @@ docker:
 
   postgres-test:
     image: postgres:15
-    env:
-      - POSTGRES_DB=test
+    env: .env.test-db
     profiles: [test]
 ```
 
@@ -935,10 +949,10 @@ links:
 
 ### Environment variable interpolation
 
-Link URLs support `${VAR}` syntax to reference environment variables from your `env_files`:
+Link URLs support `${VAR}` syntax to reference environment variables from your root `env` files:
 
 ```yaml
-env_files: [.env]
+env: [.env]
 
 links:
   - name: API
@@ -970,12 +984,12 @@ zap o "API Docs"               # Short alias for: zap launch "API Docs"
 ## Notes
 
 Top-level project notes you can print with `zap notes`.
-The notes string supports `${VAR}` interpolation from your `env_files`.
+The notes string supports `${VAR}` interpolation from your root `env` files.
 
 ### Configuration
 
 ```yaml
-env_files: [.env]
+env: [.env]
 notes: |
   Frontend: http://localhost:${FRONTEND_PORT}
   API: http://localhost:${API_PORT}
@@ -1038,7 +1052,7 @@ A complete example for a typical full-stack app:
 
 ```yaml
 project: myapp
-env_files: [.env.base, .env]
+env: [.env.base, .env]
 git_method: ssh
 
 native:
@@ -1046,27 +1060,20 @@ native:
     cmd: pnpm dev
     cwd: ./api
     repo: myorg/api
-    env:
-      - PORT
-      - DATABASE_URL
-      - REDIS_URL
-      - JWT_SECRET
+    env: .zap/env/api.yaml
     depends_on: [postgres, redis]
 
   worker:
     cmd: pnpm worker
     cwd: ./api
-    env:
-      - DATABASE_URL
-      - REDIS_URL
+    env: .zap/env/worker.yaml
     depends_on: [api]
 
   frontend:
     cmd: pnpm dev
     cwd: ./web
     repo: myorg/web
-    env:
-      - VITE_API_URL
+    env: .zap/env/web.yaml
     depends_on: [api]
 
 docker:
@@ -1074,9 +1081,7 @@ docker:
     image: postgres:15
     ports:
       - 5432:5432
-    env:
-      - POSTGRES_DB=myapp
-      - POSTGRES_PASSWORD=dev
+    env: .zap/env/postgres.yaml
     volumes:
       - /var/lib/postgresql/data
 
@@ -1088,13 +1093,13 @@ docker:
 tasks:
   db:migrate:
     desc: Run migrations
-    env: [DATABASE_URL]
+    env: .zap/env/database.yaml
     cmds:
       - pnpm --filter api prisma migrate dev
 
   db:seed:
     desc: Seed database
-    env: [DATABASE_URL]
+    env: .zap/env/database.yaml
     params:
       - name: count
         default: "10"
@@ -1104,7 +1109,7 @@ tasks:
 
   test:
     desc: Run tests with optional args
-    env: [DATABASE_URL]
+    env: .zap/env/database.yaml
     cmds:
       - "pnpm vitest {{REST}}"
 

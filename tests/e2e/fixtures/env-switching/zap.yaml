@@ -4,8 +4,9 @@ native:
     cmd: >
       node -e "console.log('Service started with TEST_VALUE=' + process.env.TEST_VALUE);
       setInterval(() => console.log('Heartbeat: TEST_VALUE=' + process.env.TEST_VALUE + ', NODE_ENV=' + process.env.NODE_ENV), 2000)"
+    env: "*"
 
-env_files:
+env:
   default:
     - .env.default
   alternate:

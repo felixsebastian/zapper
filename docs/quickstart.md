@@ -14,20 +14,17 @@ In your project root:
 
 ```yaml
 project: myapp
-env_files: [.env]
+env: [.env]
 
 native:
   backend:
     cmd: pnpm dev
-    env:
-      - DATABASE_URL
-      - PORT
+    env: "*"
 
   frontend:
     cmd: pnpm dev
     cwd: ./frontend
-    env:
-      - VITE_API_URL
+    env: "*"
 
 docker:
   postgres:

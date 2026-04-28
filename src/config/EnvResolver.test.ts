@@ -261,7 +261,7 @@ API_URL=http://\${HOST}:\${PORT}/api
   });
 
   describe("resolve", () => {
-    it("should resolve processes with envs whitelist", () => {
+    it("should resolve processes with pass-all env", () => {
       const envContent = `
 APP_ENV=development
 NODE_ENV=development
@@ -277,32 +277,34 @@ DATABASE_URL=postgresql://localhost:5432/myapp
           test: {
             name: "test",
             cmd: "echo $MYENV",
-            env: ["MYENV", "APP_ENV"],
+            env: "*",
           },
           server: {
             name: "server",
             cmd: "node server.js",
-            env: ["NODE_ENV", "PORT"],
+            env: "*",
           },
         },
       };
 
       const result = EnvResolver.resolve(config);
 
-      expect(result.native!.test.env).toEqual(["MYENV", "APP_ENV"]);
       expect(result.native!.test.resolvedEnv).toEqual({
-        MYENV: "foo",
         APP_ENV: "development",
+        NODE_ENV: "development",
+        MYENV: "foo",
+        DATABASE_URL: "postgresql://localhost:5432/myapp",
       });
 
-      expect(result.native!.server.env).toEqual(["NODE_ENV", "PORT"]);
       expect(result.native!.server.resolvedEnv).toEqual({
+        APP_ENV: "development",
         NODE_ENV: "development",
-        // PORT is not in the env file, so it won't be included
+        MYENV: "foo",
+        DATABASE_URL: "postgresql://localhost:5432/myapp",
       });
     });
 
-    it("should handle processes with no envs whitelist", () => {
+    it("should handle processes with no env", () => {
       const envContent = `
 APP_ENV=development
 NODE_ENV=development
@@ -323,14 +325,11 @@ NODE_ENV=development
 
       const result = EnvResolver.resolve(config);
 
-      expect(result.native!.test.env).toEqual([]);
-      expect(result.native!.test.resolvedEnv).toEqual({
-        APP_ENV: "development",
-        NODE_ENV: "development",
-      });
+      expect(result.native!.test.env).toBeUndefined();
+      expect(result.native!.test.resolvedEnv).toEqual({});
     });
 
-    it("should handle processes with empty envs array", () => {
+    it("should handle processes with empty service file stack", () => {
       const envContent = `
 APP_ENV=development
 NODE_ENV=development
@@ -352,13 +351,10 @@ NODE_ENV=development
       const result = EnvResolver.resolve(config);
 
       expect(result.native!.test.env).toEqual([]);
-      expect(result.native!.test.resolvedEnv).toEqual({
-        APP_ENV: "development",
-        NODE_ENV: "development",
-      });
+      expect(result.native!.test.resolvedEnv).toEqual({});
     });
 
-    it("should handle processes with existing env whitelist", () => {
+    it("should handle processes with service file stack", () => {
       const envContent = `
 CUSTOM_VAR=custom_value
       `;
@@ -366,25 +362,83 @@ CUSTOM_VAR=custom_value
 
       const config: ZapperConfig = {
         project: "test",
-        env_files: [envFile],
         native: {
           test: {
             name: "test",
             cmd: "echo hello",
-            env: ["CUSTOM_VAR"],
+            env: [envFile],
           },
         },
       };
 
       const result = EnvResolver.resolve(config);
 
-      expect(result.native!.test.env).toEqual(["CUSTOM_VAR"]);
+      expect(result.native!.test.env).toEqual([envFile]);
       expect(result.native!.test.resolvedEnv).toEqual({
         CUSTOM_VAR: "custom_value",
       });
     });
 
-    it("should handle processes with legacy envs field", () => {
+    it("should resolve strict whitelist files from the global env", () => {
+      const envContent = `
+DATABASE_URL=postgresql://localhost:5432/myapp
+JWT_SECRET=dev-secret
+PUBLIC_URL=http://localhost:3000
+      `;
+      const whitelistContent = `
+vars:
+  - DATABASE_URL
+  - JWT_SECRET
+      `;
+      const envFile = createTempFile(envContent, ".env");
+      const whitelistFile = createTempFile(whitelistContent, ".yaml");
+
+      const config: ZapperConfig = {
+        project: "test",
+        env: [envFile],
+        native: {
+          test: {
+            name: "test",
+            cmd: "echo hello",
+            env: whitelistFile,
+          },
+        },
+      };
+
+      const result = EnvResolver.resolve(config);
+
+      expect(result.native!.test.resolvedEnv).toEqual({
+        DATABASE_URL: "postgresql://localhost:5432/myapp",
+        JWT_SECRET: "dev-secret",
+      });
+    });
+
+    it("should require a global env source for whitelist files", () => {
+      const whitelistFile = createTempFile(
+        `
+vars:
+  - DATABASE_URL
+        `,
+        ".yaml",
+      );
+
+      const config: ZapperConfig = {
+        project: "test",
+        native: {
+          test: {
+            name: "test",
+            cmd: "echo hello",
+            env: whitelistFile,
+          },
+        },
+      };
+
+      expect(() => EnvResolver.resolve(config)).toThrow(
+        "Environment whitelist file requires root env or env_files",
+      );
+    });
+
+    it("should ignore legacy envs field", () => {
       const envContent = `
 LEGACY_VAR=legacy_value
       `;
@@ -404,10 +458,8 @@ LEGACY_VAR=legacy_value
 
       const result = EnvResolver.resolve(config);
 
-      expect(result.native!.test.env).toEqual([]);
-      expect(result.native!.test.resolvedEnv).toEqual({
-        LEGACY_VAR: "legacy_value",
-      });
+      expect(result.native!.test.env).toBeUndefined();
+      expect(result.native!.test.resolvedEnv).toEqual({});
     });
 
     it("should handle processes with no env files", () => {
@@ -417,14 +469,14 @@ LEGACY_VAR=legacy_value
           test: {
             name: "test",
             cmd: "echo hello",
-            env: ["SOME_VAR"],
+            env: "*",
           },
         },
       };
 
       const result = EnvResolver.resolve(config);
 
-      expect(result.native!.test.env).toEqual(["SOME_VAR"]);
+      expect(result.native!.test.env).toEqual("*");
       expect(result.native!.test.resolvedEnv).toEqual({});
     });
   });
@@ -443,7 +495,7 @@ TEST_VAR=test_value
           test: {
             name: "test",
             cmd: "echo hello",
-            env: ["TEST_VAR"],
+            env: "*",
           },
         },
       };
@@ -641,7 +693,7 @@ NODE_ENV=development`;
           {
             name: "echo-service",
             cmd: "echo test",
-            env: ["TEST_VALUE", "NODE_ENV"],
+            env: "*",
           },
         ],
         containers: [],
@@ -683,7 +735,7 @@ NODE_ENV=staging
           {
             name: "echo-service",
             cmd: "echo test",
-            env: ["TEST_VALUE", "NODE_ENV"],
+            env: "*",
           },
         ],
         containers: [],
@@ -731,7 +783,7 @@ DATABASE_URL=postgresql://localhost:5433/myapp_staging
           {
             name: "app",
             cmd: "node app.js",
-            env: ["TEST_VALUE", "NODE_ENV", "DATABASE_URL", "REDIS_URL"],
+            env: "*",
           },
         ],
         containers: [],
@@ -755,7 +807,7 @@ DATABASE_URL=postgresql://localhost:5433/myapp_staging
       });
     });
 
-    it("should handle process-specific env_files overriding global environment", () => {
+    it("should handle service env file stack overriding global environment", () => {
       const globalEnvContent = `
 GLOBAL_VAR=global_value
 TEST_VALUE=global_test_value
@@ -777,8 +829,7 @@ PROCESS_VAR=process_value
           {
             name: "app",
             cmd: "node app.js",
-            env: ["GLOBAL_VAR", "TEST_VALUE", "PROCESS_VAR"],
-            env_files: [processEnvFile], // Process-specific override
+            env: [processEnvFile], // Service-specific override
           },
         ],
         containers: [],
@@ -794,7 +845,7 @@ PROCESS_VAR=process_value
 
       const result = EnvResolver.resolveContext(context);
 
-      // Process-specific env_files should completely override global env
+      // Service file stacks should completely override global env
       expect(result.processes[0].resolvedEnv).toEqual({
         TEST_VALUE: "process_specific_value",
         PROCESS_VAR: "process_value",
@@ -822,7 +873,7 @@ DATABASE_NAME=\${DATABASE_PREFIX}_production
           {
             name: "api",
             cmd: "node api.js",
-            env: ["FULL_API_URL", "DATABASE_NAME"],
+            env: "*",
           },
         ],
         containers: [],
@@ -839,7 +890,10 @@ DATABASE_NAME=\${DATABASE_PREFIX}_production
       const result = EnvResolver.resolveContext(context);
 
       expect(result.processes[0].resolvedEnv).toEqual({
+        BASE_URL: "https://api.example.com",
+        API_VERSION: "v1",
         FULL_API_URL: "https://api.example.com/v1",
+        DATABASE_PREFIX: "myapp",
         DATABASE_NAME: "myapp_production",
       });
     });
@@ -854,7 +908,7 @@ DATABASE_NAME=\${DATABASE_PREFIX}_production
           {
             name: "app",
             cmd: "node app.js",
-            env: ["TEST_VAR"],
+            env: "*",
           },
         ],
         containers: [],
@@ -893,7 +947,7 @@ POSTGRES_PASSWORD=staging_pass
           {
             name: "database",
             image: "postgres:15",
-            env: ["POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD"],
+            env: "*",
           },
         ],
         tasks: [],
@@ -931,7 +985,7 @@ DEBUG_VAR=debug_value
           {
             name: "debug-service",
             cmd: "node debug.js",
-            env: ["DEBUG_VAR"],
+            env: "*",
           },
         ],
         containers: [],
@@ -1046,12 +1100,12 @@ BACKEND_URL=http://localhost:\${BACKEND_PORT}/api
           {
             name: "frontend",
             cmd: "npm run dev",
-            env: ["FRONTEND_PORT", "FRONTEND_URL"],
+            env: "*",
           },
           {
             name: "backend",
             cmd: "npm run server",
-            env: ["BACKEND_PORT", "BACKEND_URL"],
+            env: "*",
           },
         ],
         containers: [],
@@ -1204,7 +1258,7 @@ PORT=3000
           {
             name: "app",
             cmd: "npm run dev",
-            env: ["PORT"],
+            env: "*",
           },
         ],
         containers: [],

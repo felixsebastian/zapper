@@ -100,9 +100,7 @@ ports:
 native:
   app:
     cmd: echo "hello"
-    env:
-      - FRONTEND_PORT
-      - BACKEND_PORT
+    env: "*"
 `;
     tempConfigPath = path.join(fixtureDir, `zap-${testProjectName}.yaml`);
     fs.writeFileSync(tempConfigPath, configContent);
@@ -280,16 +278,13 @@ project: ${testProjectName}
 ports:
   - FRONTEND_PORT
   - BACKEND_PORT
-env_files:
+env:
   - .env
 
 native:
   app:
     cmd: echo "hello"
-    env:
-      - FRONTEND_PORT
-      - BACKEND_PORT
-      - FRONTEND_URL
+    env: "*"
 `;
     tempConfigPath = path.join(fixtureDir, `zap-${testProjectName}.yaml`);
     fs.writeFileSync(tempConfigPath, configContent);

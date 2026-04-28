@@ -36,9 +36,7 @@ export interface ResourceInventory {
 export interface InstanceResourceInventory {
   instanceKey: string;
   instanceId: string;
-  pm2: string[];
-  containers: string[];
-  volumes: string[];
+  services: ServiceListEntry[];
 }
 
 export interface ResourceInventoryEntry {
@@ -75,11 +73,14 @@ function normalizePorts(
 function extractProcessPorts(
   context: Context,
   env: Record<string, string>,
+  statePorts: Record<string, string> | undefined,
 ): string[] {
   if (!context.ports || context.ports.length === 0) return [];
   return context.ports
-    .filter((name) => env[name] !== undefined)
-    .map((name) => `${name}=${env[name]}`);
+    .filter(
+      (name) => statePorts?.[name] !== undefined || env[name] !== undefined,
+    )
+    .map((name) => `${name}=${statePorts?.[name] ?? env[name]}`);
 }
 
 function parseManagedVolumeName(
@@ -109,6 +110,7 @@ function getStaleVolumeEntries(
 
 async function getResourceInventory(
   context: Context,
+  service?: string | string[],
 ): Promise<ResourceInventory> {
   const stateInstances = context.state.instances || {};
   const configuredServices = new Set([
@@ -128,12 +130,26 @@ async function getResourceInventory(
 
   const instances = new Map<string, InstanceResourceInventory>();
   for (const [instanceKey, instance] of Object.entries(stateInstances)) {
+    const instanceContext: Context = {
+      ...context,
+      instanceKey,
+      instanceId: instance.id,
+      instance: {
+        key: instanceKey,
+        id: instance.id,
+        ports: instance.ports || {},
+        volumes: instance.volumes || {},
+      },
+    };
     instances.set(instance.id, {
       instanceKey,
       instanceId: instance.id,
-      pm2: [],
-      containers: [],
-      volumes: Object.keys(instance.volumes || {}).sort(),
+      services: buildServiceEntries(
+        context,
+        await getStatus(instanceContext, service, false),
+        instance.ports || {},
+        instance.volumes || {},
+      ),
     });
   }
 
@@ -154,12 +170,6 @@ async function getResourceInventory(
     if (!instance) {
       alien.push({ type, name, reason: "instance not in this repo state" });
       return;
-    }
-
-    if (type === "pm2") {
-      instance.pm2.push(name);
-    } else {
-      instance.containers.push(name);
     }
 
     if (!configuredServices.has(parsed.service)) {
@@ -192,8 +202,7 @@ async function getResourceInventory(
       continue;
     }
 
-    if (!instance.volumes.includes(volume.name)) {
-      instance.volumes.push(volume.name);
+    if (!stateInstances[instance.instanceKey]?.volumes?.[volume.name]) {
       dangling.push({
         type: "volume",
         name: volume.name,
@@ -215,27 +224,21 @@ async function getResourceInventory(
   }
 
   return {
-    instances: Array.from(instances.values())
-      .map((instance) => ({
-        ...instance,
-        pm2: Array.from(new Set(instance.pm2)).sort(),
-        containers: Array.from(new Set(instance.containers)).sort(),
-        volumes: Array.from(new Set(instance.volumes)).sort(),
-      }))
-      .sort((a, b) => a.instanceKey.localeCompare(b.instanceKey)),
+    instances: Array.from(instances.values()).sort((a, b) =>
+      a.instanceKey.localeCompare(b.instanceKey),
+    ),
     alien: alien.sort((a, b) => a.name.localeCompare(b.name)),
     dangling: dangling.sort((a, b) => a.name.localeCompare(b.name)),
     staleVolumes,
   };
 }
 
-export async function getServiceList(
+function buildServiceEntries(
   context: Context,
-  service?: string | string[],
-  options: { extended?: boolean } = {},
-): Promise<ServiceListResult> {
-  const statusResult = await getStatus(context, service, false);
-
+  statusResult: Awaited<ReturnType<typeof getStatus>>,
+  statePorts: Record<string, string> | undefined,
+  stateVolumes: Record<string, StoredVolume> | undefined,
+): ServiceListEntry[] {
   const nativeStatus = new Map(
     statusResult.native.map((item) => [item.service, item.status]),
   );
@@ -247,12 +250,36 @@ export async function getServiceList(
     type: "native",
     service: proc.name,
     status: nativeStatus.get(proc.name) ?? "down",
-    ports: extractProcessPorts(context, proc.resolvedEnv || {}),
+    ports: extractProcessPorts(context, proc.resolvedEnv || {}, statePorts),
     volumes: [],
     cwd: proc.cwd,
     cmd: proc.cmd,
   }));
 
+  const dockerEntries: ServiceListEntry[] = context.containers.map(
+    (container) => ({
+      type: "docker",
+      service: container.name,
+      status: dockerStatus.get(container.name) ?? "down",
+      ports: normalizePorts(container.ports, statePorts),
+      volumes: getContainerVolumeBindings(
+        container.name,
+        container.volumes,
+        stateVolumes || {},
+      ),
+      cmd: container.command || container.image,
+    }),
+  );
+
+  return [...nativeEntries, ...dockerEntries];
+}
+
+export async function getServiceList(
+  context: Context,
+  service?: string | string[],
+  options: { extended?: boolean } = {},
+): Promise<ServiceListResult> {
+  const statusResult = await getStatus(context, service, false);
   const instancePorts = context.instance?.ports;
   const loadedPorts =
     instancePorts && Object.keys(instancePorts).length > 0
@@ -263,19 +290,11 @@ export async function getServiceList(
     instanceVolumes && Object.keys(instanceVolumes).length > 0
       ? instanceVolumes
       : loadVolumesForInstance(context.projectRoot, context.instanceKey);
-  const dockerEntries: ServiceListEntry[] = context.containers.map(
-    (container) => ({
-      type: "docker",
-      service: container.name,
-      status: dockerStatus.get(container.name) ?? "down",
-      ports: normalizePorts(container.ports, loadedPorts),
-      volumes: getContainerVolumeBindings(
-        container.name,
-        container.volumes,
-        loadedVolumes,
-      ),
-      cmd: container.command || container.image,
-    }),
+  const entries = buildServiceEntries(
+    context,
+    statusResult,
+    loadedPorts,
+    loadedVolumes,
   );
 
   const serviceSet =
@@ -283,14 +302,14 @@ export async function getServiceList(
       ? undefined
       : new Set(Array.isArray(service) ? service : [service]);
 
-  const services = [...nativeEntries, ...dockerEntries].filter((item) =>
+  const services = entries.filter((item) =>
     serviceSet ? serviceSet.has(item.service) : true,
   );
 
   return {
     services,
     resources: options.extended
-      ? await getResourceInventory(context)
+      ? await getResourceInventory(context, service)
       : undefined,
   };
 }

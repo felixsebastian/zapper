@@ -1,8 +1,8 @@
 project: test-env-resolution
-env_files:
+env:
   - "test.env"
 
 native:
   test-service:
     cmd: "echo 'Testing env resolution'"
-    env: ["TEST_VAR"]
+    env: "*"

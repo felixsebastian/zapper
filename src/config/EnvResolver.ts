@@ -17,7 +17,9 @@ interface RawEnvFile {
   envs?: Array<Record<string, string>>;
 }
 
-type InlineEnv = { keys: string[]; pairs: Record<string, string> };
+interface WhitelistFile {
+  vars?: unknown;
+}
 
 export class EnvResolver {
   static resolve(config: ZapperConfig, projectRoot?: string): ZapperConfig {
@@ -26,21 +28,36 @@ export class EnvResolver {
     // Load ports from .zap/state.json if projectRoot is provided
     const assignedPorts = projectRoot ? loadPorts(projectRoot) : {};
 
+    const defaultEnvFiles = this.pickDefaultEnvFiles(
+      resolvedConfig.env ?? resolvedConfig.env_files,
+    );
+    const hasGlobalEnvSource =
+      Array.isArray(defaultEnvFiles) && defaultEnvFiles.length > 0;
     const mergedEnvFromFiles = this.loadAndMergeEnvFiles(
-      this.pickDefaultEnvFiles(resolvedConfig.env_files),
+      defaultEnvFiles,
       assignedPorts,
     );
 
     if (resolvedConfig.native) {
       for (const [name, proc] of Object.entries(resolvedConfig.native)) {
         if (!proc.name) proc.name = name;
-        this.resolveConfigProcessEnv(proc, mergedEnvFromFiles);
+        this.resolveConfigProcessEnv(
+          proc,
+          mergedEnvFromFiles,
+          assignedPorts,
+          hasGlobalEnvSource,
+        );
       }
     }
 
     if (resolvedConfig.processes) {
       for (const proc of resolvedConfig.processes) {
-        this.resolveConfigProcessEnv(proc, mergedEnvFromFiles);
+        this.resolveConfigProcessEnv(
+          proc,
+          mergedEnvFromFiles,
+          assignedPorts,
+          hasGlobalEnvSource,
+        );
       }
     }
 
@@ -49,14 +66,24 @@ export class EnvResolver {
     if (dockerServices) {
       for (const [name, container] of Object.entries(dockerServices)) {
         if (!container.name) container.name = name;
-        this.resolveConfigContainerEnv(container, mergedEnvFromFiles);
+        this.resolveConfigContainerEnv(
+          container,
+          mergedEnvFromFiles,
+          assignedPorts,
+          hasGlobalEnvSource,
+        );
       }
     }
 
     if (resolvedConfig.tasks) {
       for (const [name, task] of Object.entries(resolvedConfig.tasks)) {
         if (!task.name) task.name = name;
-        this.resolveConfigTaskEnv(task, mergedEnvFromFiles);
+        this.resolveConfigTaskEnv(
+          task,
+          mergedEnvFromFiles,
+          assignedPorts,
+          hasGlobalEnvSource,
+        );
       }
     }
 
@@ -75,17 +102,38 @@ export class EnvResolver {
       resolvedContext.envFiles,
       assignedPorts,
     );
+    const hasGlobalEnvSource =
+      Array.isArray(resolvedContext.envFiles) &&
+      resolvedContext.envFiles.length > 0;
 
     for (const proc of resolvedContext.processes) {
-      this.resolveProcessEnv(proc, mergedEnvFromFiles, context.projectRoot);
+      this.resolveProcessEnv(
+        proc,
+        mergedEnvFromFiles,
+        context.projectRoot,
+        assignedPorts,
+        hasGlobalEnvSource,
+      );
     }
 
     for (const container of resolvedContext.containers) {
-      this.resolveContainerEnv(container, mergedEnvFromFiles);
+      this.resolveContainerEnv(
+        container,
+        mergedEnvFromFiles,
+        context.projectRoot,
+        assignedPorts,
+        hasGlobalEnvSource,
+      );
     }
 
     for (const task of resolvedContext.tasks) {
-      this.resolveTaskEnv(task, mergedEnvFromFiles, context.projectRoot);
+      this.resolveTaskEnv(
+        task,
+        mergedEnvFromFiles,
+        context.projectRoot,
+        assignedPorts,
+        hasGlobalEnvSource,
+      );
     }
 
     if (resolvedContext.homepage) {
@@ -120,81 +168,34 @@ export class EnvResolver {
     return result.parsed?.__value__ ?? value;
   }
 
-  private static splitInlineEnv(entries?: string[] | string): InlineEnv {
-    const result: InlineEnv = { keys: [], pairs: {} };
-    if (!Array.isArray(entries)) {
-      if (typeof entries === "string") {
-        throw new Error(
-          `EnvResolver received string env reference '${entries}' - this should have been resolved by WhitelistResolver`,
-        );
-      }
-      return result;
-    }
-
-    for (const raw of entries) {
-      const idx = raw.indexOf("=");
-      if (idx === -1) result.keys.push(raw);
-      else result.pairs[raw.slice(0, idx)] = raw.slice(idx + 1);
-    }
-
-    return result;
-  }
-
   private static resolveConfigProcessEnv(
     proc: ConfigProcess,
     mergedEnvFromFiles: Record<string, string>,
+    assignedPorts: Record<string, string>,
+    hasGlobalEnvSource: boolean,
   ): void {
-    const local = this.loadAndMergeEnvFiles(proc.env_files);
-    const useLocalOnly = Object.keys(local).length > 0;
-
-    if (useLocalOnly) {
-      const inline = this.splitInlineEnv(proc.env);
-      proc.resolvedEnv = { ...local, ...inline.pairs };
-
-      return;
-    }
-
-    const inline = this.splitInlineEnv(proc.env);
-
-    const whitelist =
-      inline.keys.length > 0
-        ? inline.keys
-        : Array.isArray(proc.env)
-          ? proc.env
-          : [];
-
-    const envSubset: Record<string, string> = {};
-
-    // If no whitelist is specified (no env array), inherit all environment variables
-    if (whitelist.length === 0) {
-      Object.assign(envSubset, mergedEnvFromFiles);
-    } else {
-      // Only include whitelisted environment variables
-      for (const key of whitelist) {
-        const value = mergedEnvFromFiles[key];
-        if (value !== undefined) envSubset[key] = value;
-      }
-    }
-
-    proc.resolvedEnv = { ...envSubset, ...inline.pairs };
-    if (!Array.isArray(proc.env)) proc.env = whitelist;
+    proc.resolvedEnv = this.resolveServiceEnv(
+      proc.env,
+      mergedEnvFromFiles,
+      undefined,
+      assignedPorts,
+      hasGlobalEnvSource,
+    );
   }
 
   private static resolveConfigContainerEnv(
     container: ConfigContainer,
     mergedEnvFromFiles: Record<string, string>,
+    assignedPorts: Record<string, string>,
+    hasGlobalEnvSource: boolean,
   ): void {
-    const inline = this.splitInlineEnv(container.env);
-    const whitelist = inline.keys;
-    const envSubset: Record<string, string> = {};
-
-    for (const key of whitelist) {
-      const value = mergedEnvFromFiles[key];
-      if (value !== undefined) envSubset[key] = value;
-    }
-
-    container.resolvedEnv = { ...envSubset, ...inline.pairs };
-    container.env = Array.isArray(container.env) ? container.env : whitelist;
+    container.resolvedEnv = this.resolveServiceEnv(
+      container.env,
+      mergedEnvFromFiles,
+      undefined,
+      assignedPorts,
+      hasGlobalEnvSource,
+    );
     container.ports = this.expandPorts(container.ports, mergedEnvFromFiles);
 
     renderer.log.debug(`Final resolved env for docker ${container.name}:`, {
@@ -205,18 +206,16 @@ export class EnvResolver {
   private static resolveConfigTaskEnv(
     task: ConfigTask,
     mergedEnvFromFiles: Record<string, string>,
+    assignedPorts: Record<string, string>,
+    hasGlobalEnvSource: boolean,
   ): void {
-    const inline = this.splitInlineEnv(task.env);
-    const whitelist = inline.keys;
-    const envSubset: Record<string, string> = {};
-
-    for (const key of whitelist) {
-      const value = mergedEnvFromFiles[key];
-      if (value !== undefined) envSubset[key] = value;
-    }
-
-    task.resolvedEnv = { ...envSubset, ...inline.pairs };
-    task.env = Array.isArray(task.env) ? task.env : whitelist;
+    task.resolvedEnv = this.resolveServiceEnv(
+      task.env,
+      mergedEnvFromFiles,
+      undefined,
+      assignedPorts,
+      hasGlobalEnvSource,
+    );
     renderer.log.debug(`Final resolved env for task ${task.name}:`, {
       data: task.resolvedEnv,
     });
@@ -226,65 +225,32 @@ export class EnvResolver {
     proc: Process,
     mergedEnvFromFiles: Record<string, string>,
     projectRoot: string,
+    assignedPorts: Record<string, string>,
+    hasGlobalEnvSource: boolean,
   ): void {
-    let processEnvFiles: string[] | undefined;
-    if (proc.env_files && proc.env_files.length > 0) {
-      processEnvFiles = proc.env_files.map((p) =>
-        path.isAbsolute(p) ? p : path.join(projectRoot, p),
-      );
-    }
-
-    const local = this.loadAndMergeEnvFiles(processEnvFiles);
-    const useLocalOnly = Object.keys(local).length > 0;
-
-    if (useLocalOnly) {
-      const inline = this.splitInlineEnv(proc.env);
-      proc.resolvedEnv = { ...local, ...inline.pairs };
-
-      return;
-    }
-
-    const inline = this.splitInlineEnv(proc.env);
-
-    const whitelist =
-      inline.keys.length > 0
-        ? inline.keys
-        : Array.isArray(proc.env)
-          ? proc.env
-          : [];
-
-    const envSubset: Record<string, string> = {};
-
-    // If no whitelist is specified (no env array), inherit all environment variables
-    if (whitelist.length === 0) {
-      Object.assign(envSubset, mergedEnvFromFiles);
-    } else {
-      // Only include whitelisted environment variables
-      for (const key of whitelist) {
-        const value = mergedEnvFromFiles[key];
-        if (value !== undefined) envSubset[key] = value;
-      }
-    }
-
-    proc.resolvedEnv = { ...envSubset, ...inline.pairs };
-    if (!Array.isArray(proc.env)) proc.env = whitelist;
+    proc.resolvedEnv = this.resolveServiceEnv(
+      proc.env,
+      mergedEnvFromFiles,
+      projectRoot,
+      assignedPorts,
+      hasGlobalEnvSource,
+    );
   }
 
   private static resolveContainerEnv(
     container: Container,
     mergedEnvFromFiles: Record<string, string>,
+    projectRoot: string,
+    assignedPorts: Record<string, string>,
+    hasGlobalEnvSource: boolean,
   ): void {
-    const inline = this.splitInlineEnv(container.env);
-    const whitelist = inline.keys;
-    const envSubset: Record<string, string> = {};
-
-    for (const key of whitelist) {
-      const value = mergedEnvFromFiles[key];
-      if (value !== undefined) envSubset[key] = value;
-    }
-
-    container.resolvedEnv = { ...envSubset, ...inline.pairs };
-    container.env = Array.isArray(container.env) ? container.env : whitelist;
+    container.resolvedEnv = this.resolveServiceEnv(
+      container.env,
+      mergedEnvFromFiles,
+      projectRoot,
+      assignedPorts,
+      hasGlobalEnvSource,
+    );
     container.ports = this.expandPorts(container.ports, mergedEnvFromFiles);
 
     renderer.log.debug(`Final resolved env for docker ${container.name}:`, {
@@ -296,46 +262,105 @@ export class EnvResolver {
     task: Task,
     mergedEnvFromFiles: Record<string, string>,
     projectRoot: string,
+    assignedPorts: Record<string, string>,
+    hasGlobalEnvSource: boolean,
   ): void {
     renderer.log.debug(`Processing task: ${task.name}`);
 
-    let taskEnvFiles: string[] | undefined;
-    if (task.env_files && task.env_files.length > 0) {
-      taskEnvFiles = task.env_files.map((p) =>
-        path.isAbsolute(p) ? p : path.join(projectRoot, p),
-      );
-    }
-
-    const local = this.loadAndMergeEnvFiles(taskEnvFiles);
-    const useLocalOnly = Object.keys(local).length > 0;
-
-    if (useLocalOnly) {
-      const inline = this.splitInlineEnv(task.env);
-      task.resolvedEnv = { ...local, ...inline.pairs };
-
-      renderer.log.debug(
-        `Final resolved env for ${task.name} (local env_files + inline pairs):`,
-        { data: task.resolvedEnv },
-      );
-
-      return;
-    }
-
-    const inline = this.splitInlineEnv(task.env);
-    const whitelist = inline.keys;
-    const envSubset: Record<string, string> = {};
-
-    for (const key of whitelist) {
-      const value = mergedEnvFromFiles[key];
-      if (value !== undefined) envSubset[key] = value;
-    }
-
-    task.resolvedEnv = { ...envSubset, ...inline.pairs };
-    task.env = Array.isArray(task.env) ? task.env : whitelist;
+    task.resolvedEnv = this.resolveServiceEnv(
+      task.env,
+      mergedEnvFromFiles,
+      projectRoot,
+      assignedPorts,
+      hasGlobalEnvSource,
+    );
 
     renderer.log.debug(`Final resolved env for task ${task.name}:`, {
       data: task.resolvedEnv,
     });
+  }
+
+  private static resolveServiceEnv(
+    env: string[] | string | undefined,
+    globalEnv: Record<string, string>,
+    projectRoot?: string,
+    assignedPorts: Record<string, string> = {},
+    hasGlobalEnvSource = false,
+  ): Record<string, string> {
+    if (env === undefined) return {};
+
+    if (env === "*") return { ...globalEnv };
+
+    if (Array.isArray(env)) {
+      const files = this.resolvePaths(env, projectRoot);
+      return this.loadAndMergeEnvFiles(files, assignedPorts);
+    }
+
+    if (!hasGlobalEnvSource) {
+      throw new Error(
+        `Environment whitelist file requires root env or env_files: ${env}`,
+      );
+    }
+
+    const whitelistPath = this.resolvePath(env, projectRoot);
+    const vars = this.loadWhitelistFile(whitelistPath);
+    const resolved: Record<string, string> = {};
+    for (const key of vars) {
+      const value = globalEnv[key];
+      if (value !== undefined) resolved[key] = value;
+    }
+    return resolved;
+  }
+
+  private static resolvePaths(paths: string[], projectRoot?: string): string[] {
+    return paths.map((p) => this.resolvePath(p, projectRoot));
+  }
+
+  private static resolvePath(filePath: string, projectRoot?: string): string {
+    if (!projectRoot || path.isAbsolute(filePath)) return filePath;
+    return path.join(projectRoot, filePath);
+  }
+
+  private static loadWhitelistFile(filePath: string): string[] {
+    if (!existsSync(filePath)) {
+      throw new Error(`Environment whitelist file not found: ${filePath}`);
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext !== ".yaml" && ext !== ".yml") {
+      throw new Error(`Environment whitelist file must be YAML: ${filePath}`);
+    }
+
+    const data = parse(readFileSync(filePath, "utf8")) as
+      | WhitelistFile
+      | undefined;
+
+    if (
+      !data ||
+      typeof data !== "object" ||
+      !Array.isArray(data.vars) ||
+      Object.keys(data).some((key) => key !== "vars")
+    ) {
+      throw new Error(
+        `Environment whitelist file must contain only a vars array: ${filePath}`,
+      );
+    }
+
+    const vars = data.vars;
+    for (const value of vars) {
+      if (typeof value !== "string" || value.length === 0) {
+        throw new Error(
+          `Environment whitelist vars must be non-empty strings: ${filePath}`,
+        );
+      }
+      if (value === "*") {
+        throw new Error(
+          `Environment whitelist variable "*" is reserved: ${filePath}`,
+        );
+      }
+    }
+
+    return vars;
   }
 
   private static loadAndMergeEnvFiles(
@@ -413,7 +438,7 @@ export class EnvResolver {
   }
 
   private static pickDefaultEnvFiles(
-    envFiles?: ZapperConfig["env_files"],
+    envFiles?: ZapperConfig["env"] | ZapperConfig["env_files"],
   ): string[] | undefined {
     if (!envFiles) return undefined;
     if (Array.isArray(envFiles)) return envFiles;

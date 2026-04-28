@@ -70,28 +70,29 @@ export function createContext(
   // Load and validate state from state.json
   const state = loadState(projectRoot);
 
-  // Resolve env_files to absolute paths relative to projectRoot
+  // Resolve root env/env_files to absolute paths relative to projectRoot
   let envFiles: string[] | undefined;
   const environmentSetNames: string[] = [];
-  if (config.env_files) {
-    if (Array.isArray(config.env_files)) {
+  const rootEnv = config.env ?? config.env_files;
+  if (rootEnv) {
+    if (Array.isArray(rootEnv)) {
       if (state.activeEnvironment && state.activeEnvironment !== "default") {
         throw new Error(
           `Environment not found: ${state.activeEnvironment}. Available environments: default`,
         );
       }
-      if (config.env_files.length > 0) {
-        envFiles = config.env_files.map((p) =>
+      if (rootEnv.length > 0) {
+        envFiles = rootEnv.map((p) =>
           path.isAbsolute(p) ? p : path.join(projectRoot, p),
         );
         environmentSetNames.push("default");
       }
     } else {
-      const available = Object.keys(config.env_files).sort();
+      const available = Object.keys(rootEnv).sort();
       environmentSetNames.push(...available);
 
       const activeName = state.activeEnvironment || "default";
-      const activeEnvironment = config.env_files[activeName];
+      const activeEnvironment = rootEnv[activeName];
 
       if (!activeEnvironment && state.activeEnvironment) {
         throw new Error(

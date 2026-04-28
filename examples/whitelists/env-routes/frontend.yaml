@@ -1,0 +1,4 @@
+vars:
+  - API_URL
+  - SENTRY_DSN
+  - FEATURE_FLAGS

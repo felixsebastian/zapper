@@ -1,0 +1,5 @@
+vars:
+  - DATABASE_URL
+  - REDIS_URL
+  - JWT_SECRET
+  - SMTP_HOST

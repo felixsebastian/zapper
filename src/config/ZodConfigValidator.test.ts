@@ -24,7 +24,7 @@ describe("ZodConfigValidator", () => {
         database: {
           image: "postgres:15",
           ports: ["5432:5432"],
-          env: ["POSTGRES_DB", "POSTGRES_USER"],
+          env: "*",
           volumes: [
             {
               name: "postgres_data",
@@ -72,7 +72,7 @@ describe("ZodConfigValidator", () => {
         frontend: {
           cmd: "npm run dev",
           cwd: "./frontend",
-          env: ["PORT", "API_URL"],
+          env: "*",
         },
       },
       docker: {
@@ -440,75 +440,70 @@ describe("ZodConfigValidator", () => {
     }).not.toThrow();
   });
 
-  describe("whitelist functionality", () => {
-    it("should validate and resolve whitelists correctly", () => {
+  describe("environment routing", () => {
+    it("should validate service file stacks and whitelist file paths", () => {
       const config = {
-        project: "test-whitelists",
-        whitelists: {
-          "frontend-vars": ["PORT", "API_URL"],
-          "backend-vars": ["DATABASE_URL", "JWT_SECRET"],
-        },
+        project: "test-env-routing",
+        env: [".env.local"],
         native: {
           frontend: {
             cmd: "npm start",
-            env: "frontend-vars",
+            env: "*",
           },
           backend: {
             cmd: "npm run server",
-            env: "backend-vars",
+            env: [".env.backend", ".env.backend.user"],
           },
         },
         docker: {
           database: {
             image: "postgres:15",
-            env: "frontend-vars",
+            env: ".zap/env/database.yaml",
           },
         },
         tasks: {
           build: {
             cmds: ["npm run build"],
-            env: "backend-vars",
+            env: ".zap/env/build.yaml",
           },
         },
       };
 
       const result = ZodConfigValidator.validate(config);
 
-      expect(result.native?.frontend.env).toEqual(["PORT", "API_URL"]);
+      expect(result.native?.frontend.env).toEqual("*");
       expect(result.native?.backend.env).toEqual([
-        "DATABASE_URL",
-        "JWT_SECRET",
+        ".env.backend",
+        ".env.backend.user",
       ]);
-      expect(result.docker?.database.env).toEqual(["PORT", "API_URL"]);
-      expect(result.tasks?.build.env).toEqual(["DATABASE_URL", "JWT_SECRET"]);
+      expect(result.docker?.database.env).toEqual(".zap/env/database.yaml");
+      expect(result.tasks?.build.env).toEqual(".zap/env/build.yaml");
       expect(result.native?.frontend.name).toBe("frontend");
       expect(result.native?.backend.name).toBe("backend");
     });
 
-    it("should throw error for invalid whitelist reference", () => {
+    it("should reject inline whitelists in zap.yaml", () => {
       const config = {
-        project: "test-invalid-whitelist",
+        project: "test-inline-whitelists",
         whitelists: {
-          "valid-vars": ["PORT"],
+          "backend-vars": ["DATABASE_URL"],
         },
         native: {
           app: {
             cmd: "npm start",
-            env: "invalid-whitelist",
+            env: "*",
           },
         },
       };
 
       expect(() => {
         ZodConfigValidator.validate(config);
-      }).toThrow(
-        "Process 'app' references unknown whitelist 'invalid-whitelist'",
-      );
+      }).toThrow('Unrecognized key: "whitelists"');
     });
 
-    it("should throw error when string env reference exists but no whitelists defined", () => {
+    it("should reject string env values that are not file paths", () => {
       const config = {
-        project: "test-no-whitelists",
+        project: "test-bare-string-env",
         native: {
           app: {
             cmd: "npm start",
@@ -519,41 +514,30 @@ describe("ZodConfigValidator", () => {
 
       expect(() => {
         ZodConfigValidator.validate(config);
-      }).toThrow(
-        "Environment whitelist references found but no whitelists defined",
-      );
+      }).toThrow("Environment file paths must look like file paths");
     });
 
-    it("should work with mixed array and string env values", () => {
+    it("should reject inline variable arrays", () => {
       const config = {
-        project: "test-mixed-env",
-        whitelists: {
-          "common-vars": ["PORT", "NODE_ENV"],
-        },
+        project: "test-inline-env-array",
         native: {
-          app1: {
-            cmd: "npm start",
-            env: "common-vars",
-          },
-          app2: {
+          app: {
             cmd: "npm run dev",
             env: ["DATABASE_URL", "API_KEY"],
           },
         },
       };
 
-      const result = ZodConfigValidator.validate(config);
-
-      expect(result.native?.app1.env).toEqual(["PORT", "NODE_ENV"]);
-      expect(result.native?.app2.env).toEqual(["DATABASE_URL", "API_KEY"]);
+      expect(() => {
+        ZodConfigValidator.validate(config);
+      }).toThrow("Service env arrays define env file stacks");
     });
 
-    it("should validate whitelist names follow naming rules", () => {
+    it("should reject root env and env_files together", () => {
       const config = {
-        project: "test-invalid-name",
-        whitelists: {
-          "invalid name with spaces": ["PORT"],
-        },
+        project: "test-root-env-conflict",
+        env: [".env"],
+        env_files: [".env"],
         native: {
           app: {
             cmd: "npm start",

@@ -1,22 +1,14 @@
 import { ZapperConfigSchema, ZapperConfig } from "./schemas";
 import { ZodError } from "zod";
-import { WhitelistResolver } from "./WhitelistResolver";
 import { ConfigValidationError } from "../errors";
 
 export class ZodConfigValidator {
   static validate(config: unknown): ZapperConfig {
     try {
       const validatedConfig = ZapperConfigSchema.parse(config);
-
-      // Validate whitelist references early
-      WhitelistResolver.validateReferences(validatedConfig);
-
-      // Resolve whitelist references to arrays
-      const resolvedConfig = WhitelistResolver.resolve(validatedConfig);
-
-      this.autoPopulateNames(resolvedConfig);
-      this.validateInitTask(resolvedConfig);
-      return resolvedConfig;
+      this.autoPopulateNames(validatedConfig);
+      this.validateInitTask(validatedConfig);
+      return validatedConfig;
     } catch (error) {
       if (error instanceof ZodError) {
         const errorMessages = error.issues.map((err) => {

@@ -1,6 +1,10 @@
 import { ProjectLinkResult } from "../commands/CommandResult";
 import { StatusResult, ServiceStatus } from "../core/getStatus";
-import { ServiceListResult, ServiceListEntry } from "../core/getServiceList";
+import {
+  ResourceInventoryEntry,
+  ServiceListEntry,
+  ServiceListResult,
+} from "../core/getServiceList";
 import { Context, Task } from "../types/Context";
 import { logger } from "../utils/logger";
 
@@ -143,6 +147,30 @@ function listRow(entry: ServiceListEntry): string[] {
   ];
 }
 
+function serviceListRows(entries: ServiceListEntry[]): string[][] {
+  return [
+    [
+      bold("TYPE"),
+      bold("SERVICE"),
+      bold("STATUS"),
+      bold("PORTS"),
+      bold("VOLUMES"),
+      bold("CWD"),
+      bold("CMD"),
+    ],
+    ...entries.map((service) => listRow(service)),
+  ];
+}
+
+function instanceServicesHeading(
+  instanceId: string,
+  instanceKey: string,
+): string {
+  return instanceKey
+    ? `Instance ${instanceId} (${instanceKey})`
+    : `Instance ${instanceId}`;
+}
+
 function labeledList(
   headers: [string, string],
   rows: Array<[string, string]>,
@@ -153,8 +181,14 @@ function labeledList(
   ]);
 }
 
-function countLabel(count: number, label: string): string {
-  return `${count} ${label}${count === 1 ? "" : "s"}`;
+function resourceRowsByType(
+  entries: ResourceInventoryEntry[],
+  type: "pm2" | "container" | "volume",
+): string[][] {
+  return entries
+    .filter((entry) => entry.type === type)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((entry) => [entry.name, entry.reason]);
 }
 
 function keyValueLines(rows: Array<[string, string | number]>): string {
@@ -653,47 +687,21 @@ export const renderer = {
   list: {
     toText(result: ServiceListResult, context: Context): string {
       const subtitle = formatContextSubtitle(context);
-      const rows: string[][] = [
-        [
-          bold("TYPE"),
-          bold("SERVICE"),
-          bold("STATUS"),
-          bold("PORTS"),
-          bold("VOLUMES"),
-          bold("CWD"),
-          bold("CMD"),
-        ],
-      ];
-
-      for (const service of result.services) {
-        rows.push(listRow(service));
-      }
+      const rows = serviceListRows(result.services);
 
       const resources = result.resources;
       if (!resources) return singleTableView("Services", subtitle, rows);
 
-      const tables: Array<{ heading: string; rows: string[][] }> = [
-        { heading: "Services", rows },
-      ];
-      if (resources.instances.length > 0) {
-        const instanceRows = [
-          [
-            bold("INSTANCE"),
-            bold("ID"),
-            bold("PM2"),
-            bold("CONTAINERS"),
-            bold("VOLUMES"),
-          ],
-          ...resources.instances.map((instance) => [
-            instance.instanceKey,
-            instance.instanceId,
-            countLabel(instance.pm2.length, "process"),
-            countLabel(instance.containers.length, "container"),
-            countLabel(instance.volumes.length, "volume"),
-          ]),
-        ];
-        tables.push({ heading: "Instances", rows: instanceRows });
-      }
+      const tables: Array<{ heading: string; rows: string[][] }> =
+        resources.instances.length > 0
+          ? resources.instances.map((instance) => ({
+              heading: instanceServicesHeading(
+                instance.instanceId,
+                instance.instanceKey,
+              ),
+              rows: serviceListRows(instance.services),
+            }))
+          : [{ heading: "Services", rows }];
 
       if (resources.dangling.length > 0) {
         const danglingRows = [
@@ -708,15 +716,36 @@ export const renderer = {
       }
 
       if (resources.alien.length > 0) {
-        const alienRows = [
-          [bold("TYPE"), bold("NAME"), bold("WHY")],
-          ...resources.alien.map((entry) => [
-            entry.type,
-            entry.name,
-            entry.reason,
-          ]),
+        const unrecognizedTables: Array<{
+          heading: string;
+          rows: string[][];
+        }> = [
+          {
+            heading: "Unrecognized Processes",
+            rows: [
+              [bold("NAME"), bold("WHY")],
+              ...resourceRowsByType(resources.alien, "pm2"),
+            ],
+          },
+          {
+            heading: "Unrecognized Containers",
+            rows: [
+              [bold("NAME"), bold("WHY")],
+              ...resourceRowsByType(resources.alien, "container"),
+            ],
+          },
+          {
+            heading: "Unrecognized Volumes",
+            rows: [
+              [bold("NAME"), bold("WHY")],
+              ...resourceRowsByType(resources.alien, "volume"),
+            ],
+          },
         ];
-        tables.push({ heading: "Alien Resources", rows: alienRows });
+
+        for (const tableDef of unrecognizedTables) {
+          if (tableDef.rows.length > 1) tables.push(tableDef);
+        }
       }
 
       return multiTableView(

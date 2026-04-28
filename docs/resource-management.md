@@ -7,8 +7,8 @@ Zapper names the resources it creates so they can be discovered later:
 
 `zap ls` shows configured services by default. Use `zap ls --extended` (or
 `zap ls --all`) for the local inventory view: configured services first, then
-instance records in this checkout and resources that look related to the project
-but no longer line up with the current config or state.
+recognized instances from the local `.zap/state.json` and resources that look
+related to the project but no longer line up with the current config or state.
 
 ## Resource Types
 
@@ -32,10 +32,10 @@ match the current `zap.yaml` or current state. Common causes:
 Use `zap ls --extended` to see these. The usual repair is to stop/delete the
 stale resources rather than hand-editing state.
 
-### Alien resources
+### Unrecognized resources
 
-Alien resources match the current project name but do not belong to any instance
-recorded in this checkout's `.zap/state.json`. They usually come from another
+Unrecognized resources match the current project name but do not belong to any
+instance recorded in the local `.zap/state.json`. They usually come from another
 checkout, older state, or manual resource creation.
 
 Use `zap global list <project>` or `zap global kill <project>` when you want a
