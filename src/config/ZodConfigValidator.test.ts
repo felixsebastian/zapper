@@ -501,9 +501,9 @@ describe("ZodConfigValidator", () => {
       }).toThrow('Unrecognized key: "whitelists"');
     });
 
-    it("should reject string env values that are not file paths", () => {
+    it("should allow arbitrary file path strings for string env values", () => {
       const config = {
-        project: "test-bare-string-env",
+        project: "test-loose-string-env",
         native: {
           app: {
             cmd: "npm start",
@@ -512,9 +512,25 @@ describe("ZodConfigValidator", () => {
         },
       };
 
-      expect(() => {
-        ZodConfigValidator.validate(config);
-      }).toThrow("Environment file paths must look like file paths");
+      const result = ZodConfigValidator.validate(config);
+
+      expect(result.native?.app.env).toBe("some-whitelist");
+    });
+
+    it("should allow dotenv filenames with additional suffixes", () => {
+      const config = {
+        project: "test-dotenv-suffix",
+        native: {
+          app: {
+            cmd: "npm start",
+            env: [".env.something"],
+          },
+        },
+      };
+
+      const result = ZodConfigValidator.validate(config);
+
+      expect(result.native?.app.env).toEqual([".env.something"]);
     });
 
     it("should reject inline variable arrays", () => {

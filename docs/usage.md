@@ -416,6 +416,12 @@ env: [.env]                    # Single file
 env: [.env.base, .env]         # Multiple files (later files override)
 ```
 
+Env file names are intentionally flexible. Any non-empty filename or path is
+accepted, including names such as `.env.something`, `service-env`, or
+`config/local.env`. Values that look like uppercase variable names, such as
+`DATABASE_URL`, are rejected because service `env` arrays define file stacks,
+not inline variable lists.
+
 Root `env_files` is still accepted as a compatibility alias for root `env`.
 
 ### Environment sets (recommended)

@@ -13,6 +13,7 @@ Guide for contributing to zapper.
 
 ```bash
 npm uninstall --global zapper-cli @maplab/zapper @mp-lb/zapper  # Start fresh
+pnpm remove --global zapper-cli @maplab/zapper @mp-lb/zapper     # Remove stale pnpm links
 pnpm add --global @mp-lb/zapper  # Make sure it's installed with pnpm
 pnpm install
 pnpm build
@@ -26,10 +27,21 @@ After linking, your global `zap` command points to your local build. Make change
 ```bash
 which zap                 # Should show pnpm global path
 ls -la $(which zap)       # Should symlink to your dist/index.js
+sed -n '1,80p' $(which zap)  # Should execute this checkout's dist/index.js
+pnpm list -g --depth 0    # Should show @mp-lb/zapper@link:<this checkout>
 
 # Unlink when done
 pnpm unlink --global
 npm install --global @mp-lb/zapper  # Reinstall from npm
+```
+
+If `zap` still points at an old checkout, remove the stale global package name
+and link again:
+
+```bash
+pnpm remove --global zapper-cli @maplab/zapper @mp-lb/zapper
+pnpm build
+pnpm link --global
 ```
 
 ## Testing

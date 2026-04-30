@@ -320,8 +320,10 @@ env:
 ```
 
 There is no inline whitelist array in `zap.yaml`. A service `env` array is a
-file stack, so entries must be env file paths. Explicit variable routing belongs
-in a whitelist file:
+file stack, so entries are interpreted as file names or paths. Zapper accepts
+ordinary file names such as `.env.something` and `service-env`, but rejects
+entries that look like uppercase variable names such as `DATABASE_URL`.
+Explicit variable routing belongs in a whitelist file:
 
 ```yaml
 native:

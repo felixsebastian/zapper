@@ -49,13 +49,6 @@ export const ContainerVolumeSchema = z.union([
 const looksLikeEnvVarName = (value: string): boolean =>
   /^[A-Z_][A-Z0-9_]*$/.test(value);
 
-const looksLikeFilePath = (value: string): boolean =>
-  value.startsWith(".") ||
-  value.startsWith("/") ||
-  value.includes("/") ||
-  value.includes("\\") ||
-  value.includes(".");
-
 const EnvFilePathSchema = z
   .string()
   .min(1, "Environment file path cannot be empty")
@@ -66,10 +59,6 @@ const EnvFilePathSchema = z
   .refine((value) => !value.includes("="), {
     message:
       "Service env arrays define env file stacks and cannot contain inline KEY=value entries.",
-  })
-  .refine(looksLikeFilePath, {
-    message:
-      "Environment file paths must look like file paths, such as .env, config/.env, or service.env.",
   });
 
 const EnvFilesArraySchema = z.array(EnvFilePathSchema);
