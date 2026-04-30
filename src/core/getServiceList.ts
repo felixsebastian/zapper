@@ -9,6 +9,7 @@ import {
 import { DockerManager } from "./docker";
 import { Pm2Manager } from "./process/Pm2Manager";
 import { parseServiceName } from "../utils/nameBuilder";
+import { resolveServiceTargets } from "../utils/serviceAliases";
 import { StoredVolume } from "../config/schemas";
 
 export interface ServiceListEntry {
@@ -298,7 +299,8 @@ export async function getServiceList(
   service?: string | string[],
   options: { extended?: boolean } = {},
 ): Promise<ServiceListResult> {
-  const statusResult = await getStatus(context, service, false);
+  const resolvedService = resolveServiceTargets(context, service);
+  const statusResult = await getStatus(context, resolvedService, false);
   const instancePorts = context.instance?.ports;
   const loadedPorts =
     instancePorts && Object.keys(instancePorts).length > 0
@@ -317,9 +319,11 @@ export async function getServiceList(
   );
 
   const serviceSet =
-    service === undefined
+    resolvedService === undefined
       ? undefined
-      : new Set(Array.isArray(service) ? service : [service]);
+      : new Set(
+          Array.isArray(resolvedService) ? resolvedService : [resolvedService],
+        );
 
   const services = entries.filter((item) =>
     serviceSet ? serviceSet.has(item.service) : true,
@@ -329,7 +333,7 @@ export async function getServiceList(
     services,
     ports: buildPortEntries(context, loadedPorts),
     resources: options.extended
-      ? await getResourceInventory(context, service)
+      ? await getResourceInventory(context, resolvedService)
       : undefined,
   };
 }

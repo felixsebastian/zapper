@@ -5,5 +5,6 @@ export function resolveAliasesToCanonical(
   aliasMap: AliasMap,
 ): string[] | undefined {
   if (!names) return names;
-  return names.map((n) => aliasMap[n] || n);
+  const canonical = names.map((n) => aliasMap[n] || n);
+  return Array.from(new Set(canonical));
 }

@@ -559,28 +559,8 @@ export class CommanderCli {
       );
     }
 
-    const noAliasCommands = new Set([
-      "env",
-      "environment",
-      "home",
-      "init",
-      "launch",
-      "kill",
-      "notes",
-      "profile",
-      "volume",
-    ]);
-    const shouldResolveAliases = !noAliasCommands.has(command);
-    const resolvedService =
-      service && shouldResolveAliases
-        ? Array.isArray(service)
-          ? service.map((s: string) => zapper.resolveServiceName(s))
-          : zapper.resolveServiceName(service)
-        : service;
     const normalizedService =
-      Array.isArray(resolvedService) && resolvedService.length === 0
-        ? undefined
-        : resolvedService;
+      Array.isArray(service) && service.length === 0 ? undefined : service;
 
     const handler = this.commandHandlers.get(command);
     if (!handler) {

@@ -64,6 +64,7 @@ function createMockContext(
       {
         name: "api",
         cmd: "npm start",
+        aliases: ["backend"],
         healthcheck: 10,
         profiles: ["dev"],
       },
@@ -83,6 +84,7 @@ function createMockContext(
       {
         name: "database",
         image: "postgres:15",
+        aliases: ["db"],
         healthcheck: 15,
         profiles: ["dev", "prod"],
       },
@@ -226,6 +228,34 @@ describe("getStatus", () => {
 
       expect(result.native).toHaveLength(1);
       expect(mockPm2Manager.listProcesses).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("service aliases", () => {
+    it("filters native services by canonical name when given an alias", async () => {
+      const context = createMockContext();
+      mockPm2Manager.listProcesses.mockResolvedValue([
+        createMockProcessInfo("zap.test-project.api", "online"),
+      ]);
+
+      const result = await getStatus(context, "backend");
+
+      expect(result.native.map((service) => service.service)).toEqual(["api"]);
+      expect(result.docker).toEqual([]);
+    });
+
+    it("filters docker services by canonical name when given an alias", async () => {
+      const context = createMockContext();
+      mockDockerManager.getContainerInfo.mockResolvedValue(
+        createMockDockerContainer("zap.test-project.database", "running"),
+      );
+
+      const result = await getStatus(context, "db");
+
+      expect(result.native).toEqual([]);
+      expect(result.docker.map((service) => service.service)).toEqual([
+        "database",
+      ]);
     });
   });
 

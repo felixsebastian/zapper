@@ -43,6 +43,7 @@ function createContext(): Context {
     processes: [
       {
         name: "api",
+        aliases: ["backend"],
         cmd: "pnpm dev",
         cwd: "./apps/api",
         resolvedEnv: { API_PORT: "3001" },
@@ -55,6 +56,7 @@ function createContext(): Context {
     containers: [
       {
         name: "db",
+        aliases: ["postgres"],
         image: "postgres:16",
         ports: ["$DB_PORT:5432"],
         volumes: ["/var/lib/postgresql/data:ro", "db-logs:/var/log/postgresql"],
@@ -258,5 +260,24 @@ describe("getServiceList", () => {
       false,
     );
     expect(result.resources).toBeUndefined();
+  });
+
+  it("filters results by aliases through canonical service targets", async () => {
+    mockedGetStatus.mockResolvedValue({ native: [], docker: [] });
+
+    const result = await getServiceList(createContext(), [
+      "backend",
+      "postgres",
+    ]);
+
+    expect(result.services.map((service) => service.service)).toEqual([
+      "api",
+      "db",
+    ]);
+    expect(mockedGetStatus).toHaveBeenCalledWith(
+      createContext(),
+      ["api", "db"],
+      false,
+    );
   });
 });

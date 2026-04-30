@@ -15,7 +15,11 @@ import { Planner } from "./Planner";
 import { executeActions } from "./executeActions";
 import { confirm } from "../utils/confirm";
 import { GitManager, cloneRepos as cloneRepositories } from "./git";
-import { getNativeTargets } from "../utils";
+import {
+  buildServiceAliasMap,
+  getNativeTargets,
+  resolveAliasesToCanonical,
+} from "../utils";
 import {
   ContextNotLoadedError,
   ServiceNotFoundError,
@@ -173,25 +177,7 @@ export class Zapper {
 
   private resolveAliasesToCanonical(names?: string[]): string[] | undefined {
     if (!names || !this.context) return names;
-    const aliasToName = new Map<string, string>();
-    const processes = this.getProcesses();
-
-    for (const p of processes) {
-      aliasToName.set(p.name, p.name);
-      if (Array.isArray(p.aliases)) {
-        for (const a of p.aliases) aliasToName.set(a, p.name);
-      }
-    }
-
-    const containers = this.getContainers();
-
-    for (const [name, c] of containers) {
-      aliasToName.set(name, name);
-      if (Array.isArray(c.aliases))
-        for (const a of c.aliases) aliasToName.set(a, name);
-    }
-
-    return names.map((n) => aliasToName.get(n) || n);
+    return resolveAliasesToCanonical(names, buildServiceAliasMap(this.context));
   }
 
   resolveServiceName(name: string): string {

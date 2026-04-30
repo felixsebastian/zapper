@@ -222,6 +222,8 @@ zap startup-log <service> [more-services...]
 zap task <name>
 ```
 
+Service aliases configured with `aliases` on `native` or `docker` entries are resolved before service filtering or execution. The same alias works with service-targeting commands such as `up`, `down`, `restart`, `status`, `ls`, `logs`, `startup-log`, and `clone`.
+
 `zap kill <project>` does not require a local `zap.yaml`; it targets resources by prefix (`zap.<project>.*`).
 
 ---
@@ -244,6 +246,7 @@ native:
 native:
   api:
     cmd: pnpm dev              # Required. Command to run
+    aliases: [be, backend]     # Alternate service names accepted by commands
     cwd: ./backend             # Working directory (relative to zap.yaml)
     env: "*"                   # Pass all values from the root env stack
     depends_on: [postgres]     # Start these first
@@ -302,6 +305,7 @@ docker:
 docker:
   postgres:
     image: postgres:15         # Required. Docker image
+    aliases: [db, pg]          # Alternate service names accepted by commands
     ports:                     # Port mappings (host:container)
       - 5432:5432
     env: .zap/env/postgres.yaml # Strict whitelist file for root env values
@@ -550,9 +554,9 @@ The assigned ports have **highest precedence** - they override values from any `
 - Dynamic port assignment in development
 - Sharing configurations with different port needs
 
-`zap ls` always shows assigned port variables and Docker port mappings in a
-separate Ports table, even without `--extended`, because they are part of the
-active instance's key runtime state.
+`zap ls` always shows assigned port variables in a separate Ports table, even
+without `--extended`, because they are part of the active instance's key runtime
+state.
 
 **Interpolation works with assigned ports:**
 
@@ -636,6 +640,7 @@ tasks:
 tasks:
   seed:
     desc: Seed the database # Description (shown in help)
+    aliases: [s] # Alternate task names accepted by zap task
     cwd: ./backend # Working directory
     env: .zap/env/backend.yaml # Strict whitelist file
     params: # Named parameters

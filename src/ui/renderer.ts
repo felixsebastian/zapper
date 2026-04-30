@@ -169,17 +169,10 @@ function instanceServicesHeading(
     : `Instance ${instanceId}`;
 }
 
-function portListRows(
-  result: Pick<ServiceListResult, "services" | "ports">,
-): string[][] {
-  const dockerPortRows = result.services
-    .filter((service) => service.type === "docker")
-    .flatMap((service) => service.ports.map((port) => [service.service, port]));
-
+function portListRows(result: Pick<ServiceListResult, "ports">): string[][] {
   return [
     [bold("NAME"), bold("PORT")],
     ...result.ports.map((port) => [port.name, port.value]),
-    ...dockerPortRows,
   ];
 }
 

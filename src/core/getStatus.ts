@@ -2,6 +2,7 @@ import { Pm2Manager } from "./process";
 import { DockerManager } from "./docker";
 import { Context } from "../types/Context";
 import { buildServiceName } from "../utils/nameBuilder";
+import { resolveServiceTargets } from "../utils/serviceAliases";
 
 type Status = "down" | "pending" | "up";
 
@@ -64,8 +65,13 @@ export async function getStatus(
   service?: string | string[],
   all: boolean = false,
 ): Promise<StatusResult> {
+  const resolvedService = context
+    ? resolveServiceTargets(context, service)
+    : service;
   const normalizedService =
-    Array.isArray(service) && service.length === 0 ? undefined : service;
+    Array.isArray(resolvedService) && resolvedService.length === 0
+      ? undefined
+      : resolvedService;
   const serviceSet =
     normalizedService === undefined
       ? undefined

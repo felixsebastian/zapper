@@ -10,4 +10,5 @@ export { findFileUpwards as findUp, resolveConfigPath } from "./findUp";
 export * from "./buildAliasMap";
 export * from "./resolveAliasesToCanonical";
 export * from "./resolveServiceName";
+export * from "./serviceAliases";
 export * from "./getNativeTargets";

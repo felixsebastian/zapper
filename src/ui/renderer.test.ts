@@ -121,14 +121,6 @@ describe("renderer", () => {
           cwd: "./apps/api",
           cmd: "pnpm dev",
         },
-        {
-          type: "docker",
-          service: "db",
-          status: "up",
-          ports: ["15432:5432"],
-          volumes: [],
-          cmd: "postgres:16",
-        },
       ],
       ports: [{ name: "API_PORT", value: "3001" }],
     };
@@ -139,8 +131,6 @@ describe("renderer", () => {
     expect(text).toContain("Ports");
     expect(text).toContain("API_PORT");
     expect(text).toContain("3001");
-    expect(text).toContain("db");
-    expect(text).toContain("15432:5432");
     expect(text).not.toContain("PORTS");
   });
 });
