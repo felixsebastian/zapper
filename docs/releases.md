@@ -192,6 +192,10 @@ If the run fails, treat it as a release blocker, fix the issue, and push again.
 
 ## 8. Merge back to local main
 
+After pushing, immediately return the local checkout to `main` and fast-forward it
+to the commit that was just pushed. This keeps local release follow-up work on the
+same branch/state as CI, even if the workflow later fails and needs debugging.
+
 ```bash
 git checkout main
 git pull
@@ -291,6 +295,7 @@ npm publish         # Publish to npm
 - Check if there are publishing restrictions
 - If CI shows `EOTP`, replace `NPM_TOKEN` with a granular write token that has **Bypass two-factor authentication** enabled, or finish migrating to npm trusted publishing for `.github/workflows/release.yml`
 - If you are using trusted publishing only, remove the `NPM_TOKEN` repository secret for this job; otherwise `changesets/action` will create `.npmrc` and force token-based publish instead of OIDC
+- If local publish succeeds with a token but CI fails, compare the workflow's logged `NPM_TOKEN sha256 prefix` with the same fingerprint generated locally. Do not print token characters in CI logs.
 - If trusted publishing is configured but publish still fails, confirm these values match exactly on npm:
   - GitHub org/user: `mp-lb`
   - Repository: `zapper`
@@ -299,6 +304,7 @@ npm publish         # Publish to npm
 - If publish fails with `E404 Not Found - PUT https://registry.npmjs.org/@mp-lb%2fzapper`, verify the npm scope owner exists and the publishing identity has rights to it:
   - `mp-lb` must exist on npm as the owning user or organization
   - the account connected to the trusted publisher, or the fallback token's owner, must have publish access to the `@mp-lb` scope
+  - if `npm whoami` and collaborator access look correct but the fingerprint differs from a known-good local token, update the GitHub `NPM_TOKEN` secret before rerunning the workflow
 
 **If the Version Packages PR doesn't appear:**
 - Verify you committed changeset files (should be in `.changeset/` directory)
