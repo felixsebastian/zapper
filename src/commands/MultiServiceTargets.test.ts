@@ -156,7 +156,7 @@ describe("Multi-service command targets", () => {
   });
 
   it("passes multiple services to ls filtering", async () => {
-    const listResult: ServiceListResult = { services: [] };
+    const listResult: ServiceListResult = { services: [], ports: [] };
     const zapperContext: Context = {
       projectName: "test",
       projectRoot: "/tmp/test",

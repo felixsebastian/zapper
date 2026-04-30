@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Context } from "../types/Context";
+import type { ServiceListResult } from "../core/getServiceList";
 import type { StatusResult } from "../core/getStatus";
 import { renderer } from "./renderer";
 
@@ -106,5 +107,40 @@ describe("renderer", () => {
     expect(text).toContain("Home");
     expect(text).toContain("homepage");
     expect(text).toContain("http://localhost:3001/docs");
+  });
+
+  it("formats ls ports in a separate table", () => {
+    const listResult: ServiceListResult = {
+      services: [
+        {
+          type: "native",
+          service: "api",
+          status: "up",
+          ports: ["API_PORT=3001"],
+          volumes: [],
+          cwd: "./apps/api",
+          cmd: "pnpm dev",
+        },
+        {
+          type: "docker",
+          service: "db",
+          status: "up",
+          ports: ["15432:5432"],
+          volumes: [],
+          cmd: "postgres:16",
+        },
+      ],
+      ports: [{ name: "API_PORT", value: "3001" }],
+    };
+
+    const text = renderer.list.toText(listResult, createContext("inst123"));
+
+    expect(text).toContain("Services");
+    expect(text).toContain("Ports");
+    expect(text).toContain("API_PORT");
+    expect(text).toContain("3001");
+    expect(text).toContain("db");
+    expect(text).toContain("15432:5432");
+    expect(text).not.toContain("PORTS");
   });
 });

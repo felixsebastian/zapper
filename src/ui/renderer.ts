@@ -140,7 +140,6 @@ function listRow(entry: ServiceListEntry): string[] {
     entry.type,
     entry.service,
     entry.status.toUpperCase(),
-    entry.ports.join(", "),
     entry.volumes.join(", "),
     entry.cwd || "",
     entry.cmd,
@@ -153,7 +152,6 @@ function serviceListRows(entries: ServiceListEntry[]): string[][] {
       bold("TYPE"),
       bold("SERVICE"),
       bold("STATUS"),
-      bold("PORTS"),
       bold("VOLUMES"),
       bold("CWD"),
       bold("CMD"),
@@ -169,6 +167,32 @@ function instanceServicesHeading(
   return instanceKey
     ? `Instance ${instanceId} (${instanceKey})`
     : `Instance ${instanceId}`;
+}
+
+function portListRows(
+  result: Pick<ServiceListResult, "services" | "ports">,
+): string[][] {
+  const dockerPortRows = result.services
+    .filter((service) => service.type === "docker")
+    .flatMap((service) => service.ports.map((port) => [service.service, port]));
+
+  return [
+    [bold("NAME"), bold("PORT")],
+    ...result.ports.map((port) => [port.name, port.value]),
+    ...dockerPortRows,
+  ];
+}
+
+function serviceListTables(
+  heading: string,
+  result: Pick<ServiceListResult, "services" | "ports">,
+): Array<{ heading: string; rows: string[][] }> {
+  const tables = [{ heading, rows: serviceListRows(result.services) }];
+  const portsRows = portListRows(result);
+  if (portsRows.length > 1) {
+    tables.push({ heading: "Ports", rows: portsRows });
+  }
+  return tables;
 }
 
 function labeledList(
@@ -193,10 +217,6 @@ function resourceRowsByType(
 
 function keyValueLines(rows: Array<[string, string | number]>): string {
   return rows.map(([key, value]) => `  ${key}: ${value}`).join("\n");
-}
-
-function singleTableView(title: string, subtitle: string, rows: string[][]) {
-  return [header(title, subtitle), "", table(rows)].join("\n");
 }
 
 function multiTableView(
@@ -687,21 +707,28 @@ export const renderer = {
   list: {
     toText(result: ServiceListResult, context: Context): string {
       const subtitle = formatContextSubtitle(context);
-      const rows = serviceListRows(result.services);
 
       const resources = result.resources;
-      if (!resources) return singleTableView("Services", subtitle, rows);
+      if (!resources) {
+        return multiTableView(
+          "Services",
+          subtitle,
+          serviceListTables("Services", result),
+        );
+      }
 
       const tables: Array<{ heading: string; rows: string[][] }> =
         resources.instances.length > 0
-          ? resources.instances.map((instance) => ({
-              heading: instanceServicesHeading(
-                instance.instanceId,
-                instance.instanceKey,
+          ? resources.instances.flatMap((instance) =>
+              serviceListTables(
+                instanceServicesHeading(
+                  instance.instanceId,
+                  instance.instanceKey,
+                ),
+                instance,
               ),
-              rows: serviceListRows(instance.services),
-            }))
-          : [{ heading: "Services", rows }];
+            )
+          : serviceListTables("Services", result);
 
       if (resources.dangling.length > 0) {
         const danglingRows = [

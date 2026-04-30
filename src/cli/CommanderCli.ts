@@ -195,9 +195,7 @@ export class CommanderCli {
 
     this.program
       .command("ls")
-      .description(
-        "List configured services with details (status, ports, volumes, cwd, cmd)",
-      )
+      .description("List configured services with details and assigned ports")
       .argument("[services...]", "Services to list")
       .option("-e, --extended", "Show instance and dangling resource inventory")
       .option("-a, --all", "Alias for --extended")

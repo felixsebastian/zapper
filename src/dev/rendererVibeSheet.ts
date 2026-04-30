@@ -113,6 +113,12 @@ function main(): void {
         cmd: "redis:7",
       },
     ],
+    ports: [
+      { name: "API_PORT", value: "3000" },
+      { name: "METRICS_PORT", value: "9090" },
+      { name: "POSTGRES_PORT", value: "5432" },
+      { name: "REDIS_PORT", value: "6379" },
+    ],
   };
 
   const tasks: Task[] = [

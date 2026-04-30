@@ -23,7 +23,13 @@ export interface ServiceListEntry {
 
 export interface ServiceListResult {
   services: ServiceListEntry[];
+  ports: PortListEntry[];
   resources?: ResourceInventory;
+}
+
+export interface PortListEntry {
+  name: string;
+  value: string;
 }
 
 export interface ResourceInventory {
@@ -37,6 +43,7 @@ export interface InstanceResourceInventory {
   instanceKey: string;
   instanceId: string;
   services: ServiceListEntry[];
+  ports: PortListEntry[];
 }
 
 export interface ResourceInventoryEntry {
@@ -81,6 +88,17 @@ function extractProcessPorts(
       (name) => statePorts?.[name] !== undefined || env[name] !== undefined,
     )
     .map((name) => `${name}=${statePorts?.[name] ?? env[name]}`);
+}
+
+function buildPortEntries(
+  context: Context,
+  statePorts: Record<string, string> | undefined,
+): PortListEntry[] {
+  if (!context.ports || context.ports.length === 0) return [];
+  return context.ports.map((name) => ({
+    name,
+    value: statePorts?.[name] ?? "",
+  }));
 }
 
 function parseManagedVolumeName(
@@ -150,6 +168,7 @@ async function getResourceInventory(
         instance.ports || {},
         instance.volumes || {},
       ),
+      ports: buildPortEntries(context, instance.ports || {}),
     });
   }
 
@@ -308,6 +327,7 @@ export async function getServiceList(
 
   return {
     services,
+    ports: buildPortEntries(context, loadedPorts),
     resources: options.extended
       ? await getResourceInventory(context, service)
       : undefined,

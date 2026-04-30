@@ -125,7 +125,7 @@ zap r api worker            # Short alias for: zap restart api worker
 ```bash
 zap status                  # Show status of all services
 zap status api db           # Show status for specific services
-zap ls                      # List services/containers with details (status, ports, volumes, cwd, cmd)
+zap ls                      # List services/containers plus assigned ports
 zap ls --extended           # Include instance, dangling, and alien resource inventory
 zap ls --all                # Alias for: zap ls --extended
 zap ls api db               # List details for specific services
@@ -549,6 +549,10 @@ The assigned ports have **highest precedence** - they override values from any `
 - Avoiding port conflicts when running multiple instances
 - Dynamic port assignment in development
 - Sharing configurations with different port needs
+
+`zap ls` always shows assigned port variables and Docker port mappings in a
+separate Ports table, even without `--extended`, because they are part of the
+active instance's key runtime state.
 
 **Interpolation works with assigned ports:**
 

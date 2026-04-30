@@ -159,6 +159,10 @@ describe("getServiceList", () => {
         cmd: "redis-server --appendonly yes",
       },
     ]);
+    expect(result.ports).toEqual([
+      { name: "API_PORT", value: "" },
+      { name: "WEB_PORT", value: "" },
+    ]);
     expect(result.resources).toBeUndefined();
   });
 
