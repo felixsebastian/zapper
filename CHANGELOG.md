@@ -1,5 +1,11 @@
 # @mp-lb/zapper
 
+## 0.15.0
+
+### Minor Changes
+
+- 5300158: Release clean-state verification.
+
 ## 0.14.0
 
 ### Minor Changes
