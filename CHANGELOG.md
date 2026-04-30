@@ -1,5 +1,11 @@
 # @mp-lb/zapper
 
+## 0.15.1
+
+### Patch Changes
+
+- Resolve native and Docker service aliases when filtering status and list output.
+
 ## 0.15.0
 
 ### Minor Changes
