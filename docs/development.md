@@ -78,5 +78,6 @@ Release publishing runs through `.github/workflows/release.yml`.
 - npm trusted publishing currently requires Node `22.14.0+` and npm CLI `11.5.1+`; the release workflow upgrades npm explicitly before publishing.
 - npm currently requires either trusted publishing or a granular write token with **Bypass two-factor authentication** enabled for non-interactive package publishes.
 - The release workflow passes `NPM_TOKEN` to `changesets/action` when the repository secret exists. If the secret is absent, Changesets can use OIDC trusted publishing.
+- The release workflow logs the token length, a short SHA-256 token fingerprint, `npm whoami`, and package collaborator access before publishing. It does not print token characters.
 - If release CI fails with `EOTP`, the configured `NPM_TOKEN` is not suitable for package publishing and must be replaced or removed after trusted publishing is set up on npm.
 - Keep `package.json` `repository.url` aligned with the canonical GitHub repo because npm checks it for GitHub trusted publishing.

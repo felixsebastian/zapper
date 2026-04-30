@@ -26,6 +26,7 @@ Important details:
 
 - A regular token that still requires 2FA will fail in CI with `EOTP This operation requires a one-time password`.
 - The release workflow passes `secrets.NPM_TOKEN` to Changesets when that secret exists; if it is absent, Changesets can fall back to OIDC trusted publishing.
+- The release workflow logs the token length, a short SHA-256 token fingerprint, `npm whoami`, and package collaborator access before publishing. It does not print token characters.
 - npm trusted publishing currently requires Node `22.14.0+` and npm CLI `11.5.1+`.
 - For GitHub-based trusted publishing, npm also requires `package.json` `repository.url` to exactly match the GitHub repository URL.
 - Once trusted publishing is working, remove or revoke old write tokens when possible.
