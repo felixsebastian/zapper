@@ -85,7 +85,7 @@ jobs:
           fi
 
       - name: Deploy landing page to Vercel
-        run: npx vercel deploy apps/landing-page --prod --yes --token=${{ secrets.VERCEL_API_TOKEN }}
+        run: npx vercel deploy --prod --yes --token=${{ secrets.VERCEL_API_TOKEN }}
         env:
           VERCEL_PROJECT_ID: ${{ steps.vercel.outputs.project_id }}
           VERCEL_ORG_ID: ${{ steps.vercel.outputs.org_id }}

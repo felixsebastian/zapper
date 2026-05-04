@@ -3,9 +3,9 @@ locals {
 }
 
 resource "vercel_project" "landing_page" {
-  name             = var.project_name
-  build_command    = null
-  output_directory = null
+  name           = var.project_name
+  framework      = "nextjs"
+  root_directory = "apps/landing-page"
 
   vercel_authentication = {
     deployment_type = "none"
