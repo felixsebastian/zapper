@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,10 +10,6 @@ const sourceOrder = [
   "instances.md",
   "resource-management.md",
   "env-var-mgmt.md",
-  "development.md",
-  "releases.md",
-  "orphaned-processes.md",
-  "tech-debt.md",
 ];
 
 const entries = (
@@ -29,17 +25,6 @@ const entries = (
     }),
   )
 ).filter(Boolean);
-
-const extraMarkdown = (await readdir(docsDir))
-  .filter((file) => file.endsWith(".md") && !sourceOrder.includes(file))
-  .sort();
-
-for (const file of extraMarkdown) {
-  entries.push({
-    file,
-    content: await readFile(join(docsDir, file), "utf8"),
-  });
-}
 
 const full = [
   "# Zapper documentation",

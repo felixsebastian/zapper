@@ -5,12 +5,17 @@ export default defineConfig({
   description: "A lightweight dev environment runner for local multi-service projects",
   cleanUrls: true,
   lastUpdated: true,
+  srcExclude: [
+    "development.md",
+    "releases.md",
+    "orphaned-processes.md",
+    "tech-debt.md",
+  ],
   themeConfig: {
     nav: [
       { text: "Home", link: "https://zapper.mp-lb.dev" },
       { text: "Quick Start", link: "/" },
       { text: "Reference", link: "/usage" },
-      { text: "Development", link: "/development" },
       { text: "Raw", link: "/llms-full.txt" },
     ],
     sidebar: [
@@ -22,15 +27,6 @@ export default defineConfig({
           { text: "Instances", link: "/instances" },
           { text: "Resource Management", link: "/resource-management" },
           { text: "Environment Variables", link: "/env-var-mgmt" },
-        ],
-      },
-      {
-        text: "Maintaining Zapper",
-        items: [
-          { text: "Development", link: "/development" },
-          { text: "Releases", link: "/releases" },
-          { text: "Orphaned Process Diagnostics", link: "/orphaned-processes" },
-          { text: "Tech Debt", link: "/tech-debt" },
         ],
       },
     ],
