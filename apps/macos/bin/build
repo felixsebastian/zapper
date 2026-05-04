@@ -11,6 +11,9 @@ RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 EXECUTABLE="${MACOS_DIR}/${APP_NAME}"
 ARCH="${ARCH:-$(uname -m)}"
 DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
+CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
+CODESIGN_OPTIONS="${CODESIGN_OPTIONS:-}"
+CODESIGN_ENTITLEMENTS="${CODESIGN_ENTITLEMENTS:-}"
 
 rm -rf "${APP_DIR}"
 mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
@@ -27,6 +30,18 @@ xcrun --sdk macosx swiftc \
   -o "${EXECUTABLE}" \
   "${APP_ROOT}"/Sources/Zapper/*.swift
 
-codesign --force --sign - "${APP_DIR}" >/dev/null
+codesign_args=(--force --sign "${CODESIGN_IDENTITY}")
+if [ -n "${CODESIGN_OPTIONS}" ]; then
+  codesign_args+=(--options "${CODESIGN_OPTIONS}")
+fi
+if [ "${CODESIGN_IDENTITY}" != "-" ]; then
+  codesign_args+=(--timestamp)
+fi
+if [ -n "${CODESIGN_ENTITLEMENTS}" ]; then
+  codesign_args+=(--entitlements "${CODESIGN_ENTITLEMENTS}")
+fi
+
+codesign "${codesign_args[@]}" "${APP_DIR}" >/dev/null
+codesign --verify --deep --strict "${APP_DIR}"
 
 echo "Built ${APP_DIR}"

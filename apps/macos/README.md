@@ -22,6 +22,15 @@ apps/macos/build/Zapper.app
 
 No Xcode project is required for this first version.
 
+Local builds use ad-hoc signing by default. To sign with a Developer ID
+certificate already installed in your keychain:
+
+```bash
+CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+CODESIGN_OPTIONS=runtime \
+apps/macos/bin/build
+```
+
 ## Run
 
 ```bash

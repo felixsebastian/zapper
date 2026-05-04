@@ -93,6 +93,10 @@ The workflow runs on `v*` tags or manual dispatch, zips `Zapper.app`, and
 attaches both `Zapper-<tag>-macOS.zip` and the stable `Zapper-macOS.zip` asset
 to the matching GitHub Release.
 
+Local app builds are ad-hoc signed unless `CODESIGN_IDENTITY` is set. Release
+builds require a Developer ID certificate imported from GitHub Actions secrets
+and are signed with the hardened runtime option before packaging.
+
 ## Documentation Site
 
 The docs website is a VitePress workspace package in `docs`. Keep editing the Markdown files in `docs/`; VitePress turns them into the website, and the raw docs generator publishes agent-friendly files from the same source.

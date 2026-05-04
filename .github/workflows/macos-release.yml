@@ -22,8 +22,74 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build app
+      - name: Validate signing secrets
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          missing=0
+          for name in MACOS_CERTIFICATE_P12_BASE64 MACOS_CERTIFICATE_PASSWORD MACOS_CODESIGN_IDENTITY; do
+            if [ -z "${!name:-}" ]; then
+              echo "$name is required for signed macOS release builds" >&2
+              missing=1
+            fi
+          done
+
+          notarization_count=0
+          for name in APPLE_ID APPLE_TEAM_ID APPLE_APP_SPECIFIC_PASSWORD; do
+            if [ -n "${!name:-}" ]; then
+              notarization_count=$((notarization_count + 1))
+            fi
+          done
+          if [ "$notarization_count" -ne 0 ] && [ "$notarization_count" -ne 3 ]; then
+            echo "APPLE_ID, APPLE_TEAM_ID, and APPLE_APP_SPECIFIC_PASSWORD must be set together for notarization" >&2
+            missing=1
+          fi
+
+          exit "$missing"
+
+      - name: Import code signing certificate
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          keychain_password="${MACOS_KEYCHAIN_PASSWORD:-$(uuidgen)}"
+          keychain_path="$RUNNER_TEMP/zapper-signing.keychain-db"
+          certificate_path="$RUNNER_TEMP/zapper-signing.p12"
+
+          if ! printf '%s' "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$certificate_path" 2>/dev/null; then
+            printf '%s' "$MACOS_CERTIFICATE_P12_BASE64" | base64 -D > "$certificate_path"
+          fi
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$keychain_path"
+          security list-keychains -d user -s "$keychain_path" $(security list-keychains -d user | sed 's/[ "]//g')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain_path"
+          security find-identity -v -p codesigning "$keychain_path"
+
+          echo "MACOS_SIGNING_KEYCHAIN=$keychain_path" >> "$GITHUB_ENV"
+
+      - name: Build signed app
+        env:
+          CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          CODESIGN_OPTIONS: runtime
         run: apps/macos/bin/build
+
+      - name: Verify signed app
+        run: |
+          codesign --verify --deep --strict --verbose=2 apps/macos/build/Zapper.app
+          codesign --display --verbose=4 apps/macos/build/Zapper.app
 
       - name: Package app
         id: package
@@ -39,6 +105,20 @@ jobs:
             exit 1
           fi
 
+          if [ -n "${APPLE_ID:-}" ] || [ -n "${APPLE_TEAM_ID:-}" ] || [ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ]; then
+            notarization_zip="$RUNNER_TEMP/Zapper-notarization.zip"
+            ditto -c -k --keepParent apps/macos/build/Zapper.app "$notarization_zip"
+            xcrun notarytool submit "$notarization_zip" \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+              --wait
+            xcrun stapler staple apps/macos/build/Zapper.app
+            xcrun stapler validate apps/macos/build/Zapper.app
+          else
+            echo "Notarization secrets not set; skipping notarization."
+          fi
+
           archive_name="Zapper-${tag}-macOS.zip"
           stable_archive_name="Zapper-macOS.zip"
           ditto -c -k --keepParent apps/macos/build/Zapper.app "$archive_name"
@@ -47,6 +127,10 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "archive_name=$archive_name" >> "$GITHUB_OUTPUT"
           echo "stable_archive_name=$stable_archive_name" >> "$GITHUB_OUTPUT"
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
@@ -69,4 +153,11 @@ jobs:
             gh release create "$TAG_NAME" "$ARCHIVE_NAME" "$STABLE_ARCHIVE_NAME" \
               --title "$TAG_NAME" \
               --generate-notes
+          fi
+
+      - name: Delete signing keychain
+        if: always()
+        run: |
+          if [ -n "${MACOS_SIGNING_KEYCHAIN:-}" ]; then
+            security delete-keychain "$MACOS_SIGNING_KEYCHAIN" || true
           fi

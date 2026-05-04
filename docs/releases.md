@@ -20,6 +20,22 @@ That workflow runs on `v*` tags or manual dispatch, builds `apps/macos`, zips
 `Zapper.app`, and uploads both a versioned zip and stable `Zapper-macOS.zip`
 asset to the matching GitHub Release.
 
+macOS release builds require these GitHub Actions secrets:
+
+- `MACOS_CERTIFICATE_P12_BASE64`: base64-encoded Developer ID Application `.p12`
+  certificate.
+- `MACOS_CERTIFICATE_PASSWORD`: password for the `.p12`.
+- `MACOS_CODESIGN_IDENTITY`: full signing identity name, for example
+  `Developer ID Application: Example, Inc. (TEAMID)`.
+- `MACOS_KEYCHAIN_PASSWORD`: optional temporary CI keychain password.
+
+Set these three additional secrets together to notarize and staple the app
+before packaging:
+
+- `APPLE_ID`
+- `APPLE_TEAM_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+
 ## Release Auth Prerequisite
 
 Before attempting a release, make sure npm publishing auth is configured correctly for CI. As of March 25, 2026, npm recommends trusted publishing for GitHub Actions and requires one of these for non-interactive publishes:
@@ -256,6 +272,10 @@ The workflow builds `apps/macos/build/Zapper.app`, packages
 `Zapper-v<version>-macOS.zip` and `Zapper-macOS.zip`, then creates or updates
 the GitHub Release for the tag. To rebuild an asset without pushing a new tag,
 run the workflow manually with `release_tag` set to the existing tag.
+
+The macOS release workflow fails if the required signing certificate secrets are
+missing. Notarization is skipped only when all Apple notarization secrets are
+absent; if any one notarization secret is set, all three must be present.
 
 ## Wait and Recheck After Push
 
