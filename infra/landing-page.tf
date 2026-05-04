@@ -6,6 +6,10 @@ resource "vercel_project" "landing_page" {
   name             = var.project_name
   build_command    = null
   output_directory = null
+
+  vercel_authentication = {
+    deployment_type = "none"
+  }
 }
 
 resource "vercel_project_domain" "landing_page" {
