@@ -10,6 +10,7 @@ const sourceOrder = [
   "instances.md",
   "resource-management.md",
   "global-registry.md",
+  "project-roots.md",
   "env-var-mgmt.md",
 ];
 

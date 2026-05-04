@@ -62,13 +62,14 @@ describe("SystemRegistry", () => {
 
   it("writes and updates a registered project", () => {
     const context = makeContext(projectRoot);
-    touchSystemProject({
+    const result = touchSystemProject({
       context,
       configPath: context.configPath!,
       command: "status",
       zapperVersion: "1.2.3",
     });
 
+    expect(result.projectNameChanged).toBeNull();
     const registry = loadSystemRegistry();
     const registryId = getSystemRegistryId(projectRoot, context.configPath!);
     expect(fs.existsSync(getSystemRegistryPath())).toBe(true);
@@ -81,6 +82,34 @@ describe("SystemRegistry", () => {
         default: { id: "abc123" },
       },
     });
+  });
+
+  it("reports project name changes once for the same project root and config", () => {
+    const context = makeContext(projectRoot);
+    touchSystemProject({ context, configPath: context.configPath! });
+
+    const renamedContext = {
+      ...context,
+      projectName: "renamed-app",
+    };
+    const firstRename = touchSystemProject({
+      context: renamedContext,
+      configPath: renamedContext.configPath!,
+    });
+    const secondRename = touchSystemProject({
+      context: renamedContext,
+      configPath: renamedContext.configPath!,
+    });
+
+    const registryId = getSystemRegistryId(projectRoot, context.configPath!);
+    expect(firstRename.projectNameChanged).toEqual({
+      from: "myapp",
+      to: "renamed-app",
+    });
+    expect(secondRename.projectNameChanged).toBeNull();
+    expect(loadSystemRegistry().projects[registryId].project).toBe(
+      "renamed-app",
+    );
   });
 
   it("forgets by registry id or project path", () => {

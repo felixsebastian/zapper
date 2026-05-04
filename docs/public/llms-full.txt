@@ -259,6 +259,11 @@ On macOS, the system registry defaults to
 when `XDG_STATE_HOME` is unset. Set `ZAPPER_SYSTEM_STATE_HOME` to override the
 directory, or `ZAPPER_DISABLE_SYSTEM_REGISTRY=1` to disable registry writes.
 
+If a project's `project` name changes while its project root and config path
+stay the same, Zapper updates the registry entry and prints a one-time warning
+that old resources may still be running. Use `zap system resources audit` to
+find resources left behind by the previous project name.
+
 The system project list is registry-backed and uses normal per-project Zapper
 status/list behavior for service details. The resources audit scans PM2 and
 Docker directly so it can find orphaned resources left behind by renamed
@@ -292,6 +297,8 @@ zap envset prod_dbs
 
 Most non-streaming commands support `--json` and will print machine-readable JSON to stdout.
 Examples: `up`, `down`, `restart`, `clone`, `reset`, `kill`, `status`, `ls`, `task` (list/params), `profile`, `env`, `state`, `config`, `launch`, `links`, `home`, `notes`, `init`, `system`, and git subcommands.
+
+When `--json` is enabled, Zapper suppresses incidental human logs and warnings so the command output stays parseable. Command failures are still reported as errors.
 
 Streaming commands keep stream output and are not JSON-encoded:
 
@@ -1438,6 +1445,9 @@ existing status/list/config paths to report services, ports, and
 Orphaned Resources tab, because resources can keep running after a project name
 changes, a service is removed, a checkout moves, or local state is deleted.
 
+For the precise definition of a Zapper project root, including nested
+`zap.yaml` files and custom config paths, see [Project Roots](project-roots.md).
+
 ## Current State
 
 Zapper currently names managed resources with a predictable namespace:
@@ -1610,6 +1620,11 @@ throwaway cache. Use locking, validation, and atomic writes. If a registry write
 fails, Zapper should surface that failure clearly instead of silently losing the
 project update. The exact command failure policy can vary by command, but the
 registry layer itself should not be "best effort" in design or tests.
+
+If an existing registry entry has the same project root and config path but a
+different project name, treat it as a project rename. Update the entry in place
+and print a one-time text-mode warning that old resources may still be running
+under the previous project name. Do not emit that warning in `--json` mode.
 
 ## Runtime Metadata
 
@@ -1893,6 +1908,111 @@ Start with the smallest useful version:
 Then add runtime metadata labels/env once the registry ID exists. That keeps the
 first change useful while preserving compatibility with existing PM2 and Docker
 resources.
+
+# Source: docs/project-roots.md
+
+# Project Roots
+
+This is an internal note for reasoning about Zapper project identity, especially
+for the system registry.
+
+## Definition
+
+A Zapper project root is the directory that contains the resolved config file.
+
+In code:
+
+```text
+configPath = resolveConfigPath(...)
+projectRoot = dirname(realpath(configPath))
+```
+
+Zapper does not first discover a Git repository root or package workspace root.
+The selected config file defines the Zapper project boundary.
+
+## Default Config Discovery
+
+When no `--config` value is passed, Zapper searches upward from the current
+working directory for:
+
+1. `zap.yaml`
+2. `zap.yml`
+
+The nearest matching directory wins. Within the same directory, `zap.yaml` wins
+over `zap.yml`.
+
+Example:
+
+```text
+repo/
+  zap.yaml
+  apps/
+    api/
+      zap.yaml
+```
+
+Running `zap status` from `repo/apps/api` uses `repo/apps/api/zap.yaml`, so the
+Zapper project root is `repo/apps/api`.
+
+Running `zap status` from `repo/apps/api/src` also uses
+`repo/apps/api/zap.yaml`, because it is found before `repo/zap.yaml` while
+walking upward.
+
+Running `zap status` from `repo` uses `repo/zap.yaml`, so the Zapper project
+root is `repo`.
+
+These are distinct Zapper projects even if they live in the same Git repository.
+
+## Custom Config Paths
+
+When `--config <file>` is passed, Zapper uses that file directly. It does not
+fall back to a parent `zap.yaml` if the custom file is missing.
+
+The project root is still the directory containing the selected config file:
+
+```bash
+zap --config ./prod.yaml status
+```
+
+uses `./prod.yaml`, so the project root is the current directory if `prod.yaml`
+is there.
+
+```bash
+zap --config ./apps/api/local.yaml status
+```
+
+uses `./apps/api/local.yaml`, so the project root is `./apps/api`.
+
+If `--config <directory>` is passed, Zapper searches upward from that directory
+for `zap.yaml` or `zap.yml`. It does not search downward inside the directory.
+
+## System Registry Identity
+
+The system registry should identify a Zapper project by the resolved config
+path, not only by the `project` field inside `zap.yaml`.
+
+The current registry ID is derived from:
+
+```text
+realProjectRoot + "\0" + realConfigPath
+```
+
+This is intentional:
+
+- Multiple directories in one Git repo may each have their own `zap.yaml`.
+- Multiple configs can use the same `project` name.
+- Multiple configs can live in the same directory.
+- A checkout can move on disk.
+
+The `project` field in `zap.yaml` remains the runtime resource namespace used in
+PM2/Docker names. It is not globally unique and should not be treated as the
+system registry identity by itself.
+
+## Practical Rule
+
+If a directory contains a `zap.yaml` or `zap.yml`, it can be a Zapper project
+root when Zapper resolves that file. Nested Zapper projects are allowed and
+should be treated as separate projects by system-level tooling.
 
 # Source: docs/env-var-mgmt.md
 

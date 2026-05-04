@@ -8,4 +8,5 @@ Raw documentation for agents and automation:
 - instances.md: /instances
 - resource-management.md: /resource-management
 - global-registry.md: /global-registry
+- project-roots.md: /project-roots
 - env-var-mgmt.md: /env-var-mgmt

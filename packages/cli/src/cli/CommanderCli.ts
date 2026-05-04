@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { Command as ZapCommand } from "../types/index";
 import { Zapper } from "../core/Zapper";
 import { logger, LogLevel } from "../utils/logger";
+import { renderer } from "../ui/renderer";
 import { renderCommandResult } from "../ui/commandResultRenderer";
 import {
   UpCommand,
@@ -549,60 +550,67 @@ export class CommanderCli {
       __command: command,
     };
 
-    if (allOptions.debug) {
-      logger.setLevel(LogLevel.DEBUG);
-    } else if (allOptions.verbose) {
-      logger.setLevel(LogLevel.INFO);
-    } else if (allOptions.quiet) {
-      logger.setLevel(LogLevel.WARN);
-    }
+    const jsonMode = !!allOptions.json;
+    renderer.output.setJsonMode(jsonMode);
 
-    // Keep JSON output parseable on stdout by suppressing info/debug line logs.
-    if (allOptions.json) {
-      logger.setLevel(LogLevel.WARN);
-    }
+    try {
+      if (allOptions.debug) {
+        logger.setLevel(LogLevel.DEBUG);
+      } else if (allOptions.verbose) {
+        logger.setLevel(LogLevel.INFO);
+      } else if (allOptions.quiet) {
+        logger.setLevel(LogLevel.WARN);
+      }
 
-    const skipConfigLoad =
-      (command === "kill" &&
-        typeof service === "string" &&
-        service.trim().length > 0) ||
-      command === "global" ||
-      command === "system";
+      // Keep JSON output parseable by suppressing incidental human logs.
+      if (jsonMode) {
+        logger.setLevel(LogLevel.ERROR);
+      }
 
-    const zapper = new Zapper();
-    if (!skipConfigLoad) {
-      await zapper.loadConfig(
-        allOptions.config as string | undefined,
-        allOptions,
-      );
-    }
+      const skipConfigLoad =
+        (command === "kill" &&
+          typeof service === "string" &&
+          service.trim().length > 0) ||
+        command === "global" ||
+        command === "system";
 
-    const normalizedService =
-      Array.isArray(service) && service.length === 0 ? undefined : service;
+      const zapper = new Zapper();
+      if (!skipConfigLoad) {
+        await zapper.loadConfig(
+          allOptions.config as string | undefined,
+          allOptions,
+        );
+      }
 
-    const handler = this.commandHandlers.get(command);
-    if (!handler) {
-      throw new Error(`No handler found for command: ${command}`);
-    }
+      const normalizedService =
+        Array.isArray(service) && service.length === 0 ? undefined : service;
 
-    // Parse task parameters for the task command
-    let taskParams: TaskParams | undefined;
-    if (command === "task" && typeof normalizedService === "string") {
-      taskParams = parseTaskArgs(process.argv, normalizedService);
-    }
+      const handler = this.commandHandlers.get(command);
+      if (!handler) {
+        throw new Error(`No handler found for command: ${command}`);
+      }
 
-    const context: CommandContext = {
-      zapper,
-      service: normalizedService,
-      options: allOptions,
-      taskParams,
-    };
+      // Parse task parameters for the task command
+      let taskParams: TaskParams | undefined;
+      if (command === "task" && typeof normalizedService === "string") {
+        taskParams = parseTaskArgs(process.argv, normalizedService);
+      }
 
-    const result = await handler.execute(context);
-    if (result) {
-      renderCommandResult(result, {
-        json: !!allOptions.json,
-      });
+      const context: CommandContext = {
+        zapper,
+        service: normalizedService,
+        options: allOptions,
+        taskParams,
+      };
+
+      const result = await handler.execute(context);
+      if (result) {
+        renderCommandResult(result, {
+          json: jsonMode,
+        });
+      }
+    } finally {
+      renderer.output.setJsonMode(false);
     }
   }
 

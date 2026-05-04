@@ -5,6 +5,11 @@ import {
   ServiceListEntry,
   ServiceListResult,
 } from "../core/getServiceList";
+import type {
+  SystemProjectStatus,
+  SystemResourceAuditEntry,
+  SystemRegistryProject,
+} from "../system";
 import { Context, Task } from "../types/Context";
 import { logger } from "../utils/logger";
 
@@ -54,6 +59,18 @@ const ansi = {
 const ansiEscape = String.fromCharCode(27);
 
 type Tone = "info" | "ok" | "warn" | "error" | "muted" | "accent";
+type OutputMode = "text" | "json";
+
+let outputMode: OutputMode = "text";
+
+function isJsonOutputMode(): boolean {
+  return outputMode === "json";
+}
+
+function renderHumanOutput(fn: () => void): void {
+  if (isJsonOutputMode()) return;
+  fn();
+}
 
 function color(tone: Tone, text: string): string {
   switch (tone) {
@@ -186,6 +203,56 @@ function serviceListTables(
     tables.push({ heading: "Ports", rows: portsRows });
   }
   return tables;
+}
+
+function systemProjectRows(projects: SystemProjectStatus[]): string[][] {
+  return [
+    [
+      bold("PROJECT"),
+      bold("STATE"),
+      bold("INSTANCES"),
+      bold("SERVICES"),
+      bold("LAST SEEN"),
+      bold("ROOT"),
+    ],
+    ...projects.map((project) => {
+      const serviceCount = project.instances.reduce(
+        (sum, instance) => sum + (instance.list?.services.length || 0),
+        0,
+      );
+      return [
+        project.project,
+        project.state.toUpperCase(),
+        String(project.instances.length),
+        String(serviceCount),
+        project.lastSeenAt,
+        project.projectRoot,
+      ];
+    }),
+  ];
+}
+
+function registryProjectRows(projects: SystemRegistryProject[]): string[][] {
+  return [
+    [bold("PROJECT"), bold("ROOT"), bold("CONFIG")],
+    ...projects.map((project) => [
+      project.project,
+      project.projectRoot,
+      project.configPath,
+    ]),
+  ];
+}
+
+function auditResourceRows(resources: SystemResourceAuditEntry[]): string[][] {
+  return [
+    [bold("TYPE"), bold("RESOURCE"), bold("CLASSIFICATION"), bold("WHY")],
+    ...resources.map((resource) => [
+      resource.type,
+      resource.name,
+      resource.classification,
+      resource.reason,
+    ]),
+  ];
 }
 
 function labeledList(
@@ -321,28 +388,49 @@ logger.setSink({
 });
 
 export const renderer = {
+  output: {
+    setJsonMode(enabled: boolean): void {
+      outputMode = enabled ? "json" : "text";
+    },
+    isJsonMode(): boolean {
+      return isJsonOutputMode();
+    },
+  },
+
   /**
    * Human logs (single-line, consistent). Assume logger itself handles timestamping if desired.
    * NOTE: We keep using your logger here for compatibility with existing call sites.
    */
   log: {
     error(message: string, options: LogOptions = {}): void {
-      logger.error(message, { ...options, noEmoji: true });
+      renderHumanOutput(() => {
+        logger.error(message, { ...options, noEmoji: true });
+      });
     },
     warn(message: string, options: LogOptions = {}): void {
-      logger.warn(message, { ...options, noEmoji: true });
+      renderHumanOutput(() => {
+        logger.warn(message, { ...options, noEmoji: true });
+      });
     },
     info(message: string, options: LogOptions = {}): void {
-      logger.info(message, { ...options, noEmoji: true });
+      renderHumanOutput(() => {
+        logger.info(message, { ...options, noEmoji: true });
+      });
     },
     debug(message: string, options: LogOptions = {}): void {
-      logger.debug(message, { ...options, noEmoji: true });
+      renderHumanOutput(() => {
+        logger.debug(message, { ...options, noEmoji: true });
+      });
     },
     success(message: string, options: LogOptions = {}): void {
-      logger.success(message, { ...options, noEmoji: true });
+      renderHumanOutput(() => {
+        logger.success(message, { ...options, noEmoji: true });
+      });
     },
     report(text: string): void {
-      logger.info(text, { noEmoji: true });
+      renderHumanOutput(() => {
+        logger.info(text, { noEmoji: true });
+      });
     },
   },
 
@@ -782,6 +870,96 @@ export const renderer = {
 
     toJson(result: ServiceListResult): ServiceListResult {
       return result;
+    },
+  },
+
+  system: {
+    projectsToText(projects: SystemProjectStatus[]): string {
+      if (projects.length === 0) {
+        return `${header("System Projects")}\n\n${dim("No system projects registered.")}`;
+      }
+
+      return [
+        header("System Projects"),
+        "",
+        table(systemProjectRows(projects)),
+      ].join("\n");
+    },
+
+    projectsToJson(projects: SystemProjectStatus[]): SystemProjectStatus[] {
+      return projects;
+    },
+
+    registryProjectsToText(projects: SystemRegistryProject[]): string {
+      if (projects.length === 0) return dim("No registry entries changed.");
+      return table(registryProjectRows(projects));
+    },
+
+    registryProjectsToJson(
+      projects: SystemRegistryProject[],
+    ): SystemRegistryProject[] {
+      return projects;
+    },
+
+    resourcesToText(resources: SystemResourceAuditEntry[]): string {
+      if (resources.length === 0) {
+        return `${header("Orphaned Resources")}\n\n${dim("No orphaned system resources found.")}`;
+      }
+
+      return [
+        header("Orphaned Resources"),
+        "",
+        table(auditResourceRows(resources)),
+      ].join("\n");
+    },
+
+    resourcesToJson(
+      resources: SystemResourceAuditEntry[],
+    ): SystemResourceAuditEntry[] {
+      return resources;
+    },
+
+    registryPrunedText(removed: SystemRegistryProject[]): string {
+      const count = removed.length;
+      return [
+        `Pruned ${count} system registry entr${count === 1 ? "y" : "ies"}.`,
+        "",
+        renderer.system.registryProjectsToText(removed),
+      ].join("\n");
+    },
+
+    registryForgotText(removed: SystemRegistryProject | null): string {
+      if (!removed) return "No matching system registry entry found.";
+      return [
+        "Forgot system registry entry:",
+        "",
+        renderer.system.registryProjectsToText([removed]),
+      ].join("\n");
+    },
+
+    registryRepairedText(data: {
+      removed: SystemRegistryProject[];
+      projects: SystemProjectStatus[];
+    }): string {
+      const count = data.removed.length;
+      return [
+        `Repaired system registry. Pruned ${count} stale entr${count === 1 ? "y" : "ies"}.`,
+        "",
+        renderer.system.projectsToText(data.projects),
+      ].join("\n");
+    },
+
+    resourcesCleanedText(data: {
+      status: "aborted" | "completed";
+      resources: SystemResourceAuditEntry[];
+    }): string {
+      if (data.status === "aborted") return renderer.command.abortedText();
+      const count = data.resources.length;
+      return [
+        `Cleaned ${count} system resource${count === 1 ? "" : "s"}.`,
+        "",
+        renderer.system.resourcesToText(data.resources),
+      ].join("\n");
     },
   },
 

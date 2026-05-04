@@ -56,6 +56,34 @@ describe("renderer", () => {
     expect(successSpy).toHaveBeenCalled();
   });
 
+  it("suppresses human renderer output in JSON mode", () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      renderer.output.setJsonMode(true);
+
+      renderer.log.info("info");
+      renderer.log.warn("warning");
+      renderer.log.error("error");
+      renderer.log.success("success");
+      renderer.log.report("report");
+      renderer.machine.json({ ok: true });
+
+      expect(renderer.output.isJsonMode()).toBe(true);
+      expect(logSpy).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledWith('{"ok":true}');
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      renderer.output.setJsonMode(false);
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
   it("formats instance-aware status header", () => {
     const text = renderer.status.toText(
       createStatusResult(),

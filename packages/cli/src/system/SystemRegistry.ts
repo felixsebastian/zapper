@@ -46,7 +46,18 @@ export interface TouchSystemProjectInput {
   zapperVersion?: string;
 }
 
+export interface TouchSystemProjectResult {
+  projectNameChanged: {
+    from: string;
+    to: string;
+  } | null;
+}
+
 const REGISTRY_VERSION = 1 as const;
+
+const NO_TOUCH_RESULT: TouchSystemProjectResult = {
+  projectNameChanged: null,
+};
 
 function canonicalPath(value: string): string {
   const resolved = path.resolve(value);
@@ -181,22 +192,33 @@ export function saveSystemRegistry(registry: SystemRegistryData): void {
   }
 }
 
-export function touchSystemProject(input: TouchSystemProjectInput): void {
-  if (process.env.ZAPPER_DISABLE_SYSTEM_REGISTRY === "1") return;
+export function touchSystemProject(
+  input: TouchSystemProjectInput,
+): TouchSystemProjectResult {
+  if (process.env.ZAPPER_DISABLE_SYSTEM_REGISTRY === "1") {
+    return NO_TOUCH_RESULT;
+  }
   if (
     process.env.NODE_ENV === "test" &&
     !process.env.ZAPPER_SYSTEM_STATE_HOME
   ) {
-    return;
+    return NO_TOUCH_RESULT;
   }
 
-  withLock(() => {
+  return withLock(() => {
     const registry = loadSystemRegistry();
     const projectRoot = canonicalPath(input.context.projectRoot);
     const configPath = canonicalPath(input.configPath);
     const registryId = getSystemRegistryId(projectRoot, configPath);
     const now = new Date().toISOString();
     const existing = registry.projects[registryId];
+    const projectNameChanged =
+      existing && existing.project !== input.context.projectName
+        ? {
+            from: existing.project,
+            to: input.context.projectName,
+          }
+        : null;
     const stateInstances = input.context.state.instances || {};
     const instances: Record<string, SystemRegistryInstance> = {
       ...(existing?.instances || {}),
@@ -230,6 +252,7 @@ export function touchSystemProject(input: TouchSystemProjectInput): void {
     };
 
     saveSystemRegistry(registry);
+    return { projectNameChanged };
   });
 }
 

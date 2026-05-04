@@ -26,7 +26,7 @@ pnpm remove --global zapper-cli @maplab/zapper @mp-lb/zapper     # Remove stale 
 pnpm add --global @mp-lb/zapper  # Make sure it's installed with pnpm
 pnpm install
 pnpm build
-pnpm --dir packages/cli link --global
+cd packages/cli && pnpm link --global && cd ../..
 ```
 
 After linking, your global `zap` command points to the local CLI package build. Make changes, run `pnpm build`, and test immediately.
@@ -50,7 +50,7 @@ and link again:
 ```bash
 pnpm remove --global zapper-cli @maplab/zapper @mp-lb/zapper
 pnpm build
-pnpm --dir packages/cli link --global
+cd packages/cli && pnpm link --global && cd ../..
 ```
 
 ## Testing
@@ -135,6 +135,11 @@ terraform apply \
 ```
 
 The workflow provisions the Vercel projects/domains through Terraform, builds `@mp-lb/zapper-landing-page` and `@mp-lb/zapper-docs`, then deploys both projects with the Vercel CLI.
+The landing page `/download/mac` route redirects to the latest macOS GitHub
+Release zip. Add `DESKTOP_RELEASES_GITHUB_TOKEN` to the `PRODUCTION_SECRETS`
+repository secret env file when the route needs higher GitHub API limits or
+access to non-public release assets; Terraform passes that token into the Vercel
+project runtime environment.
 
 ## Release CI Auth
 

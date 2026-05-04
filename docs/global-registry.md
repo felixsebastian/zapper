@@ -40,6 +40,9 @@ existing status/list/config paths to report services, ports, and
 Orphaned Resources tab, because resources can keep running after a project name
 changes, a service is removed, a checkout moves, or local state is deleted.
 
+For the precise definition of a Zapper project root, including nested
+`zap.yaml` files and custom config paths, see [Project Roots](project-roots.md).
+
 ## Current State
 
 Zapper currently names managed resources with a predictable namespace:
@@ -212,6 +215,11 @@ throwaway cache. Use locking, validation, and atomic writes. If a registry write
 fails, Zapper should surface that failure clearly instead of silently losing the
 project update. The exact command failure policy can vary by command, but the
 registry layer itself should not be "best effort" in design or tests.
+
+If an existing registry entry has the same project root and config path but a
+different project name, treat it as a project rename. Update the entry in place
+and print a one-time text-mode warning that old resources may still be running
+under the previous project name. Do not emit that warning in `--json` mode.
 
 ## Runtime Metadata
 

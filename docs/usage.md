@@ -208,6 +208,11 @@ On macOS, the system registry defaults to
 when `XDG_STATE_HOME` is unset. Set `ZAPPER_SYSTEM_STATE_HOME` to override the
 directory, or `ZAPPER_DISABLE_SYSTEM_REGISTRY=1` to disable registry writes.
 
+If a project's `project` name changes while its project root and config path
+stay the same, Zapper updates the registry entry and prints a one-time warning
+that old resources may still be running. Use `zap system resources audit` to
+find resources left behind by the previous project name.
+
 The system project list is registry-backed and uses normal per-project Zapper
 status/list behavior for service details. The resources audit scans PM2 and
 Docker directly so it can find orphaned resources left behind by renamed
@@ -241,6 +246,8 @@ zap envset prod_dbs
 
 Most non-streaming commands support `--json` and will print machine-readable JSON to stdout.
 Examples: `up`, `down`, `restart`, `clone`, `reset`, `kill`, `status`, `ls`, `task` (list/params), `profile`, `env`, `state`, `config`, `launch`, `links`, `home`, `notes`, `init`, `system`, and git subcommands.
+
+When `--json` is enabled, Zapper suppresses incidental human logs and warnings so the command output stays parseable. Command failures are still reported as errors.
 
 Streaming commands keep stream output and are not JSON-encoded:
 

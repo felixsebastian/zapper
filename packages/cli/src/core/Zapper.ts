@@ -139,7 +139,7 @@ export class Zapper {
     this.context.configPath = absoluteConfigPath;
 
     if (!cliOptions?.__skipSystemRegistryTouch) {
-      touchSystemProject({
+      const touchResult = touchSystemProject({
         context: this.context,
         configPath: absoluteConfigPath,
         command:
@@ -148,6 +148,12 @@ export class Zapper {
             : undefined,
         zapperVersion: packageJson.version,
       });
+
+      if (touchResult.projectNameChanged) {
+        renderer.log.warn(
+          `Project name changed from ${touchResult.projectNameChanged.from} to ${touchResult.projectNameChanged.to}. Old resources may still be running; run \`zap system resources audit\`.`,
+        );
+      }
     }
   }
 

@@ -1,6 +1,7 @@
 import { InstallSnippet } from "@/components/landing/InstallSnippet";
 import { Out, Prompt, Terminal } from "@/components/landing/Terminal";
 import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 import Link from "next/link";
 
 const navLinks = [
@@ -110,6 +111,16 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <InstallSnippet command="npm i -g pm2 @mp-lb/zapper" />
+                <Button
+                  asChild
+                  variant="default"
+                  className="h-10 font-mono-tight"
+                >
+                  <a href="/download/mac">
+                    <Download aria-hidden="true" />
+                    Download for Mac
+                  </a>
+                </Button>
                 <Button
                   asChild
                   variant="outline"

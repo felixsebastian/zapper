@@ -59,6 +59,13 @@ variable "cloudflare_api_token" {
   default     = ""
 }
 
+variable "desktop_releases_github_token" {
+  description = "Optional GitHub token exposed to the landing page runtime for release asset lookup"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "cloudflare_zone_id" {
   description = "Legacy Cloudflare zone ID input. DNS records now resolve the active zone from var.domain."
   type        = string
