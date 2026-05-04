@@ -30,9 +30,9 @@ export const Terminal = ({
           {title}
         </span>
       </div>
-      <pre className="font-mono-tight text-[13px] leading-relaxed p-5 overflow-x-auto text-[hsl(var(--term-fg))]">
+      <div className="overflow-x-auto whitespace-pre p-5 font-mono-tight text-[13px] leading-relaxed text-[hsl(var(--term-fg))]">
         {children}
-      </pre>
+      </div>
     </div>
   );
 };
@@ -61,5 +61,5 @@ export const Out = ({
           : color === "accent"
             ? "text-[hsl(var(--term-accent))]"
             : "text-[hsl(var(--term-fg))]";
-  return <div className={cls}>{children}</div>;
+  return <div className={cn("whitespace-pre", cls)}>{children}</div>;
 };

@@ -148,53 +148,55 @@ export default function Home() {
               <Prompt>zap ls</Prompt>
               <Out color="muted">== Services (todo-app · 0xbabc) ==</Out>
               {"\n"}
-              <Out color="muted">TYPE SERVICE STATUS CMD</Out>
+              <Out color="muted">{"TYPE    SERVICE   STATUS  CMD"}</Out>
               <Out>
-                native backend{" "}
-                <span className="text-[hsl(var(--term-up))]">UP</span> pnpm dev
+                {"native  backend   "}
+                <span className="text-[hsl(var(--term-up))]">UP</span>
+                {"      pnpm dev"}
               </Out>
               <Out>
-                native worker{" "}
-                <span className="text-[hsl(var(--term-up))]">UP</span> pnpm
-                worker
+                {"native  worker    "}
+                <span className="text-[hsl(var(--term-up))]">UP</span>
+                {"      pnpm worker"}
               </Out>
               <Out>
-                native frontend{" "}
-                <span className="text-[hsl(var(--term-up))]">UP</span> pnpm dev
+                {"native  frontend  "}
+                <span className="text-[hsl(var(--term-up))]">UP</span>
+                {"      pnpm dev"}
               </Out>
               <Out>
-                docker mongodb{" "}
-                <span className="text-[hsl(var(--term-up))]">UP</span>{" "}
-                mongo:latest
+                {"docker  mongodb   "}
+                <span className="text-[hsl(var(--term-up))]">UP</span>
+                {"      mongo:latest"}
               </Out>
               <Out>
-                docker redis{" "}
-                <span className="text-[hsl(var(--term-up))]">UP</span>{" "}
-                redis:7-alpine
+                {"docker  redis     "}
+                <span className="text-[hsl(var(--term-up))]">UP</span>
+                {"      redis:7-alpine"}
               </Out>
               {"\n"}
               <Prompt>zap links</Prompt>
-              <Out color="muted">NAME URL</Out>
+              <Out color="muted">{"NAME          URL"}</Out>
               <Out>
-                Frontend{" "}
+                {"Frontend      "}
                 <span className="text-[hsl(var(--term-path))]">
                   http://localhost:61964
                 </span>
               </Out>
               <Out>
-                API{" "}
+                {"API           "}
                 <span className="text-[hsl(var(--term-path))]">
                   http://localhost:50230
                 </span>
               </Out>
               <Out>
-                Worker queue{" "}
+                {"Worker queue  "}
                 <span className="text-[hsl(var(--term-path))]">
                   http://localhost:50231/queues
                 </span>
               </Out>
               <Out>
-                Maildev{" "}
+                {"Maildev       "}
                 <span className="text-[hsl(var(--term-path))]">
                   http://localhost:63050
                 </span>
