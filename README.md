@@ -18,6 +18,7 @@ Infrastructure as code for your local development environment.
 
 ## Documentation
 
+- **[Docs](docs/index.md)** — Quick start, reference, and maintainer docs
 - **[Usage](docs/usage.md)** — Installation, configuration, CLI reference
 - **[Development](docs/development.md)** — Contributing, testing, releases
 
@@ -25,4 +26,5 @@ Infrastructure as code for your local development environment.
 
 - `packages/cli` — published CLI package (`@mp-lb/zapper`)
 - `apps/landing-page` — Next.js landing page
+- `docs` — VitePress documentation site and raw agent docs bundle
 - `infra` — Terraform-managed deployment resources for the landing page

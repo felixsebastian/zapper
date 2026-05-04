@@ -8,6 +8,7 @@ Zapper is a pnpm workspace:
 
 - `packages/cli` contains the published CLI package, source, unit tests, e2e tests, examples, and CLI-specific tooling.
 - `apps/landing-page` contains the Next.js landing page.
+- `docs` contains the VitePress documentation site. Its Markdown files remain the source of truth, and `pnpm --filter @mp-lb/zapper-docs raw` generates `llms.txt` and `llms-full.txt` for agents and automation.
 - `infra` contains Terraform-managed deployment resources for the landing page.
 
 ## Prerequisites
@@ -61,9 +62,23 @@ pnpm --filter @mp-lb/zapper test yaml-parser.test.ts    # Specific CLI test file
 pnpm test:e2e                    # E2E in isolated Linux VM (macOS + Lima)
 pnpm dev:renderer                # Renderer vibe sheet (local development preview)
 pnpm dev:landing                 # Landing page dev server
+pnpm dev:docs                    # VitePress docs dev server on 127.0.0.1:4315
+pnpm docs:build                  # Build the docs site and generated raw docs
 ```
 
 For manual CLI testing, use the example projects in `packages/cli/examples/`. After building, cd into one and run `zap up`.
+
+## Documentation Site
+
+The docs website is a VitePress workspace package in `docs`. Keep editing the Markdown files in `docs/`; VitePress turns them into the website, and the raw docs generator publishes agent-friendly files from the same source.
+
+```bash
+pnpm dev:docs
+pnpm docs:build
+pnpm docs:preview
+```
+
+`pnpm build` runs the docs build through Turbo. The generated site lives in `docs/.vitepress/dist`, and the published raw files are available at `/llms.txt` and `/llms-full.txt` in the built site.
 
 ### E2E in Linux VM (macOS)
 

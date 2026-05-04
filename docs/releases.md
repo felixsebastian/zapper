@@ -65,7 +65,7 @@ Run commands in this order since:
 1. Build failures cause test failures and other downstream issues
 2. E2E tests verify the built CLI works end-to-end
 3. Unit tests verify individual components
-4. TypeScript is checked as part of build step
+4. TypeScript and the VitePress docs site are checked as part of the build step
 5. Lint fixes should be applied last to avoid introducing new issues
 
 Common issues and fixes:
@@ -152,7 +152,7 @@ zap task verify
 
 ### 6.1 Documentation contradiction/staleness check (required)
 
-Before pushing, verify docs still match current behavior, especially `zap.yaml` config docs.
+Before pushing, verify docs still match current behavior, especially `zap.yaml` config docs. The Markdown files in `docs/` are the docs source; VitePress builds the web docs from them and generates `/llms.txt` plus `/llms-full.txt` for raw agent access.
 
 Use quick grep checks:
 
@@ -165,6 +165,7 @@ Then do a manual contradiction pass:
 
 - If config semantics changed, confirm `docs/usage.md` examples and prose match current behavior.
 - Check CLI command names/options in docs against current CLI implementation.
+- Run `pnpm docs:build` if you changed documentation structure or need to verify the raw generated docs bundle directly.
 - Remove or correct stale statements and outdated examples.
 - Treat unresolved doc contradictions as release blockers.
 

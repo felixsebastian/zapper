@@ -1,0 +1,14 @@
+# Zapper documentation
+
+Raw documentation for agents and automation:
+
+- Full raw bundle: /llms-full.txt
+- index.md: /
+- usage.md: /usage
+- instances.md: /instances
+- resource-management.md: /resource-management
+- env-var-mgmt.md: /env-var-mgmt
+- development.md: /development
+- releases.md: /releases
+- orphaned-processes.md: /orphaned-processes
+- tech-debt.md: /tech-debt

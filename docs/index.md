@@ -1,6 +1,6 @@
-# Quick Start
+# Zapper
 
-Get your dev environment running in under 5 minutes.
+A lightweight dev environment runner for local multi-service projects.
 
 ## Install
 
@@ -9,8 +9,6 @@ npm install -g pm2 @mp-lb/zapper
 ```
 
 ## Create `zap.yaml`
-
-In your project root:
 
 ```yaml
 project: myapp
@@ -36,9 +34,9 @@ docker:
 ## Run
 
 ```bash
-zap up        # start everything
-zap status    # check what's running
-zap down      # stop everything
+zap up
+zap status
+zap down
 ```
 
-That's it. For the full reference, see [usage.md](./usage.md).
+See the [full reference](usage.md) for every `zap.yaml` field and command.

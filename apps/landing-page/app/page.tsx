@@ -286,7 +286,7 @@ export default function Home() {
                 and your shell history.
               </p>
             </div>
-            <div className="grid overflow-hidden rounded-lg border border-border bg-border md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid overflow-hidden rounded-lg border border-border bg-border md:grid-cols-2 lg:grid-cols-4">
               {features.map((feature) => (
                 <div key={feature.title} className="bg-card p-6">
                   <div className="mb-3 font-mono-tight text-xs text-accent">

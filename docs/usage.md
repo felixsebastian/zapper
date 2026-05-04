@@ -560,7 +560,7 @@ state.
 
 **Interpolation works with assigned ports:**
 
-```env
+```txt
 # .env
 FRONTEND_PORT=3000
 FRONTEND_URL=http://localhost:${FRONTEND_PORT}
@@ -728,7 +728,7 @@ zap task deploy                  # Error: Required parameter 'env' not provided
 
 #### Pass-through arguments (REST)
 
-Use `{{REST}}` to forward extra CLI arguments:
+Use <code v-pre>{{REST}}</code> to forward extra CLI arguments:
 
 ```yaml
 tasks:
@@ -747,7 +747,7 @@ zap task test -- --coverage src/
 
 #### Custom delimiters
 
-If your commands contain `{{` and `}}`, use custom delimiters:
+If your commands contain <code v-pre>{{</code> and <code v-pre>}}</code>, use custom delimiters:
 
 ```yaml
 project: myapp

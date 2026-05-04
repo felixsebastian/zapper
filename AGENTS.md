@@ -12,6 +12,8 @@ A lightweight dev environment runner. Define your local dev setup in a single `z
 
 * **[Development](docs/development.md)** — To see how we run/test/build the app
 
+* **[Docs site](docs/index.md)** — VitePress entrypoint; raw agent docs are generated as `/llms.txt` and `/llms-full.txt`
+
 ## Documentation Freshness (Required)
 
 * Any behavior change must include doc updates in the same PR.
