@@ -7,6 +7,7 @@ export default defineConfig({
   lastUpdated: true,
   themeConfig: {
     nav: [
+      { text: "Home", link: "https://zapper.mp-lb.dev" },
       { text: "Quick Start", link: "/" },
       { text: "Reference", link: "/usage" },
       { text: "Development", link: "/development" },
