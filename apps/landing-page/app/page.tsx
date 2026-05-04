@@ -6,7 +6,7 @@ import Link from "next/link";
 const navLinks = [
   {
     label: "Docs",
-    href: "https://github.com/felixsebastian/zapper/blob/main/docs/usage.md",
+    href: "https://docs.zapper.mp-lb.dev",
   },
   { label: "GitHub", href: "https://github.com/felixsebastian/zapper" },
   {
@@ -116,7 +116,7 @@ export default function Home() {
                   className="h-10 font-mono-tight"
                 >
                   <a
-                    href="https://github.com/felixsebastian/zapper/blob/main/docs/usage.md"
+                    href="https://docs.zapper.mp-lb.dev"
                     target="_blank"
                     rel="noreferrer"
                   >

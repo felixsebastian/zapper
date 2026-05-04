@@ -16,6 +16,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Zapper",
   description: "Zapper - Simple local dev",
+  icons: {
+    icon: [
+      {
+        url: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8dGV4dCB5PSI3NSIgZm9udC1zaXplPSI4MCI+4pqh77iPPC90ZXh0Pgo8L3N2Zz4=",
+        type: "image/svg+xml",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({

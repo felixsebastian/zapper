@@ -20,5 +20,5 @@ pnpm --filter @mp-lb/zapper-landing-page build
 Deployment is managed from the main repo:
 
 - Terraform resources live in `infra`.
-- GitHub Actions workflow: `.github/workflows/deploy-landing-page.yml`.
-- The workflow provisions the Vercel project/domain, builds this app, and deploys it with the Vercel CLI.
+- GitHub Actions workflow: `.github/workflows/deploy-web.yml`.
+- The workflow provisions the Vercel projects/domains for the landing page and docs site, builds both, and deploys them with the Vercel CLI.

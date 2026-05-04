@@ -1846,11 +1846,11 @@ Notes:
 - Keep a failed run VM for debugging: `ZAP_E2E_KEEP_VM=1 pnpm test:e2e`.
 - By default, `pnpm test:e2e` is strict and fails if VM setup is missing.
 
-## Landing Page Deployment
+## Web Deployment
 
-The landing page lives in `apps/landing-page` and is deployed by `.github/workflows/deploy-landing-page.yml`.
+The landing page lives in `apps/landing-page`, and the docs site lives in `docs`. Both are deployed by `.github/workflows/deploy-web.yml`.
 
-Deployment resources are managed through Terraform in `infra`:
+Deployment resources are managed through Terraform in `infra`. Terraform creates separate Vercel projects for the landing page and docs site, plus Cloudflare DNS records for `zapper.mp-lb.dev` and `docs.zapper.mp-lb.dev` by default.
 
 ```bash
 cd infra
@@ -1862,7 +1862,7 @@ terraform apply \
   -var="cloudflare_zone_id=$CLOUDFLARE_ZONE_ID"
 ```
 
-The workflow provisions the Vercel project/domain through Terraform, builds `@mp-lb/zapper-landing-page`, and deploys `apps/landing-page` with the Vercel CLI.
+The workflow provisions the Vercel projects/domains through Terraform, builds `@mp-lb/zapper-landing-page` and `@mp-lb/zapper-docs`, then deploys both projects with the Vercel CLI.
 
 ## Release CI Auth
 
