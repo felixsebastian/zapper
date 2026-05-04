@@ -428,8 +428,6 @@ export default function Home() {
             built by{" "}
             <a
               href="https://www.mp-lb.dev"
-              target="_blank"
-              rel="noreferrer"
               className="text-foreground transition-colors hover:text-accent"
             >
               MAP Lab
