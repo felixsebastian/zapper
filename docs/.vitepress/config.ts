@@ -12,8 +12,11 @@ export default defineConfig({
     "tech-debt.md",
   ],
   themeConfig: {
+    logoLink: {
+      link: "https://zapper.mp-lb.dev",
+      target: "_self",
+    },
     nav: [
-      { text: "Home", link: "https://zapper.mp-lb.dev" },
       { text: "Quick Start", link: "/" },
       { text: "Reference", link: "/usage" },
       { text: "Raw", link: "/llms-full.txt" },
