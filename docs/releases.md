@@ -17,7 +17,8 @@ Zapper CLI is published to npm as `@mp-lb/zapper` from `packages/cli`. We use [C
 
 The native macOS menu bar app is built separately by `.github/workflows/macos-release.yml`.
 That workflow runs on `v*` tags or manual dispatch, builds `apps/macos`, zips
-`Zapper.app`, and uploads the zip to the matching GitHub Release.
+`Zapper.app`, and uploads both a versioned zip and stable `Zapper-macOS.zip`
+asset to the matching GitHub Release.
 
 ## Release Auth Prerequisite
 
@@ -252,9 +253,9 @@ gh run watch <run-id> --exit-status
 ```
 
 The workflow builds `apps/macos/build/Zapper.app`, packages
-`Zapper-v<version>-macOS.zip`, and creates or updates the GitHub Release for the
-tag. To rebuild an asset without pushing a new tag, run the workflow manually
-with `release_tag` set to the existing tag.
+`Zapper-v<version>-macOS.zip` and `Zapper-macOS.zip`, then creates or updates
+the GitHub Release for the tag. To rebuild an asset without pushing a new tag,
+run the workflow manually with `release_tag` set to the existing tag.
 
 ## Wait and Recheck After Push
 

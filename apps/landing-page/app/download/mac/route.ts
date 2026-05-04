@@ -40,16 +40,18 @@ function getGitHubHeaders(): Record<string, string> {
 
 function findMacAsset(assets: GitHubReleaseAsset[]): GitHubReleaseAsset | null {
   return (
+    assets.find((asset) => asset.name === "Zapper-macOS.zip") ??
     assets.find((asset) => {
       const name = asset.name.toLowerCase();
       return name.endsWith(".zip") && name.includes("macos");
-    }) ?? null
+    }) ??
+    null
   );
 }
 
 export async function GET() {
   const repo = getRepo();
-  const releasesUrl = `https://github.com/${repo}/releases`;
+  const stableDownloadUrl = `https://github.com/${repo}/releases/latest/download/Zapper-macOS.zip`;
   const response = await fetch(
     `https://api.github.com/repos/${repo}/releases/latest`,
     {
@@ -59,17 +61,17 @@ export async function GET() {
   );
 
   if (!response.ok) {
-    return NextResponse.redirect(releasesUrl, {
+    return NextResponse.redirect(stableDownloadUrl, {
       status: 302,
       headers: {
-        "Cache-Control": "no-store",
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",
       },
     });
   }
 
   const release = (await response.json()) as GitHubRelease;
   const asset = findMacAsset(release.assets);
-  const targetUrl = asset?.browser_download_url || release.html_url;
+  const targetUrl = asset?.browser_download_url || stableDownloadUrl;
 
   return NextResponse.redirect(targetUrl, {
     status: 302,

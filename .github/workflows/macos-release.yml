@@ -40,27 +40,33 @@ jobs:
           fi
 
           archive_name="Zapper-${tag}-macOS.zip"
+          stable_archive_name="Zapper-macOS.zip"
           ditto -c -k --keepParent apps/macos/build/Zapper.app "$archive_name"
+          cp "$archive_name" "$stable_archive_name"
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "archive_name=$archive_name" >> "$GITHUB_OUTPUT"
+          echo "stable_archive_name=$stable_archive_name" >> "$GITHUB_OUTPUT"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.package.outputs.archive_name }}
-          path: ${{ steps.package.outputs.archive_name }}
+          path: |
+            ${{ steps.package.outputs.archive_name }}
+            ${{ steps.package.outputs.stable_archive_name }}
 
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ steps.package.outputs.tag }}
           ARCHIVE_NAME: ${{ steps.package.outputs.archive_name }}
+          STABLE_ARCHIVE_NAME: ${{ steps.package.outputs.stable_archive_name }}
         run: |
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            gh release upload "$TAG_NAME" "$ARCHIVE_NAME" --clobber
+            gh release upload "$TAG_NAME" "$ARCHIVE_NAME" "$STABLE_ARCHIVE_NAME" --clobber
           else
-            gh release create "$TAG_NAME" "$ARCHIVE_NAME" \
+            gh release create "$TAG_NAME" "$ARCHIVE_NAME" "$STABLE_ARCHIVE_NAME" \
               --title "$TAG_NAME" \
               --generate-notes
           fi

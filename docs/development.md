@@ -90,7 +90,8 @@ running it.
 
 GitHub Actions builds release assets through `.github/workflows/macos-release.yml`.
 The workflow runs on `v*` tags or manual dispatch, zips `Zapper.app`, and
-attaches the archive to the matching GitHub Release.
+attaches both `Zapper-<tag>-macOS.zip` and the stable `Zapper-macOS.zip` asset
+to the matching GitHub Release.
 
 ## Documentation Site
 

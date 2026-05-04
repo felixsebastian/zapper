@@ -26,10 +26,12 @@ Deployment is managed from the main repo:
 ## Mac Download Route
 
 `/download/mac` redirects to the latest GitHub Release asset whose filename
-contains `macOS` and ends in `.zip`. Set `DESKTOP_RELEASES_GITHUB_TOKEN`,
+is `Zapper-macOS.zip`, falling back to any `macOS` zip asset. If GitHub API
+lookup fails, it redirects to GitHub's stable latest-release download URL for
+`Zapper-macOS.zip`. Set `DESKTOP_RELEASES_GITHUB_TOKEN`,
 `GITHUB_RELEASE_TOKEN`, or `GITHUB_TOKEN` in the hosting environment to raise
-GitHub API limits or access private releases. Set `ZAPPER_GITHUB_REPO` to
-override the default `mp-lb/zapper` repository.
+GitHub API limits. Set `ZAPPER_GITHUB_REPO` to override the default
+`mp-lb/zapper` repository.
 
 The production deployment can receive the token from the GitHub Actions secret
 `PRODUCTION_SECRETS`, formatted as an env file containing
