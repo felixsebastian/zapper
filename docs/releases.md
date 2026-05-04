@@ -13,7 +13,7 @@ Step-by-step runbook for cutting releases of Zapper CLI.
 
 ## Overview
 
-Zapper CLI is published to npm as `@mp-lb/zapper`. We use [Changesets](https://github.com/changesets/changesets) for versioning and automated publishing via GitHub Actions.
+Zapper CLI is published to npm as `@mp-lb/zapper` from `packages/cli`. We use [Changesets](https://github.com/changesets/changesets) for versioning and automated publishing via GitHub Actions.
 
 ## Release Auth Prerequisite
 
@@ -28,7 +28,7 @@ Important details:
 - The release workflow passes `secrets.NPM_TOKEN` to Changesets when that secret exists; if it is absent, Changesets can fall back to OIDC trusted publishing.
 - The release workflow logs the token length, a short SHA-256 token fingerprint, `npm whoami`, and package collaborator access before publishing. It does not print token characters.
 - npm trusted publishing currently requires Node `22.14.0+` and npm CLI `11.5.1+`.
-- For GitHub-based trusted publishing, npm also requires `package.json` `repository.url` to exactly match the GitHub repository URL.
+- For GitHub-based trusted publishing, npm also requires `packages/cli/package.json` `repository.url` to exactly match the GitHub repository URL.
 - Once trusted publishing is working, remove or revoke old write tokens when possible.
 
 ## 1. Create release branch
@@ -42,16 +42,16 @@ git checkout -b release/$(date +%Y-%m-%d)
 If this machine has not run VM E2E before, set it up first:
 
 ```bash
-bash ./etc/e2e_setup.sh
+bash ./packages/cli/etc/e2e_setup.sh
 ```
 
 Run verification tasks in this specific order:
 
 ```bash
-npm run build
-npm run test:e2e
-npm test
-npm run lint:fix
+pnpm build
+pnpm test:e2e
+pnpm test
+pnpm lint:fix
 ```
 
 **CRITICAL: ALL COMMANDS MUST RETURN EXIT CODE 0 (SUCCESS)**
@@ -72,7 +72,7 @@ Common issues and fixes:
 - **Build failures** (exit code ≠ 0): Usually TypeScript errors - fix the code
 - **E2E test failures** (exit code ≠ 0): CLI integration broken - fix the functionality
 - **Unit test failures** (exit code ≠ 0): Fix broken tests or update them if behavior changed
-- **Lint failures** (exit code ≠ 0): Run `npm run lint:fix` to auto-fix, then manually fix remaining issues
+- **Lint failures** (exit code ≠ 0): Run `pnpm lint:fix` to auto-fix, then manually fix remaining issues
 - **Warnings are fine**: Build warnings, lint warnings, etc. don't block if exit code is 0
 
 ## 3. Add verify task (recommended)
@@ -85,10 +85,10 @@ tasks:
   verify:
     desc: Run all verification checks for release
     cmds:
-      - npm run build
-      - npm run test:e2e
-      - npm test
-      - npm run lint:fix
+      - pnpm build
+      - pnpm test:e2e
+      - pnpm test
+      - pnpm lint:fix
 ```
 
 Then you can run:
@@ -128,7 +128,7 @@ Follow the prompts to select the version bump type and describe the changes:
 Apply the changeset to update package.json version:
 
 ```bash
-npm run version
+pnpm version
 # or: changeset version
 ```
 
@@ -136,7 +136,7 @@ Commit the version bumps:
 
 ```bash
 git add .
-git commit -m "Release: v$(node -p "require('./package.json').version")"
+git commit -m "Release: v$(node -p "require('./packages/cli/package.json').version")"
 ```
 
 ## 6. Final verification
@@ -145,7 +145,7 @@ Run the verification one more time to ensure version changes didn't break anythi
 
 ```bash
 zap task verify
-# or manually: npm run build && npm run test:e2e && npm test && npm run lint:fix
+# or manually: pnpm build && pnpm test:e2e && pnpm test && pnpm lint:fix
 ```
 
 **This MUST pass cleanly.** If it fails, fix the issues and repeat until clean.
@@ -157,7 +157,7 @@ Before pushing, verify docs still match current behavior, especially `zap.yaml` 
 Use quick grep checks:
 
 ```bash
-rg -n "project|env|env_files|git_method|task_delimiters|native|docker|tasks|homepage|notes|links" src/config/schemas.ts
+rg -n "project|env|env_files|git_method|task_delimiters|native|docker|tasks|homepage|notes|links" packages/cli/src/config/schemas.ts
 rg -n "project|env|env_files|git_method|task_delimiters|native|docker|tasks|homepage|notes|links" docs/usage.md
 ```
 
@@ -216,7 +216,7 @@ Check npm directly with npm CLI:
 npm view @mp-lb/zapper version
 ```
 
-Confirm this matches your just-released version from `package.json`.
+Confirm this matches your just-released version from `packages/cli/package.json`.
 
 Then test the published package:
 
@@ -269,8 +269,8 @@ Check npm to verify the new version was published: https://www.npmjs.com/package
 If the automated process fails, you can publish manually:
 
 ```bash
-npm run build       # Ensure latest build
-npm publish         # Publish to npm
+pnpm --filter @mp-lb/zapper build       # Ensure latest CLI build
+pnpm --filter @mp-lb/zapper publish     # Publish to npm
 ```
 
 **Note:** Only use this if GitHub Actions is broken. The automated process is preferred.
@@ -290,7 +290,7 @@ npm publish         # Publish to npm
 
 **If npm publish fails:**
 - Check if you're authenticated: `npm whoami`
-- Verify package.json has correct name and version
+- Verify `packages/cli/package.json` has correct name and version
 - Ensure no duplicate version exists on npm
 - Check if there are publishing restrictions
 - If CI shows `EOTP`, replace `NPM_TOKEN` with a granular write token that has **Bypass two-factor authentication** enabled, or finish migrating to npm trusted publishing for `.github/workflows/release.yml`
@@ -300,7 +300,7 @@ npm publish         # Publish to npm
   - GitHub org/user: `mp-lb`
   - Repository: `zapper`
   - Workflow filename: `release.yml`
-  - `package.json` `repository.url`: `git+https://github.com/mp-lb/zapper.git`
+  - `packages/cli/package.json` `repository.url`: `git+https://github.com/mp-lb/zapper.git`
 - If publish fails with `E404 Not Found - PUT https://registry.npmjs.org/@mp-lb%2fzapper`, verify the npm scope owner exists and the publishing identity has rights to it:
   - `mp-lb` must exist on npm as the owning user or organization
   - the account connected to the trusted publisher, or the fallback token's owner, must have publish access to the `@mp-lb` scope

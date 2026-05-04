@@ -20,7 +20,7 @@ A lightweight dev environment runner. Define your local dev setup in a single `z
 
 * If release/development workflow changes, update `docs/releases.md` and `docs/development.md`.
 
-* Treat `src/config/schemas.ts` as the source of truth for config keys.
+* Treat `packages/cli/src/config/schemas.ts` as the source of truth for config keys.
 
 * Before wrapping up, run a docs consistency pass:
 
@@ -35,7 +35,7 @@ A lightweight dev environment runner. Define your local dev setup in a single `z
 Create example projects for testing:
 
 ```
-./examples/myproj/zap.yaml
+./packages/cli/examples/myproj/zap.yaml
 ```
 
 Remember to `pnpm build` and link (usually already linked). Then cd into the example project and zap away.
@@ -44,11 +44,11 @@ Remember to `pnpm build` and link (usually already linked). Then cd into the exa
 
 ## Commands
 
-* `pnpm test` — run tests
+* `pnpm test` — run CLI unit tests
 
-* `pnpm build` — build the project
+* `pnpm build` — build all workspace projects
 
-* `pnpm lint:fix` — fix linting issues
+* `pnpm lint:fix` — fix linting issues across workspace projects
 
 ## Verification
 
@@ -56,15 +56,15 @@ Use this verification flow while developing:
 
 * Lint after every small change: `pnpm lint` (or `pnpm lint:fix` to auto-fix).
 
-* Run focused/unit tests as you go: `pnpm test <path-to-test-file>`.
+* Run focused/unit tests as you go: `pnpm --filter @mp-lb/zapper test <path-to-test-file>`.
 
 * Run the normal test suite before wrapping up: `pnpm test`.
 
 * Run end-to-end tests once near the end of a big change, when you think the work is done:
 
-  * `pnpm test:e2e` runs tests inside an isolated Linux VM via `etc/e2e_run.sh` (macOS + Lima).
+  * `pnpm test:e2e` runs tests inside an isolated Linux VM via `packages/cli/etc/e2e_run.sh` (macOS + Lima).
 
-  * One-time setup for that VM flow: `bash ./etc/e2e_setup.sh`.
+  * One-time setup for that VM flow: `bash ./packages/cli/etc/e2e_setup.sh`.
 
   * Then run: `pnpm test:e2e`.
 

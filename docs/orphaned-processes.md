@@ -8,7 +8,7 @@ Run these to check for problems:
 
 ```bash
 # 1. Count zombie zap status polling processes (should be 0 or very few)
-ps aux | grep "zapper/dist/index.js status --json" | grep -v grep | wc -l
+ps aux | grep "zapper/packages/cli/dist/index.js status --json" | grep -v grep | wc -l
 
 # 2. Check for orphaned processes from projects not in PM2
 pm2 jlist 2>/dev/null | python3 -c "
@@ -38,7 +38,7 @@ done
 
 ### Zombie `zap status --json` processes
 
-**Symptom**: Many `node .../zapper/dist/index.js status --json` processes accumulating.
+**Symptom**: Many `node .../zapper/packages/cli/dist/index.js status --json` processes accumulating.
 
 **Root cause**: The zapper VS Code extension (`zapper-vscode`) polls `zap status --json` every 2 seconds. If a poll takes longer than 2 seconds and overlapping polls aren't prevented, processes stack up. Can also happen if the extension crashes without cleaning up child processes.
 
@@ -56,7 +56,7 @@ done
 
 **Fix applied**: `Pm2Manager` now has `killProcessTree()` and `killManagedProcessTree()` methods that kill the entire process tree (using process group signals and `pgrep -P` traversal) before running `pm2 delete/stop`.
 
-**Key file**: `~/Code/zapper/src/core/process/Pm2Manager.ts`
+**Key file**: `~/Code/zapper/packages/cli/src/core/process/Pm2Manager.ts`
 
 ## Cleanup Commands
 
@@ -64,7 +64,7 @@ If orphaned processes are detected, clean them up:
 
 ```bash
 # Kill zombie status pollers
-pkill -f "zapper/dist/index.js status --json"
+pkill -f "zapper/packages/cli/dist/index.js status --json"
 
 # Kill orphaned processes for a specific project (e.g., orb0)
 pkill -f "orb0/.zap/"

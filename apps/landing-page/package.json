@@ -1,0 +1,38 @@
+{
+  "name": "@mp-lb/zapper-landing-page",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev": "WATCHPACK_POLLING=true next dev -p 15383",
+    "dev:turbopack": "WATCHPACK_POLLING=true next dev --turbopack -p 15383",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "lucide-react": "^0.539.0",
+    "next": "15.4.10",
+    "prism-react-renderer": "^2.4.1",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.33.0",
+    "@next/eslint-plugin-next": "15.4.10",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "globals": "^16.3.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

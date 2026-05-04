@@ -4,6 +4,7 @@ import tsparser from "@typescript-eslint/parser";
 import prettier from "eslint-plugin-prettier";
 import prettierConfig from "eslint-config-prettier";
 import globals from "globals";
+import nextPlugin from "@next/eslint-plugin-next";
 
 export default [
   js.configs.recommended,
@@ -16,21 +17,22 @@ export default [
         sourceType: "module",
       },
       globals: {
-        ...globals.node,
+        ...globals.browser,
       },
     },
     plugins: {
       "@typescript-eslint": tseslint,
+      "@next/next": nextPlugin,
       prettier: prettier,
     },
     rules: {
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs["core-web-vitals"].rules,
       ...tseslint.configs.recommended.rules,
       ...prettierConfig.rules,
       "prettier/prettier": "error",
       "@typescript-eslint/no-unused-vars": "error",
       "@typescript-eslint/no-explicit-any": "error",
-      // Disable core rule for TS (handled by TS compiler)
-      "no-undef": "off",
     },
   },
   {
@@ -39,7 +41,7 @@ export default [
       ecmaVersion: "latest",
       sourceType: "module",
       globals: {
-        ...globals.node,
+        ...globals.browser,
       },
     },
     plugins: {
@@ -51,6 +53,6 @@ export default [
     },
   },
   {
-    ignores: ["dist/", "node_modules/", "*.log"],
+    ignores: [".next/", "dist/", "node_modules/", "*.log"],
   },
-]; 
+];

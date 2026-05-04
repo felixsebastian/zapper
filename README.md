@@ -20,3 +20,9 @@ Infrastructure as code for your local development environment.
 
 - **[Usage](docs/usage.md)** — Installation, configuration, CLI reference
 - **[Development](docs/development.md)** — Contributing, testing, releases
+
+## Repository Layout
+
+- `packages/cli` — published CLI package (`@mp-lb/zapper`)
+- `apps/landing-page` — Next.js landing page
+- `infra` — Terraform-managed deployment resources for the landing page

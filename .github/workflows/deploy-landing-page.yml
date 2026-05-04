@@ -1,0 +1,95 @@
+name: Deploy Landing Page
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/landing-page/**"
+      - "infra/**"
+      - ".github/workflows/deploy-landing-page.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+  workflow_dispatch:
+
+env:
+  PROJECT_NAME: zapper
+
+jobs:
+  deploy-landing-page:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+
+      - name: Terraform Init
+        working-directory: infra
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.GCP_PROJECT_ID }}-terraform-state" \
+            -backend-config="prefix=terraform/state/${{ env.PROJECT_NAME }}"
+
+      - name: Terraform Apply
+        working-directory: infra
+        run: |
+          terraform apply -auto-approve \
+            -var="project_name=${{ env.PROJECT_NAME }}" \
+            -var="vercel_api_token=${{ secrets.VERCEL_API_TOKEN }}" \
+            -var="cloudflare_api_token=${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -var="cloudflare_zone_id=${{ secrets.CLOUDFLARE_ZONE_ID }}"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build landing page
+        run: pnpm --filter=@mp-lb/zapper-landing-page build
+
+      - name: Get Vercel IDs
+        id: vercel
+        working-directory: infra
+        env:
+          VERCEL_API_TOKEN: ${{ secrets.VERCEL_API_TOKEN }}
+          VERCEL_ORG_ID_SECRET: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          echo "project_id=$(terraform output -raw vercel_project_id)" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$VERCEL_ORG_ID_SECRET" ]; then
+            echo "org_id=$VERCEL_ORG_ID_SECRET" >> "$GITHUB_OUTPUT"
+          else
+            ORG_ID=$(curl -fsS -H "Authorization: Bearer $VERCEL_API_TOKEN" https://api.vercel.com/v2/user | jq -r '.user.id')
+            echo "org_id=$ORG_ID" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy landing page to Vercel
+        run: npx vercel deploy apps/landing-page --prod --yes --token=${{ secrets.VERCEL_API_TOKEN }}
+        env:
+          VERCEL_PROJECT_ID: ${{ steps.vercel.outputs.project_id }}
+          VERCEL_ORG_ID: ${{ steps.vercel.outputs.org_id }}
+
+      - name: Show outputs
+        working-directory: infra
+        run: terraform output

@@ -15,10 +15,10 @@ End-to-end tests for the Zapper CLI that run against real PM2 processes.
 
 ```bash
 # Run all e2e tests (builds CLI first)
-npm run test:e2e
+pnpm test:e2e
 
 # Run regular unit tests only
-npm test
+pnpm test
 ```
 
 ## Test Features
@@ -60,5 +60,5 @@ If tests fail:
 
 1. **Check PM2**: `pm2 list` to see if test processes are still running
 2. **Manual cleanup**: `pm2 delete all` to clear all processes
-3. **Build CLI**: Ensure `npm run build` completed successfully
+3. **Build CLI**: Ensure `pnpm build` completed successfully
 4. **PM2 installation**: Ensure PM2 is installed globally (`npm i -g pm2`)
