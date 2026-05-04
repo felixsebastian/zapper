@@ -1,0 +1,66 @@
+name: macOS App Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing or new GitHub Release tag, for example v0.15.1"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-release-asset:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build app
+        run: apps/macos/bin/build
+
+      - name: Package app
+        id: package
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.release_tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+
+          if [ -z "$tag" ]; then
+            echo "Release tag is required" >&2
+            exit 1
+          fi
+
+          archive_name="Zapper-${tag}-macOS.zip"
+          ditto -c -k --keepParent apps/macos/build/Zapper.app "$archive_name"
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "archive_name=$archive_name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.archive_name }}
+          path: ${{ steps.package.outputs.archive_name }}
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.package.outputs.tag }}
+          ARCHIVE_NAME: ${{ steps.package.outputs.archive_name }}
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" "$ARCHIVE_NAME" --clobber
+          else
+            gh release create "$TAG_NAME" "$ARCHIVE_NAME" \
+              --title "$TAG_NAME" \
+              --generate-notes
+          fi

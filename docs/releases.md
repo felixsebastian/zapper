@@ -15,6 +15,10 @@ Step-by-step runbook for cutting releases of Zapper CLI.
 
 Zapper CLI is published to npm as `@mp-lb/zapper` from `packages/cli`. We use [Changesets](https://github.com/changesets/changesets) for versioning and automated publishing via GitHub Actions.
 
+The native macOS menu bar app is built separately by `.github/workflows/macos-release.yml`.
+That workflow runs on `v*` tags or manual dispatch, builds `apps/macos`, zips
+`Zapper.app`, and uploads the zip to the matching GitHub Release.
+
 ## Release Auth Prerequisite
 
 Before attempting a release, make sure npm publishing auth is configured correctly for CI. As of March 25, 2026, npm recommends trusted publishing for GitHub Actions and requires one of these for non-interactive publishes:
@@ -228,6 +232,29 @@ zap --help
 ```
 
 Check npm to verify the new version was published: https://www.npmjs.com/package/@mp-lb/zapper
+
+## 11. Publish macOS app asset
+
+After the release version is final, push a matching `v*` tag to build and attach
+the macOS app to a GitHub Release:
+
+```bash
+version="$(node -p "require('./packages/cli/package.json').version")"
+git tag "v${version}"
+git push origin "v${version}"
+```
+
+Monitor the `macOS App Release` workflow:
+
+```bash
+gh run list --workflow macos-release.yml --limit 5
+gh run watch <run-id> --exit-status
+```
+
+The workflow builds `apps/macos/build/Zapper.app`, packages
+`Zapper-v<version>-macOS.zip`, and creates or updates the GitHub Release for the
+tag. To rebuild an asset without pushing a new tag, run the workflow manually
+with `release_tag` set to the existing tag.
 
 ## Wait and Recheck After Push
 

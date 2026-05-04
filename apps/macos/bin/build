@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_NAME="Zapper"
+APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BUILD_DIR="${APP_ROOT}/build"
+APP_DIR="${BUILD_DIR}/${APP_NAME}.app"
+CONTENTS_DIR="${APP_DIR}/Contents"
+MACOS_DIR="${CONTENTS_DIR}/MacOS"
+RESOURCES_DIR="${CONTENTS_DIR}/Resources"
+EXECUTABLE="${MACOS_DIR}/${APP_NAME}"
+ARCH="${ARCH:-$(uname -m)}"
+DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
+
+rm -rf "${APP_DIR}"
+mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
+
+cp "${APP_ROOT}/Resources/Info.plist" "${CONTENTS_DIR}/Info.plist"
+
+xcrun --sdk macosx swiftc \
+  -target "${ARCH}-apple-macos${DEPLOYMENT_TARGET}" \
+  -parse-as-library \
+  -O \
+  -framework SwiftUI \
+  -framework AppKit \
+  -framework Combine \
+  -o "${EXECUTABLE}" \
+  "${APP_ROOT}"/Sources/Zapper/*.swift
+
+codesign --force --sign - "${APP_DIR}" >/dev/null
+
+echo "Built ${APP_DIR}"

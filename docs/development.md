@@ -68,6 +68,30 @@ pnpm docs:build                  # Build the docs site and generated raw docs
 
 For manual CLI testing, use the example projects in `packages/cli/examples/`. After building, cd into one and run `zap up`.
 
+## macOS Menu Bar App
+
+The native macOS app lives in `apps/macos`. It is a lightweight SwiftUI
+dashboard hosted by an AppKit menu bar status item. It shells out to the
+installed `zap` CLI for reads and actions: `zap system projects --json`,
+`zap home --json`, and `zap up`/`zap down` for instances or individual services.
+It does not parse `.zap` state or `zap.yaml` directly.
+
+The first version does not require opening Xcode. Build and run it with:
+
+```bash
+apps/macos/bin/build
+apps/macos/bin/run
+apps/macos/bin/clean
+```
+
+The build script uses `swiftc` and writes `apps/macos/build/Zapper.app`. If the
+app cannot find the CLI, set `ZAPPER_CLI_PATH` to the `zap` executable before
+running it.
+
+GitHub Actions builds release assets through `.github/workflows/macos-release.yml`.
+The workflow runs on `v*` tags or manual dispatch, zips `Zapper.app`, and
+attaches the archive to the matching GitHub Release.
+
 ## Documentation Site
 
 The docs website is a VitePress workspace package in `docs`. Keep editing the Markdown files in `docs/`; VitePress turns them into the website, and the raw docs generator publishes agent-friendly files from the same source.
