@@ -60,7 +60,7 @@ variable "cloudflare_api_token" {
 }
 
 variable "cloudflare_zone_id" {
-  description = "Cloudflare zone ID for the domain"
+  description = "Legacy Cloudflare zone ID input. DNS records now resolve the active zone from var.domain."
   type        = string
   default     = ""
 }

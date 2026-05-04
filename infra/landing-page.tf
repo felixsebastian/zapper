@@ -1,5 +1,6 @@
 locals {
-  landing_page_domain = var.landing_page_domain != "" ? var.landing_page_domain : "${var.project_name}.${var.domain}"
+  landing_page_domain                 = var.landing_page_domain != "" ? var.landing_page_domain : "${var.project_name}.${var.domain}"
+  landing_page_cloudflare_record_name = trimsuffix(local.landing_page_domain, ".${var.domain}")
 }
 
 resource "vercel_project" "landing_page" {
