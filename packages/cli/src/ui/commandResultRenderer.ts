@@ -1,5 +1,10 @@
 import { CommandResult } from "../commands/CommandResult";
 import { renderer } from "./renderer";
+import type {
+  SystemProjectStatus,
+  SystemResourceAuditEntry,
+  SystemRegistryProject,
+} from "../system";
 
 export interface RenderCommandResultOptions {
   json: boolean;
@@ -100,6 +105,21 @@ function toJsonPayload(result: CommandResult): unknown {
         allProjects: result.allProjects,
         projects: result.projects,
       };
+    case "system.projects":
+      return { projects: result.projects };
+    case "system.registry.prune":
+      return { removed: result.removed };
+    case "system.registry.forget":
+      return { removed: result.removed };
+    case "system.registry.repair":
+      return { removed: result.removed, projects: result.projects };
+    case "system.resources.audit":
+      return result.audit;
+    case "system.resources.cleanup":
+      return {
+        status: result.status,
+        resources: result.cleanup.resources,
+      };
     case "init":
       return {
         isolated: result.isolated,
@@ -122,6 +142,45 @@ function toJsonPayload(result: CommandResult): unknown {
         volumes: result.volumes,
       };
   }
+}
+
+function renderSystemProjects(projects: SystemProjectStatus[]): string {
+  if (projects.length === 0) return "No system projects registered.";
+  return projects
+    .map((project) => {
+      const serviceCount = project.instances.reduce(
+        (sum, instance) => sum + (instance.list?.services.length || 0),
+        0,
+      );
+      const lines = [
+        `${project.project}  ${project.state}`,
+        `  root: ${project.projectRoot}`,
+        `  config: ${project.configPath}`,
+        `  last seen: ${project.lastSeenAt}`,
+        `  instances: ${project.instances.length}`,
+        `  services: ${serviceCount}`,
+      ];
+      if (project.error) lines.push(`  error: ${project.error}`);
+      return lines.join("\n");
+    })
+    .join("\n\n");
+}
+
+function renderRegistryProjects(projects: SystemRegistryProject[]): string {
+  if (projects.length === 0) return "No registry entries changed.";
+  return projects
+    .map((project) => `${project.project}  ${project.projectRoot}`)
+    .join("\n");
+}
+
+function renderAuditResources(resources: SystemResourceAuditEntry[]): string {
+  if (resources.length === 0) return "No orphaned system resources found.";
+  return resources
+    .map(
+      (resource) =>
+        `${resource.type}  ${resource.name}  ${resource.classification}\n  ${resource.reason}`,
+    )
+    .join("\n");
 }
 
 export function renderCommandResult(
@@ -310,6 +369,44 @@ export function renderCommandResult(
       }
       return;
     }
+    case "system.projects":
+      renderer.log.report(renderSystemProjects(result.projects));
+      return;
+    case "system.registry.prune":
+      renderer.log.report(
+        `Pruned ${result.removed.length} system registry entr${result.removed.length === 1 ? "y" : "ies"}.\n${renderRegistryProjects(result.removed)}`,
+      );
+      return;
+    case "system.registry.forget":
+      renderer.log.report(
+        result.removed
+          ? `Forgot system registry entry:\n${renderRegistryProjects([
+              result.removed,
+            ])}`
+          : "No matching system registry entry found.",
+      );
+      return;
+    case "system.registry.repair":
+      renderer.log.report(
+        [
+          `Repaired system registry. Pruned ${result.removed.length} stale entr${result.removed.length === 1 ? "y" : "ies"}.`,
+          "",
+          renderSystemProjects(result.projects),
+        ].join("\n"),
+      );
+      return;
+    case "system.resources.audit":
+      renderer.log.report(renderAuditResources(result.audit.resources));
+      return;
+    case "system.resources.cleanup":
+      if (result.status === "aborted") {
+        renderer.log.info(renderer.command.abortedText());
+        return;
+      }
+      renderer.log.report(
+        `Cleaned ${result.cleanup.resources.length} system resource${result.cleanup.resources.length === 1 ? "" : "s"}.\n${renderAuditResources(result.cleanup.resources)}`,
+      );
+      return;
     case "init":
       renderer.log.info(
         renderer.command.initInstanceText(

@@ -38,7 +38,8 @@ export type Command =
   | "notes"
   | "init"
   | "volume"
-  | "global";
+  | "global"
+  | "system";
 
 export interface CliOptions {
   command: Command;

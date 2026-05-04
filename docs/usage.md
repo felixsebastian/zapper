@@ -185,6 +185,34 @@ zap open                    # Alias for: zap launch
 zap o "API Docs"            # Short alias for: zap launch "API Docs"
 ```
 
+### System Registry
+
+System commands inspect machine-wide Zapper state rather than only the current
+repository. They are intended for desktop integrations, project discovery, and
+orphaned resource cleanup.
+
+```bash
+zap system projects                  # List registered Zapper projects
+zap system projects --json           # Output registered projects as JSON
+zap system registry prune            # Remove stale system registry entries
+zap system registry forget <target>  # Forget one registry entry by id or path
+zap system registry repair           # Prune stale entries and show projects
+zap system resources audit           # Show orphaned PM2/Docker resources
+zap system resources cleanup         # Delete audited orphaned resources
+zap system resources cleanup --include-volumes
+```
+
+On macOS, the system registry defaults to
+`~/Library/Application Support/Zapper/registry.json`. On Linux, it defaults to
+`$XDG_STATE_HOME/zapper/registry.json`, or `~/.local/state/zapper/registry.json`
+when `XDG_STATE_HOME` is unset. Set `ZAPPER_SYSTEM_STATE_HOME` to override the
+directory, or `ZAPPER_DISABLE_SYSTEM_REGISTRY=1` to disable registry writes.
+
+The system project list is registry-backed and uses normal per-project Zapper
+status/list behavior for service details. The resources audit scans PM2 and
+Docker directly so it can find orphaned resources left behind by renamed
+projects, removed services, moved checkouts, or deleted local state.
+
 ### Profiles
 
 ```bash
@@ -212,7 +240,7 @@ zap envset prod_dbs
 ### JSON Output
 
 Most non-streaming commands support `--json` and will print machine-readable JSON to stdout.
-Examples: `up`, `down`, `restart`, `clone`, `reset`, `kill`, `status`, `ls`, `task` (list/params), `profile`, `env`, `state`, `config`, `launch`, `links`, `home`, `notes`, `init`, and git subcommands.
+Examples: `up`, `down`, `restart`, `clone`, `reset`, `kill`, `status`, `ls`, `task` (list/params), `profile`, `env`, `state`, `config`, `launch`, `links`, `home`, `notes`, `init`, `system`, and git subcommands.
 
 Streaming commands keep stream output and are not JSON-encoded:
 

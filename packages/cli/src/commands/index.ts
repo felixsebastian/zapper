@@ -26,3 +26,4 @@ export { NotesCommand } from "./NotesCommand";
 export { InitCommand } from "./InitCommand";
 export { VolumeCommand } from "./VolumeCommand";
 export { GlobalCommand } from "./GlobalCommand";
+export { SystemCommand } from "./SystemCommand";

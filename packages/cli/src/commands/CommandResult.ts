@@ -1,6 +1,11 @@
 import { StoredVolume, ZapperState } from "../config/schemas";
 import { StatusResult } from "../core/getStatus";
 import { ServiceListResult } from "../core/getServiceList";
+import type {
+  SystemProjectStatus,
+  SystemResourceAuditResult,
+  SystemRegistryProject,
+} from "../system";
 import { Context, Task } from "../types/Context";
 
 export interface ProjectLinkResult {
@@ -147,6 +152,32 @@ export type CommandResult =
         pm2: string[];
         containers: string[];
       }>;
+    }
+  | {
+      kind: "system.projects";
+      projects: SystemProjectStatus[];
+    }
+  | {
+      kind: "system.registry.prune";
+      removed: SystemRegistryProject[];
+    }
+  | {
+      kind: "system.registry.forget";
+      removed: SystemRegistryProject | null;
+    }
+  | {
+      kind: "system.registry.repair";
+      removed: SystemRegistryProject[];
+      projects: SystemProjectStatus[];
+    }
+  | {
+      kind: "system.resources.audit";
+      audit: SystemResourceAuditResult;
+    }
+  | {
+      kind: "system.resources.cleanup";
+      status: "aborted" | "completed";
+      cleanup: SystemResourceAuditResult;
     }
   | {
       kind: "init";

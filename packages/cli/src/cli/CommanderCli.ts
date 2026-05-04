@@ -30,6 +30,7 @@ import {
   InitCommand,
   VolumeCommand,
   GlobalCommand,
+  SystemCommand,
   CommandContext,
   CommandHandler,
   TaskParams,
@@ -116,6 +117,7 @@ export class CommanderCli {
     this.commandHandlers.set("init", new InitCommand());
     this.commandHandlers.set("volume", new VolumeCommand());
     this.commandHandlers.set("global", new GlobalCommand());
+    this.commandHandlers.set("system", new SystemCommand());
   }
 
   private setupProgram(): void {
@@ -516,6 +518,21 @@ export class CommanderCli {
         const service = project ? ["kill", project] : ["kill"];
         await this.executeCommand("global", service, command);
       });
+
+    this.program
+      .command("system [area] [action] [target]")
+      .description(
+        "Machine-wide Zapper project registry and orphaned resource audit",
+      )
+      .option("--include-volumes", "Include generated Docker volumes")
+      .option("-y, --force", "Force cleanup operations")
+      .option("-j, --json", "Output command result as minified JSON")
+      .action(async (area, action, target, options, command) => {
+        const service = [area, action, target].filter(
+          (part): part is string => typeof part === "string" && part.length > 0,
+        );
+        await this.executeCommand("system", service, command);
+      });
   }
 
   private async executeCommand(
@@ -549,7 +566,8 @@ export class CommanderCli {
       (command === "kill" &&
         typeof service === "string" &&
         service.trim().length > 0) ||
-      command === "global";
+      command === "global" ||
+      command === "system";
 
     const zapper = new Zapper();
     if (!skipConfigLoad) {

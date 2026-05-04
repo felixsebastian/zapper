@@ -7,4 +7,5 @@ Raw documentation for agents and automation:
 - usage.md: /usage
 - instances.md: /instances
 - resource-management.md: /resource-management
+- global-registry.md: /global-registry
 - env-var-mgmt.md: /env-var-mgmt

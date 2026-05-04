@@ -38,6 +38,12 @@ import {
   initializeManagedVolumes,
   loadVolumesForInstance,
 } from "../config/volumeManager";
+import {
+  getProjectRootHash,
+  getSystemRegistryId,
+  touchSystemProject,
+} from "../system/SystemRegistry";
+import packageJson from "../../package.json";
 
 export interface ProjectKillTargets {
   projectName: string;
@@ -62,7 +68,8 @@ export class Zapper {
           : "No zap.yaml config file found in current directory or parent directories",
       );
     }
-    const projectRoot = path.dirname(path.resolve(resolvedPath));
+    const absoluteConfigPath = path.resolve(resolvedPath);
+    const projectRoot = path.dirname(absoluteConfigPath);
     const config = parseYamlFile(resolvedPath);
 
     // Apply CLI overrides to config
@@ -70,6 +77,7 @@ export class Zapper {
 
     // Create context from config
     this.context = createContext(configWithOverrides, projectRoot);
+    this.context.configPath = absoluteConfigPath;
 
     const rawInstanceOpt = cliOptions?.instance;
     const selectedInstanceKey =
@@ -128,6 +136,19 @@ export class Zapper {
 
     // Resolve environment variables with proper path resolution
     this.context = EnvResolver.resolveContext(this.context);
+    this.context.configPath = absoluteConfigPath;
+
+    if (!cliOptions?.__skipSystemRegistryTouch) {
+      touchSystemProject({
+        context: this.context,
+        configPath: absoluteConfigPath,
+        command:
+          typeof cliOptions?.__command === "string"
+            ? cliOptions.__command
+            : undefined,
+        zapperVersion: packageJson.version,
+      });
+    }
   }
 
   private applyCliOverrides(
@@ -206,12 +227,25 @@ export class Zapper {
   // TODO: Remove this once all components are updated to use Context
   private createLegacyConfig(): ZapperConfig {
     if (!this.context) throw new ContextNotLoadedError();
+    const registryId = this.context.configPath
+      ? getSystemRegistryId(this.context.projectRoot, this.context.configPath)
+      : undefined;
+    const projectRootHash = getProjectRootHash(this.context.projectRoot);
 
     // Convert processes to native format
     const native: Record<string, any> = {};
     for (const process of this.context.processes) {
       native[process.name] = {
         ...process,
+        resolvedEnv: {
+          ...(process.resolvedEnv || {}),
+          ZAPPER_PROJECT: this.context.projectName,
+          ZAPPER_SERVICE: process.name,
+          ZAPPER_INSTANCE_ID: this.context.instanceId || "",
+          ZAPPER_INSTANCE_KEY: this.context.instanceKey,
+          ...(registryId ? { ZAPPER_REGISTRY_ID: registryId } : {}),
+          ZAPPER_PROJECT_ROOT_HASH: projectRootHash,
+        },
         name: process.name, // Keep the name field for compatibility
       };
     }
@@ -243,7 +277,8 @@ export class Zapper {
       tasks,
       instanceId: this.context.instanceId,
       instanceKey: this.context.instanceKey,
-    } as ZapperConfig & { instanceId?: string | null };
+      configPath: this.context.configPath,
+    } as ZapperConfig & { instanceId?: string | null; configPath?: string };
   }
 
   async startProcesses(processNames?: string[]): Promise<void> {

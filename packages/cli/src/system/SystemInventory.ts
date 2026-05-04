@@ -1,0 +1,313 @@
+import fs from "fs";
+import { Zapper } from "../core/Zapper";
+import { getServiceList, ServiceListResult } from "../core/getServiceList";
+import { DockerManager } from "../core/docker/DockerManager";
+import { Pm2Manager } from "../core/process/Pm2Manager";
+import { parseServiceName } from "../utils/nameBuilder";
+import { loadSystemRegistry, SystemRegistryProject } from "./SystemRegistry";
+
+export type SystemProjectState = "active" | "inactive" | "stale" | "unresolved";
+
+export interface SystemProjectInstanceStatus {
+  instanceKey: string;
+  instanceId: string;
+  list?: ServiceListResult;
+  error?: string;
+}
+
+export interface SystemProjectStatus {
+  registryId: string;
+  project: string;
+  projectRoot: string;
+  configPath: string;
+  state: SystemProjectState;
+  lastSeenAt: string;
+  lastCommand?: string;
+  instances: SystemProjectInstanceStatus[];
+  error?: string;
+}
+
+export type SystemResourceType = "pm2" | "container" | "volume";
+export type SystemResourceClassification =
+  | "dangling"
+  | "legacy"
+  | "live-unregistered"
+  | "ambiguous";
+
+export interface SystemResourceAuditEntry {
+  type: SystemResourceType;
+  name: string;
+  project?: string;
+  instanceId?: string;
+  service?: string;
+  classification: SystemResourceClassification;
+  reason: string;
+}
+
+export interface SystemResourceAuditResult {
+  resources: SystemResourceAuditEntry[];
+}
+
+function projectIsActive(instances: SystemProjectInstanceStatus[]): boolean {
+  return instances.some((instance) =>
+    instance.list?.services.some((service) => service.status !== "down"),
+  );
+}
+
+async function loadProjectInstance(
+  project: SystemRegistryProject,
+  instanceKey: string,
+): Promise<SystemProjectInstanceStatus> {
+  const instanceId = project.instances[instanceKey]?.id || "";
+  try {
+    const zapper = new Zapper();
+    await zapper.loadConfig(project.configPath, {
+      __command: "system",
+      __skipSystemRegistryTouch: true,
+      instance: instanceKey,
+    });
+    const context = zapper.getContext();
+    if (!context) throw new Error("Project context did not load");
+    return {
+      instanceKey: context.instanceKey,
+      instanceId: context.instanceId || instanceId,
+      list: await getServiceList(context),
+    };
+  } catch (error) {
+    return {
+      instanceKey,
+      instanceId,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function getSystemProjects(): Promise<SystemProjectStatus[]> {
+  const registry = loadSystemRegistry();
+  const results: SystemProjectStatus[] = [];
+
+  for (const project of Object.values(registry.projects).sort((a, b) =>
+    a.project.localeCompare(b.project),
+  )) {
+    if (
+      !fs.existsSync(project.projectRoot) ||
+      !fs.existsSync(project.configPath)
+    ) {
+      results.push({
+        registryId: project.registryId,
+        project: project.project,
+        projectRoot: project.projectRoot,
+        configPath: project.configPath,
+        state: "stale",
+        lastSeenAt: project.lastSeenAt,
+        lastCommand: project.lastCommand,
+        instances: [],
+        error: "Project root or config path no longer exists",
+      });
+      continue;
+    }
+
+    const instanceKeys = Object.keys(project.instances);
+    const instances = await Promise.all(
+      (instanceKeys.length > 0 ? instanceKeys : ["default"]).map((key) =>
+        loadProjectInstance(project, key),
+      ),
+    );
+    const unresolved = instances.every((instance) => instance.error);
+
+    results.push({
+      registryId: project.registryId,
+      project: project.project,
+      projectRoot: project.projectRoot,
+      configPath: project.configPath,
+      state: unresolved
+        ? "unresolved"
+        : projectIsActive(instances)
+          ? "active"
+          : "inactive",
+      lastSeenAt: project.lastSeenAt,
+      lastCommand: project.lastCommand,
+      instances,
+      error: unresolved ? "Project could not be loaded" : undefined,
+    });
+  }
+
+  return results;
+}
+
+function parseManagedVolumeName(
+  name: string,
+): { project: string; instanceId: string } | null {
+  const parts = name.split(".");
+  if (parts.length !== 4) return null;
+  if (parts[0] !== "zap" || !/^vol\d+$/.test(parts[3])) return null;
+  return { project: parts[1], instanceId: parts[2] };
+}
+
+function buildRegistryIndex(projects: SystemProjectStatus[]): {
+  projectNames: Set<string>;
+  instanceIds: Set<string>;
+  serviceKeys: Set<string>;
+} {
+  const projectNames = new Set<string>();
+  const instanceIds = new Set<string>();
+  const serviceKeys = new Set<string>();
+
+  for (const project of projects) {
+    projectNames.add(project.project);
+    for (const instance of project.instances) {
+      if (instance.instanceId) instanceIds.add(instance.instanceId);
+      for (const service of instance.list?.services || []) {
+        serviceKeys.add(
+          `${project.project}:${instance.instanceId}:${service.service}`,
+        );
+      }
+    }
+  }
+
+  return { projectNames, instanceIds, serviceKeys };
+}
+
+function classifyServiceResource(
+  type: "pm2" | "container",
+  name: string,
+  index: ReturnType<typeof buildRegistryIndex>,
+): SystemResourceAuditEntry | null {
+  const parsed = parseServiceName(name);
+  if (!parsed) return null;
+
+  if (!parsed.instanceId) {
+    return {
+      type,
+      name,
+      project: parsed.project,
+      service: parsed.service,
+      classification: "legacy",
+      reason: "Resource uses legacy name without an instance ID",
+    };
+  }
+
+  if (!index.projectNames.has(parsed.project)) {
+    return {
+      type,
+      name,
+      project: parsed.project,
+      instanceId: parsed.instanceId,
+      service: parsed.service,
+      classification: "live-unregistered",
+      reason: "No registered project matches this resource name",
+    };
+  }
+
+  if (!index.instanceIds.has(parsed.instanceId)) {
+    return {
+      type,
+      name,
+      project: parsed.project,
+      instanceId: parsed.instanceId,
+      service: parsed.service,
+      classification: "live-unregistered",
+      reason: "Project is registered, but this instance ID is unknown",
+    };
+  }
+
+  if (
+    !index.serviceKeys.has(
+      `${parsed.project}:${parsed.instanceId}:${parsed.service}`,
+    )
+  ) {
+    return {
+      type,
+      name,
+      project: parsed.project,
+      instanceId: parsed.instanceId,
+      service: parsed.service,
+      classification: "dangling",
+      reason: "Service is not in the current registered project config",
+    };
+  }
+
+  return null;
+}
+
+function classifyVolumeResource(
+  name: string,
+  index: ReturnType<typeof buildRegistryIndex>,
+): SystemResourceAuditEntry | null {
+  const parsed = parseManagedVolumeName(name);
+  if (!parsed) return null;
+
+  if (!index.projectNames.has(parsed.project)) {
+    return {
+      type: "volume",
+      name,
+      project: parsed.project,
+      instanceId: parsed.instanceId,
+      classification: "live-unregistered",
+      reason: "No registered project matches this generated volume",
+    };
+  }
+
+  if (!index.instanceIds.has(parsed.instanceId)) {
+    return {
+      type: "volume",
+      name,
+      project: parsed.project,
+      instanceId: parsed.instanceId,
+      classification: "dangling",
+      reason: "Generated volume belongs to an unknown instance ID",
+    };
+  }
+
+  return null;
+}
+
+export async function auditSystemResources(): Promise<SystemResourceAuditResult> {
+  const [projects, pm2Processes, dockerContainers, dockerVolumes] =
+    await Promise.all([
+      getSystemProjects(),
+      Pm2Manager.listProcesses(),
+      DockerManager.listContainers(),
+      DockerManager.listVolumes(),
+    ]);
+  const index = buildRegistryIndex(projects);
+  const resources: SystemResourceAuditEntry[] = [];
+
+  for (const process of pm2Processes) {
+    const entry = classifyServiceResource("pm2", process.name, index);
+    if (entry) resources.push(entry);
+  }
+  for (const container of dockerContainers) {
+    const entry = classifyServiceResource("container", container.name, index);
+    if (entry) resources.push(entry);
+  }
+  for (const volume of dockerVolumes) {
+    const entry = classifyVolumeResource(volume.name, index);
+    if (entry) resources.push(entry);
+  }
+
+  return {
+    resources: resources.sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
+
+export async function cleanupSystemResources(options: {
+  includeVolumes?: boolean;
+}): Promise<SystemResourceAuditResult> {
+  const audit = await auditSystemResources();
+  const resources = audit.resources.filter(
+    (resource) => options.includeVolumes || resource.type !== "volume",
+  );
+
+  for (const resource of resources) {
+    if (resource.type === "pm2") {
+      await Pm2Manager.deleteProcess(resource.name);
+    } else if (resource.type === "container") {
+      await DockerManager.removeContainer(resource.name);
+    } else if (resource.type === "volume") {
+      await DockerManager.removeVolume(resource.name);
+    }
+  }
+
+  return { resources };
+}

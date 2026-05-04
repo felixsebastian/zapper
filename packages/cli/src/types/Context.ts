@@ -27,6 +27,7 @@ export interface Task extends Omit<ConfigTask, "name"> {
 export interface Context {
   projectName: string; // Renamed from 'project' in config
   projectRoot: string; // Absolute path to directory containing zap.yaml
+  configPath?: string; // Absolute path to the loaded zap config file
   envFiles?: string[]; // Already resolved to absolute paths
   environments: string[]; // Available env file sets
   ports?: string[]; // Port names from config

@@ -8,6 +8,10 @@ import { findContainer } from "./findContainer";
 import { buildServiceName } from "../utils/nameBuilder";
 import { DEFAULT_INSTANCE_KEY } from "./instanceResolver";
 import { resolveContainerVolumes } from "../config/volumeManager";
+import {
+  getProjectRootHash,
+  getSystemRegistryId,
+} from "../system/SystemRegistry";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -92,8 +96,10 @@ async function executeAction(
     const runtimeConfig = config as ZapperConfig & {
       instanceId?: string;
       instanceKey?: string;
+      configPath?: string;
     };
     const instanceId = runtimeConfig.instanceId;
+    const instanceKey = runtimeConfig.instanceKey || DEFAULT_INSTANCE_KEY;
     const dockerName = buildServiceName(projectName, name, instanceId);
 
     if (action.type === "start") {
@@ -101,7 +107,7 @@ async function executeAction(
       const resolvedVolumes = resolveContainerVolumes({
         projectRoot: configDir || ".",
         projectName,
-        instanceKey: runtimeConfig.instanceKey || DEFAULT_INSTANCE_KEY,
+        instanceKey,
         instanceId: instanceId || DEFAULT_INSTANCE_KEY,
         serviceName: name,
         volumes: c.volumes,
@@ -118,7 +124,18 @@ async function executeAction(
         "com.docker.compose.service": name,
         "com.zapper.project": projectName,
         "com.zapper.service": name,
+        "com.zapper.instance-id": instanceId || "",
+        "com.zapper.instance-key": instanceKey,
       } as Record<string, string>;
+      if (runtimeConfig.configPath) {
+        labels["com.zapper.registry-id"] = getSystemRegistryId(
+          configDir || ".",
+          runtimeConfig.configPath,
+        );
+        labels["com.zapper.project-root-hash"] = getProjectRootHash(
+          configDir || ".",
+        );
+      }
 
       await DockerManager.startContainerAsync(
         dockerName,

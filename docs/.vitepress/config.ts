@@ -29,6 +29,7 @@ export default defineConfig({
           { text: "Reference", link: "/usage" },
           { text: "Instances", link: "/instances" },
           { text: "Resource Management", link: "/resource-management" },
+          { text: "Global Registry Design", link: "/global-registry" },
           { text: "Environment Variables", link: "/env-var-mgmt" },
         ],
       },

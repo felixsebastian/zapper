@@ -5,6 +5,9 @@ Zapper names the resources it creates so they can be discovered later:
 - PM2 processes and Docker containers: `zap.<project>.<instanceId>.<service>`
 - Generated Docker volumes: `zap.<project>.<instanceId>.volN`
 
+For the proposed machine-wide project registry and dashboard model, see
+[Global Registry Design](global-registry.md).
+
 `zap ls` shows configured services and assigned ports by default. Use `zap ls --extended` (or
 `zap ls --all`) for the local inventory view: configured services first, then
 recognized instances from the local `.zap/state.json` and resources that look

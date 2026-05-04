@@ -239,6 +239,8 @@ describe("executeActions", () => {
             "com.docker.compose.service": "database",
             "com.zapper.project": "test-project",
             "com.zapper.service": "database",
+            "com.zapper.instance-id": "",
+            "com.zapper.instance-key": "default",
           },
         },
         {
@@ -284,6 +286,8 @@ describe("executeActions", () => {
             "com.docker.compose.service": "redis",
             "com.zapper.project": "test-project",
             "com.zapper.service": "redis",
+            "com.zapper.instance-id": "",
+            "com.zapper.instance-key": "default",
           },
         },
         {
