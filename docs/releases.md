@@ -20,21 +20,23 @@ That workflow runs on `v*` tags or manual dispatch, builds `apps/macos`, zips
 `Zapper.app`, and uploads both a versioned zip and stable `Zapper-macOS.zip`
 asset to the matching GitHub Release.
 
-macOS release builds require these GitHub Actions secrets:
+macOS release builds use the same desktop signing environment names as the
+Electron apps in nearby MAP Lab repos. CI loads `.env.production` first, then
+loads `PRODUCTION_SECRETS` from GitHub Actions.
 
-- `MACOS_CERTIFICATE_P12_BASE64`: base64-encoded Developer ID Application `.p12`
-  certificate.
-- `MACOS_CERTIFICATE_PASSWORD`: password for the `.p12`.
-- `MACOS_CODESIGN_IDENTITY`: full signing identity name, for example
-  `Developer ID Application: Example, Inc. (TEAMID)`.
-- `MACOS_KEYCHAIN_PASSWORD`: optional temporary CI keychain password.
-
-Set these three additional secrets together to notarize and staple the app
-before packaging:
+Put non-secret desktop release values in `.env.production`:
 
 - `APPLE_ID`
 - `APPLE_TEAM_ID`
+- `CSC_LINK`: base64-encoded Developer ID Application `.p12`, a supported
+  `data:...;base64,...` value, an HTTPS URL, or a local file path.
+
+Put secret desktop release values in the GitHub Actions `PRODUCTION_SECRETS`
+env-file secret:
+
+- `CSC_KEY_PASSWORD`
 - `APPLE_APP_SPECIFIC_PASSWORD`
+- `DESKTOP_RELEASES_GITHUB_TOKEN`
 
 ## Release Auth Prerequisite
 
@@ -273,9 +275,11 @@ The workflow builds `apps/macos/build/Zapper.app`, packages
 the GitHub Release for the tag. To rebuild an asset without pushing a new tag,
 run the workflow manually with `release_tag` set to the existing tag.
 
-The macOS release workflow fails if the required signing certificate secrets are
-missing. Notarization is skipped only when all Apple notarization secrets are
-absent; if any one notarization secret is set, all three must be present.
+The macOS release workflow fails if any required signing or notarization value
+is missing. It imports `CSC_LINK` into a temporary keychain, auto-detects the
+Developer ID Application signing identity, signs with the hardened runtime,
+submits to Apple notarization, staples the app, and then uploads the release
+zips.
 
 ## Wait and Recheck After Push
 

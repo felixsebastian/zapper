@@ -94,8 +94,10 @@ attaches both `Zapper-<tag>-macOS.zip` and the stable `Zapper-macOS.zip` asset
 to the matching GitHub Release.
 
 Local app builds are ad-hoc signed unless `CODESIGN_IDENTITY` is set. Release
-builds require a Developer ID certificate imported from GitHub Actions secrets
-and are signed with the hardened runtime option before packaging.
+builds load `CSC_LINK`, `APPLE_ID`, and `APPLE_TEAM_ID` from `.env.production`,
+load `CSC_KEY_PASSWORD` and `APPLE_APP_SPECIFIC_PASSWORD` from the
+`PRODUCTION_SECRETS` GitHub Actions env-file secret, and then sign with the
+hardened runtime before notarizing and packaging.
 
 ## Documentation Site
 
