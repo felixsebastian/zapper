@@ -37,6 +37,10 @@ CODESIGN_OPTIONS=runtime \
 apps/macos/bin/build
 ```
 
+The build signs the app and nested runtime binaries with
+`apps/macos/Signing/Zapper.entitlements`. Those entitlements are required for
+the bundled Node/V8 runtime under Apple's hardened runtime.
+
 ## Run
 
 ```bash

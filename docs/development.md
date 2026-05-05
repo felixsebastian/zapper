@@ -106,6 +106,9 @@ builds load `CSC_LINK`, `APPLE_ID`, and `APPLE_TEAM_ID` from `.env.production`,
 load `CSC_KEY_PASSWORD` and `APPLE_APP_SPECIFIC_PASSWORD` from the
 `PRODUCTION_SECRETS` GitHub Actions env-file secret, and then sign with the
 hardened runtime before notarizing and packaging.
+The build signs nested runtime binaries with
+`apps/macos/Signing/Zapper.entitlements` so the bundled Node/V8 runtime can run
+under the hardened runtime.
 
 ## Documentation Site
 

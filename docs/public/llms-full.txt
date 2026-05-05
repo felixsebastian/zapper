@@ -2447,6 +2447,11 @@ The important improvement is that a Finder-launched app no longer needs the
 user's `node` from `nvm`, `fnm`, `mise`, `asdf`, Volta, Homebrew, or another
 shell-only setup just to run Zapper itself.
 
+Because release builds use Apple's hardened runtime, nested runtime binaries are
+signed with `apps/macos/Signing/Zapper.entitlements`. Those entitlements allow
+the bundled Node/V8 runtime to allocate executable memory inside the notarized
+app bundle.
+
 ## Decision: Bundle Zapper's Runtime in the macOS App
 
 The desktop app should be self-contained for running Zapper itself.

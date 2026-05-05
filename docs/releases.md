@@ -282,6 +282,9 @@ is missing. It imports `CSC_LINK` into a temporary keychain, auto-detects the
 Developer ID Application signing identity, signs with the hardened runtime,
 submits to Apple notarization, staples the app, and then uploads the release
 zips.
+The app and nested runtime binaries are signed with
+`apps/macos/Signing/Zapper.entitlements`; Node/V8 requires those hardened
+runtime entitlements to run from the notarized app bundle.
 
 ## Wait and Recheck After Push
 
