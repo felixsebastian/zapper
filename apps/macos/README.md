@@ -38,4 +38,8 @@ apps/macos/bin/run
 ```
 
 If the app cannot find `zap`, set `ZAPPER_CLI_PATH` to the CLI executable before
-running it.
+running it, or use the terminal button in the app to choose the executable. The
+chosen path is stored in user defaults. The app also checks standard Homebrew,
+pnpm, npm, Bun, Volta, asdf, and mise paths, and runs `zap` with a merged shell
+`PATH` so script-based installs can still find `node` when the app is launched
+from Finder.

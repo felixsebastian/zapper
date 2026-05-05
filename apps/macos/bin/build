@@ -19,6 +19,7 @@ rm -rf "${APP_DIR}"
 mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
 
 cp "${APP_ROOT}/Resources/Info.plist" "${CONTENTS_DIR}/Info.plist"
+find "${APP_ROOT}/Resources" -mindepth 1 -maxdepth 1 ! -name Info.plist -exec cp -R {} "${RESOURCES_DIR}/" \;
 
 xcrun --sdk macosx swiftc \
   -target "${ARCH}-apple-macos${DEPLOYMENT_TARGET}" \

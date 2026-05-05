@@ -20,6 +20,8 @@ struct DashboardView: View {
         if let errorMessage = model.errorMessage, model.projects.isEmpty {
             ErrorView(message: errorMessage) {
                 Task { await model.refresh() }
+            } chooseZap: {
+                model.chooseZapCLI()
             }
         } else if model.projects.isEmpty {
             EmptyStateView(isRefreshing: model.isRefreshing)
@@ -55,6 +57,14 @@ private struct HeaderView: View {
             }
 
             Spacer()
+
+            Button {
+                model.chooseZapCLI()
+            } label: {
+                Image(systemName: "terminal")
+            }
+            .buttonStyle(.borderless)
+            .help("Choose zap CLI")
 
             Button {
                 Task { await model.refresh() }
@@ -94,6 +104,19 @@ private struct FooterView: View {
             }
 
             Spacer()
+
+            if let configuredZapPath = model.configuredZapPath {
+                Text("CLI \(URL(fileURLWithPath: configuredZapPath).lastPathComponent)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .help(configuredZapPath)
+
+                Button("Clear CLI") {
+                    model.clearZapCLIOverride()
+                }
+                .buttonStyle(.borderless)
+            }
 
             if let actionMessage = model.actionMessage {
                 Text(actionMessage)
@@ -297,6 +320,7 @@ private struct CountPill: View {
 private struct ErrorView: View {
     let message: String
     let retry: () -> Void
+    let chooseZap: () -> Void
 
     var body: some View {
         VStack(spacing: 10) {
@@ -308,7 +332,10 @@ private struct ErrorView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 24)
-            Button("Retry", action: retry)
+            HStack(spacing: 10) {
+                Button("Choose zap", action: chooseZap)
+                Button("Retry", action: retry)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -10,6 +10,8 @@
   <string>Zapper</string>
   <key>CFBundleIdentifier</key>
   <string>dev.mp-lb.zapper.macos</string>
+  <key>CFBundleIconFile</key>
+  <string>Zapper</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>

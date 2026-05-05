@@ -84,9 +84,11 @@ apps/macos/bin/run
 apps/macos/bin/clean
 ```
 
-The build script uses `swiftc` and writes `apps/macos/build/Zapper.app`. If the
-app cannot find the CLI, set `ZAPPER_CLI_PATH` to the `zap` executable before
-running it.
+The build script uses `swiftc` and writes `apps/macos/build/Zapper.app`. The app
+looks for `zap` in `ZAPPER_CLI_PATH`, a saved in-app override, standard Homebrew
+and JavaScript package-manager paths, LaunchServices `PATH`, and the login
+shell `PATH`. If discovery still fails, use the terminal button in the app to
+choose the `zap` executable; the selected path is stored in user defaults.
 
 GitHub Actions builds release assets through `.github/workflows/macos-release.yml`.
 The workflow runs on `v*` tags or manual dispatch, zips `Zapper.app`, and

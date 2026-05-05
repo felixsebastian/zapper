@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import AppKit
 
 @MainActor
 final class DashboardModel: ObservableObject {
@@ -10,8 +11,13 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var actionMessage: String?
+    @Published private(set) var configuredZapPath: String?
 
     private let cli = ZapperCLI()
+
+    init() {
+        configuredZapPath = ZapperCLI.savedZapPath
+    }
 
     var counts: ServiceCounts {
         projects.reduce(.empty) { partial, project in
@@ -81,6 +87,40 @@ final class DashboardModel: ObservableObject {
 
     func stopService(_ service: ZapperService, instance: ZapperInstance, project: ZapperProject) async {
         await runAction(.down, project: project, instance: instance, service: service.service)
+    }
+
+    func chooseZapCLI() {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+
+        let panel = NSOpenPanel()
+        panel.title = "Choose zap CLI"
+        panel.message = "Choose the zap executable installed by pnpm, npm, or Homebrew."
+        panel.prompt = "Use zap"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.treatsFilePackagesAsDirectories = true
+
+        guard panel.runModal() == .OK, let path = panel.url?.path else {
+            return
+        }
+
+        do {
+            try ZapperCLI.saveZapPath(path)
+            configuredZapPath = path
+            actionMessage = "Using zap at \(path)"
+            errorMessage = nil
+            Task { await refresh() }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func clearZapCLIOverride() {
+        ZapperCLI.clearSavedZapPath()
+        configuredZapPath = nil
+        actionMessage = "Cleared zap CLI override"
+        Task { await refresh() }
     }
 
     private func runAction(
