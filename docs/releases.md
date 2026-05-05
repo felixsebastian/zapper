@@ -16,7 +16,8 @@ Step-by-step runbook for cutting releases of Zapper CLI.
 Zapper CLI is published to npm as `@mp-lb/zapper` from `packages/cli`. We use [Changesets](https://github.com/changesets/changesets) for versioning and automated publishing via GitHub Actions.
 
 The native macOS menu bar app is built separately by `.github/workflows/macos-release.yml`.
-That workflow runs on `v*` tags or manual dispatch, builds `apps/macos`, zips
+That workflow runs on `v*` tags or manual dispatch, installs Node and pnpm,
+builds the CLI, builds `apps/macos` with a bundled Node/CLI/PM2 runtime, zips
 `Zapper.app`, and uploads both a versioned zip and stable `Zapper-macOS.zip`
 asset to the matching GitHub Release.
 
@@ -270,10 +271,11 @@ gh run list --workflow macos-release.yml --limit 5
 gh run watch <run-id> --exit-status
 ```
 
-The workflow builds `apps/macos/build/Zapper.app`, packages
-`Zapper-v<version>-macOS.zip` and `Zapper-macOS.zip`, then creates or updates
-the GitHub Release for the tag. To rebuild an asset without pushing a new tag,
-run the workflow manually with `release_tag` set to the existing tag.
+The workflow builds the CLI, builds `apps/macos/build/Zapper.app` with a bundled
+Node/CLI/PM2 runtime, packages `Zapper-v<version>-macOS.zip` and
+`Zapper-macOS.zip`, then creates or updates the GitHub Release for the tag. To
+rebuild an asset without pushing a new tag, run the workflow manually with
+`release_tag` set to the existing tag.
 
 The macOS release workflow fails if any required signing or notarization value
 is missing. It imports `CSC_LINK` into a temporary keychain, auto-detects the

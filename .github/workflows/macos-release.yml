@@ -22,6 +22,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build CLI
+        run: pnpm --filter @mp-lb/zapper build
+
       - name: Load production and desktop signing secrets
         env:
           PRODUCTION_SECRETS: ${{ secrets.PRODUCTION_SECRETS }}

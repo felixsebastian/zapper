@@ -97,10 +97,6 @@ struct ZapperCLI {
 
     private static func resolveZapPath() throws -> String {
         let environment = ProcessInfo.processInfo.environment
-        if let savedPath = savedZapPath, isExecutable(savedPath) {
-            return savedPath
-        }
-
         if let explicitPath = environment["ZAPPER_CLI_PATH"], isExecutable(explicitPath) {
             return explicitPath
         }
@@ -108,6 +104,10 @@ struct ZapperCLI {
         if let bundledPath = Bundle.main.path(forResource: "zap", ofType: nil),
            isExecutable(bundledPath) {
             return bundledPath
+        }
+
+        if let savedPath = savedZapPath, isExecutable(savedPath) {
+            return savedPath
         }
 
         let commonPaths = [

@@ -72,7 +72,7 @@ For manual CLI testing, use the example projects in `packages/cli/examples/`. Af
 
 The native macOS app lives in `apps/macos`. It is a lightweight SwiftUI
 dashboard hosted by an AppKit menu bar status item. It shells out to the
-installed `zap` CLI for reads and actions: `zap system projects --json`,
+bundled `zap` CLI runtime for reads and actions: `zap system projects --json`,
 `zap home --json`, and `zap up`/`zap down` for instances or individual services.
 It does not parse `.zap` state or `zap.yaml` directly.
 
@@ -84,16 +84,22 @@ apps/macos/bin/run
 apps/macos/bin/clean
 ```
 
-The build script uses `swiftc` and writes `apps/macos/build/Zapper.app`. The app
-looks for `zap` in `ZAPPER_CLI_PATH`, a saved in-app override, standard Homebrew
-and JavaScript package-manager paths, LaunchServices `PATH`, and the login
-shell `PATH`. If discovery still fails, use the terminal button in the app to
-choose the `zap` executable; the selected path is stored in user defaults.
+The build script uses `swiftc` and writes `apps/macos/build/Zapper.app`. By
+default it also packages a local Node runtime, the built CLI, production CLI
+dependencies, and PM2 under `Contents/Resources/ZapperRuntime`. Run
+`pnpm --filter @mp-lb/zapper build` before `apps/macos/bin/build`. Set
+`PACKAGE_ZAPPER_RUNTIME=0` to skip runtime packaging for local Swift-only
+development.
+
+Release builds prefer the bundled `zap` wrapper so Finder-launched app sessions
+do not require a globally available `node`. `ZAPPER_CLI_PATH` and the in-app CLI
+picker remain available for development and diagnostics.
 
 GitHub Actions builds release assets through `.github/workflows/macos-release.yml`.
-The workflow runs on `v*` tags or manual dispatch, zips `Zapper.app`, and
-attaches both `Zapper-<tag>-macOS.zip` and the stable `Zapper-macOS.zip` asset
-to the matching GitHub Release.
+The workflow runs on `v*` tags or manual dispatch, installs Node and pnpm,
+builds the CLI, builds the signed app with the bundled runtime, zips
+`Zapper.app`, and attaches both `Zapper-<tag>-macOS.zip` and the stable
+`Zapper-macOS.zip` asset to the matching GitHub Release.
 
 Local app builds are ad-hoc signed unless `CODESIGN_IDENTITY` is set. Release
 builds load `CSC_LINK`, `APPLE_ID`, and `APPLE_TEAM_ID` from `.env.production`,

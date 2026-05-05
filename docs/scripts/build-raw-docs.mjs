@@ -12,6 +12,7 @@ const sourceOrder = [
   "global-registry.md",
   "project-roots.md",
   "env-var-mgmt.md",
+  "local-runtime.md",
 ];
 
 const entries = (

@@ -580,8 +580,11 @@ export class Pm2Manager {
 
   private static async runPm2CommandFollow(args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
-      renderer.log.debug(`Running: pm2 ${args.join(" ")}`);
-      const child = spawn("pm2", args, { stdio: ["pipe", "pipe", "pipe"] });
+      const pm2 = this.resolvePm2Command(args);
+      renderer.log.debug(`Running: ${pm2.label}`);
+      const child = spawn(pm2.command, pm2.args, {
+        stdio: ["pipe", "pipe", "pipe"],
+      });
 
       child.stdout.on("data", (data) => {
         const lines = data.toString().split("\n");
@@ -631,8 +634,9 @@ export class Pm2Manager {
 
   private static async runPm2CommandStream(args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
-      renderer.log.debug(`Running: pm2 ${args.join(" ")}`);
-      const child = spawn("pm2", args, {
+      const pm2 = this.resolvePm2Command(args);
+      renderer.log.debug(`Running: ${pm2.label}`);
+      const child = spawn(pm2.command, pm2.args, {
         stdio: ["pipe", "pipe", "pipe"],
       });
 
@@ -681,8 +685,9 @@ export class Pm2Manager {
     retryCount = 0,
   ): Promise<string> {
     return new Promise((resolve, reject) => {
-      renderer.log.debug(`Running: pm2 ${args.join(" ")}`);
-      const child = spawn("pm2", args, {
+      const pm2 = this.resolvePm2Command(args);
+      renderer.log.debug(`Running: ${pm2.label}`);
+      const child = spawn(pm2.command, pm2.args, {
         stdio: ["pipe", "pipe", "pipe"],
       });
 
@@ -744,6 +749,30 @@ export class Pm2Manager {
         reject(new Error(`Failed to run PM2 command: ${err.message}`));
       });
     });
+  }
+
+  private static resolvePm2Command(args: string[]): {
+    command: string;
+    args: string[];
+    label: string;
+  } {
+    const env = globalThis.process?.env || {};
+    const bundledNode = env.ZAPPER_NODE;
+    const bundledPm2 = env.ZAPPER_PM2_JS;
+
+    if (bundledNode && bundledPm2) {
+      return {
+        command: bundledNode,
+        args: [bundledPm2, ...args],
+        label: `${bundledNode} ${bundledPm2} ${args.join(" ")}`,
+      };
+    }
+
+    return {
+      command: "pm2",
+      args,
+      label: `pm2 ${args.join(" ")}`,
+    };
   }
 
   private static createWrapperScript(

@@ -2,7 +2,7 @@
 
 Native macOS menu bar app for the local Zapper system view.
 
-The app shells out to the installed `zap` CLI and reads `zap system projects --json`.
+The app uses a bundled Zapper CLI runtime and reads `zap system projects --json`.
 It does not read `.zap` state or `zap.yaml` files directly.
 
 The dashboard can start and stop whole instances or individual services. Project
@@ -22,6 +22,12 @@ apps/macos/build/Zapper.app
 
 No Xcode project is required for this first version.
 
+By default the build also packages a local Node runtime, the built CLI from
+`packages/cli/dist`, production CLI dependencies, and PM2 into
+`Contents/Resources/ZapperRuntime`. Run `pnpm --filter @mp-lb/zapper build`
+before building the app. Set `PACKAGE_ZAPPER_RUNTIME=0` to skip runtime
+packaging for a development-only build.
+
 Local builds use ad-hoc signing by default. To sign with a Developer ID
 certificate already installed in your keychain, pass its identity explicitly:
 
@@ -37,9 +43,7 @@ apps/macos/bin/build
 apps/macos/bin/run
 ```
 
-If the app cannot find `zap`, set `ZAPPER_CLI_PATH` to the CLI executable before
-running it, or use the terminal button in the app to choose the executable. The
-chosen path is stored in user defaults. The app also checks standard Homebrew,
-pnpm, npm, Bun, Volta, asdf, and mise paths, and runs `zap` with a merged shell
-`PATH` so script-based installs can still find `node` when the app is launched
-from Finder.
+Release builds prefer the bundled `zap` wrapper, which runs the bundled CLI with
+the bundled Node runtime. If you need to test against an external CLI, set
+`ZAPPER_CLI_PATH` before running the app, or use the terminal button in the app
+to choose an executable.

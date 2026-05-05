@@ -31,6 +31,7 @@ export default defineConfig({
           { text: "Resource Management", link: "/resource-management" },
           { text: "Global Registry Design", link: "/global-registry" },
           { text: "Environment Variables", link: "/env-var-mgmt" },
+          { text: "Local Runtime", link: "/local-runtime" },
         ],
       },
     ],

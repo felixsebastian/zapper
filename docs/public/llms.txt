@@ -10,3 +10,4 @@ Raw documentation for agents and automation:
 - global-registry.md: /global-registry
 - project-roots.md: /project-roots
 - env-var-mgmt.md: /env-var-mgmt
+- local-runtime.md: /local-runtime
