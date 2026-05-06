@@ -2,6 +2,7 @@ import { InstallSnippet } from "@/components/landing/InstallSnippet";
 import { Out, Prompt, Terminal } from "@/components/landing/Terminal";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 const navLinks = [
@@ -10,10 +11,7 @@ const navLinks = [
     href: "https://docs.zapper.mp-lb.dev",
   },
   { label: "GitHub", href: "https://github.com/felixsebastian/zapper" },
-  {
-    label: "VS Code",
-    href: "https://marketplace.visualstudio.com/items?itemName=felixsebastian.zapper-vscode",
-  },
+  { label: "Mac app", href: "#macos" },
   { label: "Discord", href: "https://discord.gg/2zdyJMce" },
 ];
 
@@ -109,22 +107,12 @@ export default function Home() {
                 terminals, no port clashes. Native processes and Docker
                 containers, one yaml, one CLI.
               </p>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
+              <div className="mt-8 flex flex-wrap items-center gap-3 sm:flex-nowrap">
                 <InstallSnippet command="npm i -g pm2 @mp-lb/zapper" />
                 <Button
                   asChild
-                  variant="default"
-                  className="h-10 font-mono-tight"
-                >
-                  <a href="/download/mac">
-                    <Download aria-hidden="true" />
-                    Download for Mac
-                  </a>
-                </Button>
-                <Button
-                  asChild
                   variant="outline"
-                  className="h-10 font-mono-tight"
+                  className="h-10 shrink-0 font-mono-tight"
                 >
                   <a
                     href="https://docs.zapper.mp-lb.dev"
@@ -132,19 +120,6 @@ export default function Home() {
                     rel="noreferrer"
                   >
                     Read the docs →
-                  </a>
-                </Button>
-                <Button
-                  asChild
-                  variant="ghost"
-                  className="h-10 font-mono-tight"
-                >
-                  <a
-                    href="https://github.com/felixsebastian/zapper"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    GitHub
                   </a>
                 </Button>
               </div>
@@ -281,6 +256,48 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="border-b border-border bg-card" id="macos">
+          <div className="container grid items-center gap-12 py-20 lg:grid-cols-[minmax(0,0.85fr)_minmax(360px,0.7fr)]">
+            <div>
+              <p className="mb-3 font-mono-tight text-xs text-accent">
+                MAC MENU BAR
+              </p>
+              <h2 className="text-3xl font-semibold tracking-tight">
+                Keep every local stack within reach.
+              </h2>
+              <p className="mt-4 max-w-xl leading-relaxed text-muted-foreground">
+                The macOS app shows running projects from the menu bar, with
+                quick start, stop, and open actions for each stack. It uses the
+                same Zapper state as the CLI, so the desktop view and terminal
+                commands stay in sync.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <Button
+                  asChild
+                  variant="default"
+                  className="h-10 font-mono-tight"
+                >
+                  <a href="/download/mac">
+                    <Download aria-hidden="true" />
+                    Download for Mac
+                  </a>
+                </Button>
+              </div>
+            </div>
+            <div className="w-full max-w-[420px] overflow-hidden rounded-lg border border-border bg-background shadow-2xl lg:mx-auto">
+              <Image
+                src="/macos-screenshot.png"
+                alt="Zapper macOS menu bar dashboard showing running local services"
+                width={882}
+                height={1064}
+                className="h-auto w-full"
+                sizes="(min-width: 1024px) 420px, min(100vw - 4rem, 420px)"
+                priority
+              />
+            </div>
+          </div>
+        </section>
+
         <section className="border-b border-border">
           <div className="container py-20">
             <div className="mb-12 max-w-2xl">
@@ -397,26 +414,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="border-b border-border" id="vscode">
-          <div className="container max-w-3xl py-20">
-            <p className="mb-3 font-mono-tight text-xs text-accent">
-              EXTENSION
-            </p>
-            <h2 className="text-3xl font-semibold tracking-tight">
-              There&apos;s a VS Code extension too.
-            </h2>
-            <p className="mt-4 leading-relaxed text-muted-foreground">
-              See statuses, start and stop services, and run tasks from the
-              sidebar. Install{" "}
-              <code className="font-mono-tight text-foreground">
-                felixsebastian.zapper-vscode
-              </code>
-              . If you live in your terminal or an AI coding tool, you probably
-              won&apos;t need it, but it&apos;s there.
-            </p>
-          </div>
-        </section>
-
         <section>
           <div className="container py-20 text-center">
             <h2 className="text-3xl font-semibold tracking-tight lg:text-4xl">
@@ -449,8 +446,8 @@ export default function Home() {
               <a
                 key={link.label}
                 href={link.href}
-                target="_blank"
-                rel="noreferrer"
+                target={link.href.startsWith("#") ? undefined : "_blank"}
+                rel={link.href.startsWith("#") ? undefined : "noreferrer"}
                 className="transition-colors hover:text-foreground"
               >
                 {link.label}

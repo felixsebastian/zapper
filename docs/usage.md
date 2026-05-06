@@ -214,9 +214,11 @@ that old resources may still be running. Use `zap system resources audit` to
 find resources left behind by the previous project name.
 
 The system project list is registry-backed and uses normal per-project Zapper
-status/list behavior for service details. The resources audit scans PM2 and
-Docker directly so it can find orphaned resources left behind by renamed
-projects, removed services, moved checkouts, or deleted local state.
+status/list behavior for service details. In JSON output, each listed service
+includes `enabled` so integrations can distinguish profile-disabled services
+from stopped services. The resources audit scans PM2 and Docker directly so it
+can find orphaned resources left behind by renamed projects, removed services,
+moved checkouts, or deleted local state.
 
 ### Profiles
 

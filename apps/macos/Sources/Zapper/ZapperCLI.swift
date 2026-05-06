@@ -74,6 +74,26 @@ struct ZapperCLI {
         }.value
     }
 
+    func loadLinks(configPath: String, instanceKey: String) async throws -> [ZapperProjectLink] {
+        try await Task.detached(priority: .userInitiated) {
+            let zapPath = try Self.resolveZapPath()
+            let output = try Self.run(
+                executable: zapPath,
+                arguments: [
+                    "--config", configPath,
+                    "--instance", instanceKey,
+                    "links",
+                    "--json"
+                ]
+            )
+            do {
+                return try JSONDecoder().decode([ZapperProjectLink].self, from: output)
+            } catch {
+                throw ZapperCLIError.invalidOutput("zap links returned JSON that the app could not read: \(error.localizedDescription)")
+            }
+        }.value
+    }
+
     func runServiceAction(
         action: ZapperServiceAction,
         configPath: String,
@@ -267,4 +287,5 @@ struct ZapperCLI {
 enum ZapperServiceAction: String {
     case up
     case down
+    case restart
 }

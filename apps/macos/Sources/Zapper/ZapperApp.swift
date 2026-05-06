@@ -41,11 +41,20 @@ final class ZapperMenuBarApp: NSObject, NSApplicationDelegate {
 
     private func configurePopover() {
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 420, height: 560)
+        popover.contentSize = NSSize(width: 420, height: 120)
         popover.contentViewController = NSHostingController(
-            rootView: DashboardView(model: model)
-                .frame(width: 420, height: 560)
+            rootView: DashboardView(model: model) { [weak self] height in
+                self?.resizePopover(height: height)
+            }
         )
+    }
+
+    private func resizePopover(height: CGFloat) {
+        let clampedHeight = min(max(120, ceil(height)), 560)
+        let newSize = NSSize(width: 420, height: clampedHeight)
+        if abs(popover.contentSize.height - newSize.height) > 1 {
+            popover.contentSize = newSize
+        }
     }
 
     private func observeModel() {

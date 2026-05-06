@@ -268,9 +268,11 @@ that old resources may still be running. Use `zap system resources audit` to
 find resources left behind by the previous project name.
 
 The system project list is registry-backed and uses normal per-project Zapper
-status/list behavior for service details. The resources audit scans PM2 and
-Docker directly so it can find orphaned resources left behind by renamed
-projects, removed services, moved checkouts, or deleted local state.
+status/list behavior for service details. In JSON output, each listed service
+includes `enabled` so integrations can distinguish profile-disabled services
+from stopped services. The resources audit scans PM2 and Docker directly so it
+can find orphaned resources left behind by renamed projects, removed services,
+moved checkouts, or deleted local state.
 
 ### Profiles
 
@@ -1745,7 +1747,8 @@ commands. It should present three levels:
 2. Instance rows:
    instance key, instance ID, service status counts, assigned port count.
 3. Service rows:
-   type, service/resource name, Zapper status, classification, reason.
+   type, service/resource name, Zapper status, enabled/profile-filter state,
+   classification, reason.
 
 For privacy and performance, the first load should not parse every `zap.yaml`.
 Only parse project config when:
@@ -2441,7 +2444,10 @@ PM2. The app prefers that bundled runtime for system reads and actions:
 - `zap down --json`
 
 The app still supports `ZAPPER_CLI_PATH`, common install-location discovery, and
-an in-app external CLI picker for development and diagnostics.
+an external CLI picker in Settings for development and diagnostics. Runtime
+metadata and repair-oriented controls live behind the gear menu rather than in
+the primary dashboard. The primary dashboard is stack-oriented: each row is one
+project instance, and expanded stack rows show compact service controls.
 
 The important improvement is that a Finder-launched app no longer needs the
 user's `node` from `nvm`, `fnm`, `mise`, `asdf`, Volta, Homebrew, or another

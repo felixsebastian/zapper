@@ -73,7 +73,8 @@ For manual CLI testing, use the example projects in `packages/cli/examples/`. Af
 The native macOS app lives in `apps/macos`. It is a lightweight SwiftUI
 dashboard hosted by an AppKit menu bar status item. It shells out to the
 bundled `zap` CLI runtime for reads and actions: `zap system projects --json`,
-`zap home --json`, and `zap up`/`zap down` for instances or individual services.
+`zap home --json`, and `zap up`/`zap down`/`zap restart` for instances or
+individual services.
 It does not parse `.zap` state or `zap.yaml` directly.
 
 The first version does not require opening Xcode. Build and run it with:
@@ -93,7 +94,23 @@ development.
 
 Release builds prefer the bundled `zap` wrapper so Finder-launched app sessions
 do not require a globally available `node`. `ZAPPER_CLI_PATH` and the in-app CLI
-picker remain available for development and diagnostics.
+picker in Settings remain available for development and diagnostics. The main
+dashboard lists stacks, where each stack is one project instance. Default
+instances show as the project name; non-default instances append the instance
+key in parentheses. Stack rows show running-service summaries with a small
+status LED and high-value actions. Pinning lives in the stack overflow menu.
+The Open control is hidden when no homepage or project links are configured,
+opens directly when there is one target, and becomes a menu when there are
+multiple targets. Pinned stacks are stored in local app preferences and appear
+in a Pinned section above unpinned stacks.
+Unpinned stacks are grouped into Active and Inactive sections using the same
+state as the stack LED: running, pending, or errored stacks are active; gray LED
+stacks are inactive. Expanded stack details group services by native and Docker
+runtime. Service start, stop, and restart controls live in each service overflow
+menu, while paths, runtime metadata, last update time, last action, CLI override
+controls, refresh, and quit are tucked into info menus or the gear menu. The
+popover uses native macOS material and resizes to content up to a capped height
+before scrolling.
 
 GitHub Actions builds release assets through `.github/workflows/macos-release.yml`.
 The workflow runs on `v*` tags or manual dispatch, installs Node and pnpm,

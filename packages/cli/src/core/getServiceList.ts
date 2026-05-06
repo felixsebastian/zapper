@@ -16,6 +16,7 @@ export interface ServiceListEntry {
   type: "native" | "docker";
   service: string;
   status: "down" | "pending" | "up";
+  enabled: boolean;
   ports: string[];
   volumes: string[];
   cwd?: string;
@@ -260,35 +261,43 @@ function buildServiceEntries(
   stateVolumes: Record<string, StoredVolume> | undefined,
 ): ServiceListEntry[] {
   const nativeStatus = new Map(
-    statusResult.native.map((item) => [item.service, item.status]),
+    statusResult.native.map((item) => [item.service, item]),
   );
   const dockerStatus = new Map(
-    statusResult.docker.map((item) => [item.service, item.status]),
+    statusResult.docker.map((item) => [item.service, item]),
   );
 
-  const nativeEntries: ServiceListEntry[] = context.processes.map((proc) => ({
-    type: "native",
-    service: proc.name,
-    status: nativeStatus.get(proc.name) ?? "down",
-    ports: extractProcessPorts(context, proc.resolvedEnv || {}, statePorts),
-    volumes: [],
-    cwd: proc.cwd,
-    cmd: proc.cmd,
-  }));
+  const nativeEntries: ServiceListEntry[] = context.processes.map((proc) => {
+    const status = nativeStatus.get(proc.name);
+    return {
+      type: "native",
+      service: proc.name,
+      status: status?.status ?? "down",
+      enabled: status?.enabled ?? true,
+      ports: extractProcessPorts(context, proc.resolvedEnv || {}, statePorts),
+      volumes: [],
+      cwd: proc.cwd,
+      cmd: proc.cmd,
+    };
+  });
 
   const dockerEntries: ServiceListEntry[] = context.containers.map(
-    (container) => ({
-      type: "docker",
-      service: container.name,
-      status: dockerStatus.get(container.name) ?? "down",
-      ports: normalizePorts(container.ports, statePorts),
-      volumes: getContainerVolumeBindings(
-        container.name,
-        container.volumes,
-        stateVolumes || {},
-      ),
-      cmd: container.command || container.image,
-    }),
+    (container) => {
+      const status = dockerStatus.get(container.name);
+      return {
+        type: "docker",
+        service: container.name,
+        status: status?.status ?? "down",
+        enabled: status?.enabled ?? true,
+        ports: normalizePorts(container.ports, statePorts),
+        volumes: getContainerVolumeBindings(
+          container.name,
+          container.volumes,
+          stateVolumes || {},
+        ),
+        cmd: container.command || container.image,
+      };
+    },
   );
 
   return [...nativeEntries, ...dockerEntries];

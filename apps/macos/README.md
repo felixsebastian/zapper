@@ -5,8 +5,20 @@ Native macOS menu bar app for the local Zapper system view.
 The app uses a bundled Zapper CLI runtime and reads `zap system projects --json`.
 It does not read `.zap` state or `zap.yaml` files directly.
 
-The dashboard can start and stop whole instances or individual services. Project
-home links come from `zap home --json` for each registered instance.
+The dashboard lists stacks, where each stack is one project instance. Default
+instances show as the project name; non-default instances show as
+`myproj (test)`. Stack rows show a running-service summary with a small status
+LED and expose start, stop, and Open actions. Pinning lives in the stack
+overflow menu. The Open control is hidden
+when no homepage or project links are configured, opens directly when there is
+one target, and becomes a menu when there are multiple targets. Pinned stacks
+are stored as a local app preference and appear in a Pinned section above
+unpinned stacks. Unpinned stacks are grouped into Active and Inactive sections
+using the same state as the stack LED: running, pending, or errored stacks are
+active; gray LED stacks are inactive. Expanding a stack groups services by
+native and Docker runtime. Service start, stop, and restart controls live in
+each service overflow menu. The popover uses the native macOS popover material
+and grows to fit its content until it reaches a capped height, then scrolls.
 
 ## Build
 
@@ -49,5 +61,5 @@ apps/macos/bin/run
 
 Release builds prefer the bundled `zap` wrapper, which runs the bundled CLI with
 the bundled Node runtime. If you need to test against an external CLI, set
-`ZAPPER_CLI_PATH` before running the app, or use the terminal button in the app
-to choose an executable.
+`ZAPPER_CLI_PATH` before running the app, or open the gear menu in the app and
+choose an external executable from Settings.

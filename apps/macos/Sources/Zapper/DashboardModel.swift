@@ -4,19 +4,24 @@ import AppKit
 
 @MainActor
 final class DashboardModel: ObservableObject {
+    private static let pinnedStackIDsKey = "ZapperPinnedStackIDs"
+
     @Published private(set) var projects: [ZapperProject] = []
     @Published private(set) var homepages: [String: String] = [:]
+    @Published private(set) var links: [String: [ZapperProjectLink]] = [:]
     @Published private(set) var isRefreshing = false
     @Published private(set) var actionInFlight: String?
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var actionMessage: String?
     @Published private(set) var configuredZapPath: String?
+    @Published private(set) var pinnedStackIDs: Set<String> = []
 
     private let cli = ZapperCLI()
 
     init() {
         configuredZapPath = ZapperCLI.savedZapPath
+        pinnedStackIDs = Set(UserDefaults.standard.stringArray(forKey: Self.pinnedStackIDsKey) ?? [])
     }
 
     var counts: ServiceCounts {
@@ -63,14 +68,19 @@ final class DashboardModel: ObservableObject {
             projects = loadedProjects
             lastUpdated = Date()
             errorMessage = nil
-            await refreshHomepages(for: loadedProjects)
+            await refreshLinks(for: loadedProjects)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     func homepage(for project: ZapperProject, instance: ZapperInstance) -> String? {
-        homepages[homepageKey(project: project, instanceKey: instance.instanceKey)]
+        links(for: project, instance: instance).first(where: \.isHomepage)?.url
+            ?? homepages[homepageKey(project: project, instanceKey: instance.instanceKey)]
+    }
+
+    func links(for project: ZapperProject, instance: ZapperInstance) -> [ZapperProjectLink] {
+        links[homepageKey(project: project, instanceKey: instance.instanceKey)] ?? []
     }
 
     func startInstance(_ instance: ZapperInstance, in project: ZapperProject) async {
@@ -81,12 +91,20 @@ final class DashboardModel: ObservableObject {
         await runAction(.down, project: project, instance: instance)
     }
 
+    func restartInstance(_ instance: ZapperInstance, in project: ZapperProject) async {
+        await runAction(.restart, project: project, instance: instance)
+    }
+
     func startService(_ service: ZapperService, instance: ZapperInstance, project: ZapperProject) async {
         await runAction(.up, project: project, instance: instance, service: service.service)
     }
 
     func stopService(_ service: ZapperService, instance: ZapperInstance, project: ZapperProject) async {
         await runAction(.down, project: project, instance: instance, service: service.service)
+    }
+
+    func restartService(_ service: ZapperService, instance: ZapperInstance, project: ZapperProject) async {
+        await runAction(.restart, project: project, instance: instance, service: service.service)
     }
 
     func chooseZapCLI() {
@@ -123,6 +141,19 @@ final class DashboardModel: ObservableObject {
         Task { await refresh() }
     }
 
+    func isPinned(stackID: String) -> Bool {
+        pinnedStackIDs.contains(stackID)
+    }
+
+    func togglePin(stackID: String) {
+        if pinnedStackIDs.contains(stackID) {
+            pinnedStackIDs.remove(stackID)
+        } else {
+            pinnedStackIDs.insert(stackID)
+        }
+        UserDefaults.standard.set(Array(pinnedStackIDs).sorted(), forKey: Self.pinnedStackIDsKey)
+    }
+
     private func runAction(
         _ action: ZapperServiceAction,
         project: ZapperProject,
@@ -152,22 +183,27 @@ final class DashboardModel: ObservableObject {
         }
     }
 
-    private func refreshHomepages(for projects: [ZapperProject]) async {
+    private func refreshLinks(for projects: [ZapperProject]) async {
         var loadedHomepages: [String: String] = [:]
+        var loadedLinks: [String: [ZapperProjectLink]] = [:]
 
         for project in projects {
             for instance in project.instances {
                 let key = homepageKey(project: project, instanceKey: instance.instanceKey)
-                if let homepage = try? await cli.loadHomepage(
+                if let links = try? await cli.loadLinks(
                     configPath: project.configPath,
                     instanceKey: instance.instanceKey
                 ) {
-                    loadedHomepages[key] = homepage
+                    loadedLinks[key] = links
+                    if let homepage = links.first(where: \.isHomepage)?.url {
+                        loadedHomepages[key] = homepage
+                    }
                 }
             }
         }
 
         homepages = loadedHomepages
+        links = loadedLinks
     }
 
     private func homepageKey(project: ZapperProject, instanceKey: String) -> String {

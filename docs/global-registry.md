@@ -337,7 +337,8 @@ commands. It should present three levels:
 2. Instance rows:
    instance key, instance ID, service status counts, assigned port count.
 3. Service rows:
-   type, service/resource name, Zapper status, classification, reason.
+   type, service/resource name, Zapper status, enabled/profile-filter state,
+   classification, reason.
 
 For privacy and performance, the first load should not parse every `zap.yaml`.
 Only parse project config when:

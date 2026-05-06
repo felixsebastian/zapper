@@ -1,18 +1,124 @@
 import AppKit
 import SwiftUI
 
+private let popoverWidth = CGFloat(420)
+private let minPopoverHeight = CGFloat(120)
+private let maxPopoverHeight = CGFloat(560)
+private let headerHeight = CGFloat(61)
+private let dividerHeight = CGFloat(1)
+private let dashboardPadding = CGFloat(24)
+private let stackSectionSpacing = CGFloat(12)
+private let stackSectionHeaderHeight = CGFloat(20)
+private let stackSpacing = CGFloat(6)
+private let collapsedStackRowHeight = CGFloat(58)
+private let expandedStackTopPadding = CGFloat(10)
+private let serviceGroupHeaderHeight = CGFloat(22)
+private let serviceRowHeight = CGFloat(28)
+private let errorRowHeight = CGFloat(24)
+private let emptyServiceRowHeight = CGFloat(22)
+private let stackActionFontSize = CGFloat(11)
+
 struct DashboardView: View {
     @ObservedObject var model: DashboardModel
+    var onHeightChange: ((CGFloat) -> Void)?
+    @State private var viewMode: DashboardViewMode = .dashboard
+    @State private var expandedStackIDs = Set<String>()
 
     var body: some View {
-        VStack(spacing: 0) {
-            HeaderView(model: model)
-            Divider()
-            content
-            Divider()
-            FooterView(model: model)
+        ZStack {
+            VisualEffectBackground()
+
+            VStack(spacing: 0) {
+                HeaderView(model: model, viewMode: $viewMode)
+                Divider()
+                if viewMode == .settings {
+                    SettingsView(model: model)
+                } else {
+                    content
+                }
+            }
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .frame(width: popoverWidth, height: desiredPopoverHeight)
+        .onAppear {
+            onHeightChange?(desiredPopoverHeight)
+        }
+        .onChange(of: desiredPopoverHeight) { height in
+            onHeightChange?(height)
+        }
+    }
+
+    private var desiredPopoverHeight: CGFloat {
+        min(max(minPopoverHeight, headerHeight + dividerHeight + currentContentHeight), maxPopoverHeight)
+    }
+
+    private var currentContentHeight: CGFloat {
+        if viewMode == .settings {
+            return 300
+        }
+
+        if model.projects.isEmpty {
+            return 220
+        }
+
+        return min(estimatedDashboardContentHeight, maxDashboardContentHeight)
+    }
+
+    private var estimatedDashboardContentHeight: CGFloat {
+        guard !allStacks.isEmpty else {
+            return 220
+        }
+
+        let sectionHeights = stackSections.reduce(CGFloat(0)) { partial, section in
+            let rows = section.stacks.reduce(CGFloat(0)) { rowPartial, stack in
+                rowPartial + estimatedStackRowHeight(stack)
+            }
+            let rowSpacing = CGFloat(max(section.stacks.count - 1, 0)) * stackSpacing
+            return partial + stackSectionHeaderHeight + rows + rowSpacing
+        }
+        let sectionSpacing = CGFloat(max(stackSections.count - 1, 0)) * stackSectionSpacing
+        return dashboardPadding + sectionHeights + sectionSpacing
+    }
+
+    private var maxDashboardContentHeight: CGFloat {
+        maxPopoverHeight - headerHeight - dividerHeight
+    }
+
+    private func estimatedStackRowHeight(_ stack: ProjectStack) -> CGFloat {
+        var height = collapsedStackRowHeight
+        guard expandedStackIDs.contains(stack.id) else {
+            return height
+        }
+
+        let groups = serviceGroups(for: stack.instance.services)
+        var detailHeight = CGFloat(stack.instance.services.count) * serviceRowHeight
+        detailHeight += CGFloat(groups.count) * serviceGroupHeaderHeight
+        if stack.project.error != nil {
+            detailHeight += errorRowHeight
+        }
+        if stack.instance.error != nil {
+            detailHeight += errorRowHeight
+        }
+        if stack.instance.services.isEmpty {
+            detailHeight += emptyServiceRowHeight
+        }
+
+        height += expandedStackTopPadding + max(emptyServiceRowHeight, detailHeight)
+        return height
+    }
+
+    private func expandedBinding(for stack: ProjectStack) -> Binding<Bool> {
+        Binding(
+            get: {
+                expandedStackIDs.contains(stack.id)
+            },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedStackIDs.insert(stack.id)
+                } else {
+                    expandedStackIDs.remove(stack.id)
+                }
+            }
+        )
     }
 
     @ViewBuilder
@@ -27,27 +133,146 @@ struct DashboardView: View {
             EmptyStateView(isRefreshing: model.isRefreshing)
         } else {
             ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(model.projects) { project in
-                        ProjectRow(project: project, model: model)
+                LazyVStack(spacing: stackSectionSpacing) {
+                    ForEach(stackSections) { section in
+                        StackSectionView(
+                            section: section,
+                            model: model,
+                            expandedBinding: expandedBinding(for:)
+                        )
                     }
                 }
                 .padding(12)
             }
+            .frame(height: currentContentHeight)
+        }
+    }
+
+    private var allStacks: [ProjectStack] {
+        model.projects.flatMap { project in
+            project.instances.map { instance in
+                ProjectStack(project: project, instance: instance)
+            }
+        }
+        .sorted { lhs, rhs in
+            lhs.sortTitle.localizedCaseInsensitiveCompare(rhs.sortTitle) == .orderedAscending
+        }
+    }
+
+    private var stackSections: [StackSection] {
+        let pinned = allStacks.filter { model.isPinned(stackID: $0.pinID) }
+        let unpinned = allStacks.filter { !model.isPinned(stackID: $0.pinID) }
+        let active = unpinned.filter(\.isActive)
+        let inactive = unpinned.filter { !$0.isActive }
+
+        return [
+            StackSection(title: "Pinned", stacks: pinned),
+            StackSection(title: "Active", stacks: active),
+            StackSection(title: "Inactive", stacks: inactive)
+        ].filter { !$0.stacks.isEmpty }
+    }
+}
+
+private struct StackSection: Identifiable {
+    let title: String
+    let stacks: [ProjectStack]
+
+    var id: String { title }
+}
+
+private struct StackSectionView: View {
+    let section: StackSection
+    @ObservedObject var model: DashboardModel
+    let expandedBinding: (ProjectStack) -> Binding<Bool>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: stackSpacing) {
+            Text(section.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .frame(maxWidth: .infinity, minHeight: stackSectionHeaderHeight, alignment: .leading)
+
+            ForEach(section.stacks) { stack in
+                StackRow(
+                    stack: stack,
+                    model: model,
+                    isExpanded: expandedBinding(stack)
+                )
+            }
+        }
+    }
+}
+
+private enum DashboardViewMode {
+    case dashboard
+    case settings
+}
+
+private struct VisualEffectBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .popover
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+}
+
+private struct ProjectStack: Identifiable {
+    let project: ZapperProject
+    let instance: ZapperInstance
+
+    var id: String { pinID }
+
+    var pinID: String { "\(project.registryId):\(instance.instanceKey)" }
+
+    var title: String {
+        if instance.instanceKey == "default" {
+            return project.project
+        }
+        return "\(project.project) (\(instance.instanceKey))"
+    }
+
+    var sortTitle: String {
+        "\(project.project):\(instance.instanceKey)"
+    }
+
+    var counts: ServiceCounts {
+        instance.counts
+    }
+
+    var isActive: Bool {
+        project.error != nil || instance.error != nil || counts.pending > 0 || counts.up > 0
+    }
+}
+
+private struct ServiceGroup: Identifiable {
+    let type: String
+    let services: [ZapperService]
+
+    var id: String { type }
+
+    var title: String {
+        switch type {
+        case "native":
+            return "Native"
+        case "docker":
+            return "Docker"
+        default:
+            return type.capitalized
         }
     }
 }
 
 private struct HeaderView: View {
     @ObservedObject var model: DashboardModel
+    @Binding var viewMode: DashboardViewMode
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: model.menuSystemImage)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(statusColor(counts: model.counts, error: model.errorMessage))
-                .frame(width: 24, height: 24)
-
             VStack(alignment: .leading, spacing: 2) {
                 Text("Zapper")
                     .font(.headline)
@@ -58,22 +283,32 @@ private struct HeaderView: View {
 
             Spacer()
 
-            Button {
-                model.chooseZapCLI()
-            } label: {
-                Image(systemName: "terminal")
-            }
-            .buttonStyle(.borderless)
-            .help("Choose zap CLI")
+            if viewMode == .settings {
+                Button {
+                    viewMode = .dashboard
+                } label: {
+                    Image(systemName: "chevron.left")
+                }
+                .buttonStyle(.borderless)
+                .help("Back")
+            } else {
+                Button {
+                    Task { await model.refresh() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .disabled(model.isRefreshing)
+                .help("Refresh")
 
-            Button {
-                Task { await model.refresh() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
+                Button {
+                    viewMode = .settings
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(.borderless)
+                .help("Settings")
             }
-            .buttonStyle(.borderless)
-            .disabled(model.isRefreshing)
-            .help("Refresh")
         }
         .padding(12)
     }
@@ -83,178 +318,446 @@ private struct HeaderView: View {
         if model.isRefreshing {
             return "Refreshing..."
         }
+        if viewMode == .settings {
+            return "Settings"
+        }
         if counts.total == 0 {
             return "No services loaded"
         }
-        return "\(counts.up) up, \(counts.pending) pending, \(counts.down) down"
+        return serviceSummary(counts)
     }
 }
 
-private struct FooterView: View {
+private struct SettingsView: View {
     @ObservedObject var model: DashboardModel
 
     var body: some View {
-        HStack {
-            if let lastUpdated = model.lastUpdated {
-                Text("Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))")
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("Not updated yet")
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 14) {
+            SettingsSection(title: "Status") {
+                SettingsRow(
+                    label: "Last updated",
+                    value: model.lastUpdated?.formatted(date: .abbreviated, time: .shortened) ?? "Not updated yet"
+                )
+
+                SettingsRow(
+                    label: "Last action",
+                    value: model.actionMessage ?? "None"
+                )
+
+                if let errorMessage = model.errorMessage {
+                    SettingsRow(label: "Last error", value: errorMessage, valueColor: .red)
+                }
+            }
+
+            SettingsSection(title: "CLI") {
+                SettingsRow(
+                    label: "Override",
+                    value: model.configuredZapPath ?? "Using bundled runtime"
+                )
+
+                HStack(spacing: 10) {
+                    Button("Choose External CLI") {
+                        model.chooseZapCLI()
+                    }
+
+                    Button("Clear Override") {
+                        model.clearZapCLIOverride()
+                    }
+                    .disabled(model.configuredZapPath == nil)
+                }
             }
 
             Spacer()
 
-            if let configuredZapPath = model.configuredZapPath {
-                Text("CLI \(URL(fileURLWithPath: configuredZapPath).lastPathComponent)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .help(configuredZapPath)
-
-                Button("Clear CLI") {
-                    model.clearZapCLIOverride()
+            HStack {
+                Button("Refresh") {
+                    Task { await model.refresh() }
                 }
-                .buttonStyle(.borderless)
-            }
-
-            if let actionMessage = model.actionMessage {
-                Text(actionMessage)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
-            Button("Quit") {
-                NSApplication.shared.terminate(nil)
-            }
-            .buttonStyle(.borderless)
-        }
-        .font(.caption)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-    }
-}
-
-private struct ProjectRow: View {
-    let project: ZapperProject
-    @ObservedObject var model: DashboardModel
-
-    var body: some View {
-        DisclosureGroup {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(project.projectRoot)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    Button {
-                        NSWorkspace.shared.open(URL(fileURLWithPath: project.projectRoot))
-                    } label: {
-                        Image(systemName: "folder")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Open project folder")
-                }
-
-                if let error = project.error {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-
-                ForEach(project.instances) { instance in
-                    InstanceRow(project: project, instance: instance, model: model)
-                }
-            }
-            .padding(.top, 8)
-        } label: {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(projectStateColor(project.state))
-                    .frame(width: 8, height: 8)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(project.project)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                    Text(project.state)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                .disabled(model.isRefreshing)
 
                 Spacer()
 
-                CountStrip(counts: project.counts)
+                Button("Quit") {
+                    NSApplication.shared.terminate(nil)
+                }
+            }
+        }
+        .buttonStyle(.borderless)
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+private struct SettingsSection<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 7) {
+                content
+            }
+        }
+    }
+}
+
+private struct SettingsRow: View {
+    let label: String
+    let value: String
+    var valueColor: Color = .secondary
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.primary)
+                .frame(width: 86, alignment: .leading)
+
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(valueColor)
+                .lineLimit(3)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private struct StackRow: View {
+    let stack: ProjectStack
+    @ObservedObject var model: DashboardModel
+    @Binding var isExpanded: Bool
+    @State private var isHovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Button {
+                    isExpanded.toggle()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 14, height: 18)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                            .opacity(isExpanded || isHovering ? 1 : 0.38)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(stack.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                            HStack(spacing: 5) {
+                                StatusLED(counts: stack.counts, error: stack.project.error ?? stack.instance.error)
+                                Text(serviceSummary(stack.counts))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                StackActions(stack: stack, model: model)
+            }
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let error = stack.project.error {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+
+                    if let error = stack.instance.error {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+
+                    ForEach(serviceGroups(for: stack.instance.services)) { group in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(group.title)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+
+                            ForEach(group.services) { service in
+                                ServiceRow(
+                                    service: service,
+                                    instance: stack.instance,
+                                    project: stack.project,
+                                    model: model
+                                )
+                            }
+                        }
+                    }
+
+                    if stack.instance.services.isEmpty {
+                        Text("No services")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.top, 10)
+                .padding(.leading, 24)
             }
         }
         .padding(10)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(isHovering ? 0.82 : 0.48))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(isHovering ? 0.45 : 0.18), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .transaction { transaction in
+            transaction.animation = nil
+        }
     }
 }
 
-private struct InstanceRow: View {
-    let project: ZapperProject
-    let instance: ZapperInstance
+private struct StackActions: View {
+    let stack: ProjectStack
     @ObservedObject var model: DashboardModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(instance.instanceKey)
-                    .font(.caption.weight(.semibold))
-                Text(instance.instanceId)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer()
-                CountStrip(counts: instance.counts)
-            }
-
-            HStack(spacing: 8) {
-                Button("Start") {
-                    Task { await model.startInstance(instance, in: project) }
+        HStack(spacing: 4) {
+            if stack.counts.up < stack.counts.total {
+                stackActionButton("Start") {
+                    Task { await model.startInstance(stack.instance, in: stack.project) }
                 }
                 .disabled(model.actionInFlight != nil)
+            }
 
-                Button("Stop") {
-                    Task { await model.stopInstance(instance, in: project) }
+            if stack.counts.up > 0 {
+                stackActionButton("Stop") {
+                    Task { await model.stopInstance(stack.instance, in: stack.project) }
                 }
                 .disabled(model.actionInFlight != nil)
+            }
 
-                if let homepage = model.homepage(for: project, instance: instance),
-                   let url = URL(string: homepage) {
-                    Button("Open Home") {
-                        NSWorkspace.shared.open(url)
-                    }
-                    .help(homepage)
+            StackOpenControl(links: model.links(for: stack.project, instance: stack.instance))
+
+            StackMoreButton(
+                stack: stack,
+                isPinned: model.isPinned(stackID: stack.pinID),
+                togglePin: {
+                    model.togglePin(stackID: stack.pinID)
                 }
-            }
-            .buttonStyle(.borderless)
-
-            if let error = instance.error {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-
-            ForEach(instance.services) { service in
-                ServiceRow(
-                    service: service,
-                    instance: instance,
-                    project: project,
-                    model: model
-                )
-            }
+            )
         }
-        .padding(8)
-        .background(Color(nsColor: .textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .buttonStyle(.borderless)
+    }
+
+    private func stackActionButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.system(size: stackActionFontSize))
+            .foregroundStyle(.primary)
+            .controlSize(.small)
+    }
+}
+
+private struct StackOpenControl: View {
+    let links: [ZapperProjectLink]
+
+    var body: some View {
+        if links.count == 1, let link = links.first, let url = URL(string: link.url) {
+            Button("Open") {
+                NSWorkspace.shared.open(url)
+            }
+            .font(.system(size: stackActionFontSize))
+            .foregroundStyle(.primary)
+            .controlSize(.small)
+            .help(link.url)
+        } else if links.count > 1 {
+            Menu {
+                ForEach(orderedLinks) { link in
+                    if let url = URL(string: link.url) {
+                        Button(link.isHomepage ? "Homepage" : link.name) {
+                            NSWorkspace.shared.open(url)
+                        }
+                        .help(link.url)
+                    }
+                }
+            } label: {
+                Text("Open")
+                    .font(.system(size: stackActionFontSize))
+                    .foregroundStyle(.primary)
+            }
+            .controlSize(.small)
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+        }
+    }
+
+    private var orderedLinks: [ZapperProjectLink] {
+        links.sorted { lhs, rhs in
+            if lhs.isHomepage != rhs.isHomepage {
+                return lhs.isHomepage
+            }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+}
+
+private struct StackMoreButton: NSViewRepresentable {
+    let stack: ProjectStack
+    let isPinned: Bool
+    let togglePin: () -> Void
+
+    func makeNSView(context: Context) -> NSButton {
+        let button = NSButton(title: "", target: context.coordinator, action: #selector(Coordinator.showMenu(_:)))
+        button.isBordered = false
+        button.bezelStyle = .inline
+        button.controlSize = .small
+        button.font = NSFont.systemFont(ofSize: stackActionFontSize)
+        button.attributedTitle = stackActionAttributedTitle("More")
+        button.attributedAlternateTitle = stackActionAttributedTitle("More")
+        button.contentTintColor = .labelColor
+        button.setButtonType(.momentaryPushIn)
+        button.toolTip = "Stack actions"
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return button
+    }
+
+    func updateNSView(_ nsView: NSButton, context: Context) {
+        context.coordinator.parent = self
+        nsView.font = NSFont.systemFont(ofSize: stackActionFontSize)
+        nsView.attributedTitle = stackActionAttributedTitle("More")
+        nsView.attributedAlternateTitle = stackActionAttributedTitle("More")
+        nsView.contentTintColor = .labelColor
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    final class Coordinator: NSObject {
+        var parent: StackMoreButton
+
+        init(parent: StackMoreButton) {
+            self.parent = parent
+        }
+
+        @objc func showMenu(_ sender: NSButton) {
+            let menu = NSMenu()
+
+            let pinItem = NSMenuItem(
+                title: parent.isPinned ? "Unpin" : "Pin",
+                action: #selector(togglePin),
+                keyEquivalent: ""
+            )
+            pinItem.target = self
+            menu.addItem(pinItem)
+
+            menu.addItem(.separator())
+
+            let openFolderItem = NSMenuItem(
+                title: "Open Project Folder",
+                action: #selector(openProjectFolder),
+                keyEquivalent: ""
+            )
+            openFolderItem.target = self
+            menu.addItem(openFolderItem)
+
+            menu.addItem(.separator())
+
+            let copyProjectPathItem = NSMenuItem(
+                title: "Copy Project Path",
+                action: #selector(copyProjectPath),
+                keyEquivalent: ""
+            )
+            copyProjectPathItem.target = self
+            menu.addItem(copyProjectPathItem)
+
+            let copyConfigPathItem = NSMenuItem(
+                title: "Copy Config Path",
+                action: #selector(copyConfigPath),
+                keyEquivalent: ""
+            )
+            copyConfigPathItem.target = self
+            menu.addItem(copyConfigPathItem)
+
+            let copyInstanceIDItem = NSMenuItem(
+                title: "Copy Instance ID",
+                action: #selector(copyInstanceID),
+                keyEquivalent: ""
+            )
+            copyInstanceIDItem.target = self
+            menu.addItem(copyInstanceIDItem)
+
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 2), in: sender)
+        }
+
+        @objc private func togglePin() {
+            parent.togglePin()
+        }
+
+        @objc private func openProjectFolder() {
+            NSWorkspace.shared.open(URL(fileURLWithPath: parent.stack.project.projectRoot))
+        }
+
+        @objc private func copyProjectPath() {
+            copyToPasteboard(parent.stack.project.projectRoot)
+        }
+
+        @objc private func copyConfigPath() {
+            copyToPasteboard(parent.stack.project.configPath)
+        }
+
+        @objc private func copyInstanceID() {
+            copyToPasteboard(parent.stack.instance.instanceId)
+        }
+    }
+}
+
+private struct StatusLED: View {
+    let counts: ServiceCounts
+    let error: String?
+
+    var body: some View {
+        Circle()
+            .fill(statusColor(counts: counts, error: error))
+            .frame(width: 7, height: 7)
+            .overlay {
+                Circle()
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.3), lineWidth: 0.5)
+            }
+            .help(statusHelp)
+    }
+
+    private var statusHelp: String {
+        if error != nil {
+            return "Needs attention"
+        }
+        if counts.pending > 0 {
+            return "Services are starting"
+        }
+        if counts.up == counts.total, counts.total > 0 {
+            return "All enabled services are running"
+        }
+        if counts.up > 0 {
+            return "Some enabled services are running"
+        }
+        return "No enabled services are running"
     }
 }
 
@@ -267,53 +770,68 @@ private struct ServiceRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(serviceStatusColor(service.status))
+                .fill(serviceStatusColor(service))
                 .frame(width: 7, height: 7)
             Text(service.service)
                 .font(.caption)
                 .lineLimit(1)
-            Text(service.type)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+
             Spacer()
-            Button("Start") {
-                Task {
-                    await model.startService(service, instance: instance, project: project)
-                }
-            }
-            .disabled(model.actionInFlight != nil)
-            Button("Stop") {
-                Task {
-                    await model.stopService(service, instance: instance, project: project)
-                }
-            }
-            .disabled(model.actionInFlight != nil)
+
+            ServiceInfoMenu(
+                service: service,
+                instance: instance,
+                project: project,
+                model: model
+            )
         }
         .buttonStyle(.borderless)
     }
 }
 
-private struct CountStrip: View {
-    let counts: ServiceCounts
+private struct ServiceInfoMenu: View {
+    let service: ZapperService
+    let instance: ZapperInstance
+    let project: ZapperProject
+    @ObservedObject var model: DashboardModel
 
     var body: some View {
-        HStack(spacing: 4) {
-            CountPill(value: counts.up, color: .green)
-            CountPill(value: counts.pending, color: .orange)
-            CountPill(value: counts.down, color: .secondary)
+        Menu {
+            if service.status == "up" || service.status == "pending" {
+                Button("Stop") {
+                    Task {
+                        await model.stopService(service, instance: instance, project: project)
+                    }
+                }
+                .disabled(model.actionInFlight != nil)
+            } else {
+                Button("Start") {
+                    Task {
+                        await model.startService(service, instance: instance, project: project)
+                    }
+                }
+                .disabled(model.actionInFlight != nil)
+            }
+
+            Button("Restart") {
+                Task {
+                    await model.restartService(service, instance: instance, project: project)
+                }
+            }
+            .disabled(model.actionInFlight != nil)
+
+            if let cwd = service.cwd {
+                Divider()
+
+                Button("Copy Working Directory") {
+                    copyToPasteboard(cwd)
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
         }
-    }
-}
-
-private struct CountPill: View {
-    let value: Int
-    let color: Color
-
-    var body: some View {
-        Text("\(value)")
-            .font(.caption2.monospacedDigit())
-            .foregroundStyle(color)
-            .frame(minWidth: 18)
+        .menuStyle(.borderlessButton)
+        .help("Service info")
     }
 }
 
@@ -369,19 +887,12 @@ private func statusColor(counts: ServiceCounts, error: String?) -> Color {
     return .secondary
 }
 
-private func projectStateColor(_ state: String) -> Color {
-    switch state {
-    case "active":
-        return .green
-    case "unresolved", "stale":
-        return .orange
-    default:
+private func serviceStatusColor(_ service: ZapperService) -> Color {
+    guard service.enabled else {
         return .secondary
     }
-}
 
-private func serviceStatusColor(_ status: String) -> Color {
-    switch status {
+    switch service.status {
     case "up":
         return .green
     case "pending":
@@ -389,4 +900,69 @@ private func serviceStatusColor(_ status: String) -> Color {
     default:
         return .secondary
     }
+}
+
+private func serviceSummary(_ counts: ServiceCounts) -> String {
+    if counts.totalIncludingDisabled == 0 {
+        return "No services"
+    }
+    if counts.total == 0 {
+        return "\(counts.disabled) disabled"
+    }
+
+    var parts = [
+        "\(counts.up)/\(counts.total) \(pluralize("service", counts.total)) running"
+    ]
+
+    if counts.pending > 0 {
+        parts.append("\(counts.pending) pending")
+    }
+
+    if counts.disabled > 0 {
+        parts.append("\(counts.disabled) disabled")
+    }
+
+    return parts.joined(separator: ", ")
+}
+
+private func serviceGroups(for services: [ZapperService]) -> [ServiceGroup] {
+    let native = services.filter { $0.type == "native" }
+    let docker = services.filter { $0.type == "docker" }
+    let otherTypes = Set(services.map(\.type))
+        .subtracting(["native", "docker"])
+        .sorted()
+
+    var groups: [ServiceGroup] = []
+    if !native.isEmpty {
+        groups.append(ServiceGroup(type: "native", services: native))
+    }
+    if !docker.isEmpty {
+        groups.append(ServiceGroup(type: "docker", services: docker))
+    }
+    for type in otherTypes {
+        let groupedServices = services.filter { $0.type == type }
+        if !groupedServices.isEmpty {
+            groups.append(ServiceGroup(type: type, services: groupedServices))
+        }
+    }
+    return groups
+}
+
+private func pluralize(_ word: String, _ count: Int) -> String {
+    count == 1 ? word : "\(word)s"
+}
+
+private func stackActionAttributedTitle(_ title: String) -> NSAttributedString {
+    NSAttributedString(
+        string: title,
+        attributes: [
+            .font: NSFont.systemFont(ofSize: stackActionFontSize),
+            .foregroundColor: NSColor.labelColor
+        ]
+    )
+}
+
+private func copyToPasteboard(_ value: String) {
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(value, forType: .string)
 }

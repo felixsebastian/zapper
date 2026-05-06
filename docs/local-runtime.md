@@ -35,7 +35,10 @@ PM2. The app prefers that bundled runtime for system reads and actions:
 - `zap down --json`
 
 The app still supports `ZAPPER_CLI_PATH`, common install-location discovery, and
-an in-app external CLI picker for development and diagnostics.
+an external CLI picker in Settings for development and diagnostics. Runtime
+metadata and repair-oriented controls live behind the gear menu rather than in
+the primary dashboard. The primary dashboard is stack-oriented: each row is one
+project instance, and expanded stack rows show compact service controls.
 
 The important improvement is that a Finder-launched app no longer needs the
 user's `node` from `nvm`, `fnm`, `mise`, `asdf`, Volta, Homebrew, or another
