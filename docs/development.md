@@ -107,10 +107,16 @@ Unpinned stacks are grouped into Active and Inactive sections using the same
 state as the stack LED: running, pending, or errored stacks are active; gray LED
 stacks are inactive. Expanded stack details group services by native and Docker
 runtime. Service start, stop, and restart controls live in each service overflow
-menu, while paths, runtime metadata, last update time, last action, CLI override
-controls, refresh, and quit are tucked into info menus or the gear menu. The
-popover uses native macOS material and resizes to content up to a capped height
-before scrolling.
+menu, and actions show immediate stale-state feedback in the stack and service
+rows before converging on the next real CLI refresh. Amber LEDs are reserved for
+real CLI-reported pending state; the spinner means the app knows the displayed
+state is stale. The open popover polls briefly at a faster cadence, settles to a
+slower idle cadence, and polls more frequently while action state is stale.
+During refresh, the header keeps showing the last service summary and uses a
+fixed-size spinner/check indicator to avoid layout shifts. Paths, runtime
+metadata, last update time, last action, CLI override controls, refresh, and
+quit are tucked into info menus or the gear menu. The popover uses native macOS
+material and resizes to content up to a capped height before scrolling.
 
 GitHub Actions builds release assets through `.github/workflows/macos-release.yml`.
 The workflow runs on `v*` tags or manual dispatch, installs Node and pnpm,

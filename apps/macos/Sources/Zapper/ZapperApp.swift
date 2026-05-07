@@ -9,6 +9,8 @@ final class ZapperMenuBarApp: NSObject, NSApplicationDelegate {
     private let popover = NSPopover()
     private var statusItem: NSStatusItem?
     private var cancellables = Set<AnyCancellable>()
+    private var pollTask: Task<Void, Never>?
+    private var recentlyOpenedUntil = Date.distantPast
 
     static func main() {
         let app = NSApplication.shared
@@ -23,10 +25,15 @@ final class ZapperMenuBarApp: NSObject, NSApplicationDelegate {
         configurePopover()
         observeModel()
         updateStatusItem()
+        restartPolling()
 
         Task {
             await model.refresh()
         }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        pollTask?.cancel()
     }
 
     private func configureStatusItem() {
@@ -66,6 +73,15 @@ final class ZapperMenuBarApp: NSObject, NSApplicationDelegate {
                 }
             }
             .store(in: &cancellables)
+
+        model.$pendingServiceActions
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.restartPolling()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     private func updateStatusItem() {
@@ -89,8 +105,50 @@ final class ZapperMenuBarApp: NSObject, NSApplicationDelegate {
         }
 
         popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+        recentlyOpenedUntil = Date().addingTimeInterval(6)
+        restartPolling()
         Task {
             await model.refresh()
         }
+    }
+
+    private func restartPolling() {
+        pollTask?.cancel()
+        pollTask = Task { [weak self] in
+            await self?.runPollingLoop()
+        }
+    }
+
+    private func runPollingLoop() async {
+        while !Task.isCancelled {
+            let interval = currentPollingInterval()
+            guard interval > 0 else {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                continue
+            }
+
+            try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+            if Task.isCancelled {
+                return
+            }
+
+            await model.refresh()
+        }
+    }
+
+    private func currentPollingInterval() -> TimeInterval {
+        if model.hasStaleServiceState {
+            return 1.0 / 3.0
+        }
+
+        guard popover.isShown else {
+            return 0
+        }
+
+        if Date() < recentlyOpenedUntil {
+            return 1
+        }
+
+        return 3
     }
 }

@@ -2,6 +2,23 @@ import Combine
 import Foundation
 import AppKit
 
+enum PendingServiceAction {
+    case starting
+    case stopping
+    case restarting
+
+    init(action: ZapperServiceAction) {
+        switch action {
+        case .up:
+            self = .starting
+        case .down:
+            self = .stopping
+        case .restart:
+            self = .restarting
+        }
+    }
+}
+
 @MainActor
 final class DashboardModel: ObservableObject {
     private static let pinnedStackIDsKey = "ZapperPinnedStackIDs"
@@ -16,6 +33,11 @@ final class DashboardModel: ObservableObject {
     @Published private(set) var actionMessage: String?
     @Published private(set) var configuredZapPath: String?
     @Published private(set) var pinnedStackIDs: Set<String> = []
+    @Published private(set) var pendingServiceActions: [String: PendingServiceAction] = [:]
+
+    var hasStaleServiceState: Bool {
+        !pendingServiceActions.isEmpty
+    }
 
     private let cli = ZapperCLI()
 
@@ -26,7 +48,10 @@ final class DashboardModel: ObservableObject {
 
     var counts: ServiceCounts {
         projects.reduce(.empty) { partial, project in
-            partial + project.counts
+            let projectCounts = project.instances.reduce(.empty) { instancePartial, instance in
+                instancePartial + counts(for: instance, in: project)
+            }
+            return partial + projectCounts
         }
     }
 
@@ -81,6 +106,37 @@ final class DashboardModel: ObservableObject {
 
     func links(for project: ZapperProject, instance: ZapperInstance) -> [ZapperProjectLink] {
         links[homepageKey(project: project, instanceKey: instance.instanceKey)] ?? []
+    }
+
+    func counts(for instance: ZapperInstance, in project: ZapperProject) -> ServiceCounts {
+        instance.services.reduce(.empty) { partial, service in
+            partial + ServiceCounts(
+                status: status(for: service, instance: instance, project: project),
+                enabled: service.enabled
+            )
+        }
+    }
+
+    func status(for service: ZapperService, instance: ZapperInstance, project: ZapperProject) -> String {
+        service.status
+    }
+
+    func isServiceBusy(_ service: ZapperService, instance: ZapperInstance, project: ZapperProject) -> Bool {
+        pendingAction(for: service, instance: instance, project: project) != nil
+    }
+
+    func isStackBusy(instance: ZapperInstance, project: ZapperProject) -> Bool {
+        let prefix = stackServiceKeyPrefix(project: project, instanceKey: instance.instanceKey)
+        return pendingServiceActions.keys.contains { $0.hasPrefix(prefix) }
+    }
+
+    func isStackActive(instance: ZapperInstance, project: ZapperProject) -> Bool {
+        let counts = counts(for: instance, in: project)
+        return project.error != nil
+            || instance.error != nil
+            || isStackBusy(instance: instance, project: project)
+            || counts.pending > 0
+            || counts.up > 0
     }
 
     func startInstance(_ instance: ZapperInstance, in project: ZapperProject) async {
@@ -165,9 +221,14 @@ final class DashboardModel: ObservableObject {
         }
 
         let target = service ?? instance.instanceKey
+        let affectedServices = affectedServiceNames(action: action, instance: instance, service: service)
         actionInFlight = "\(action.rawValue):\(project.registryId):\(instance.instanceKey):\(service ?? "*")"
         actionMessage = "\(action.rawValue) \(project.project)/\(target)"
-        defer { actionInFlight = nil }
+        setPendingAction(PendingServiceAction(action: action), for: affectedServices, project: project, instance: instance)
+        defer {
+            clearPendingActions(for: affectedServices, project: project, instance: instance)
+            actionInFlight = nil
+        }
 
         do {
             try await cli.runServiceAction(
@@ -208,5 +269,71 @@ final class DashboardModel: ObservableObject {
 
     private func homepageKey(project: ZapperProject, instanceKey: String) -> String {
         "\(project.registryId):\(instanceKey)"
+    }
+
+    private func pendingAction(
+        for service: ZapperService,
+        instance: ZapperInstance,
+        project: ZapperProject
+    ) -> PendingServiceAction? {
+        pendingServiceActions[serviceKey(project: project, instanceKey: instance.instanceKey, service: service.service)]
+    }
+
+    private func affectedServiceNames(
+        action: ZapperServiceAction,
+        instance: ZapperInstance,
+        service: String?
+    ) -> [String] {
+        if let service {
+            return [service]
+        }
+
+        return instance.services
+            .filter { service in
+                guard service.enabled else {
+                    return false
+                }
+
+                switch action {
+                case .up:
+                    return service.status != "up"
+                case .down:
+                    return service.status == "up" || service.status == "pending"
+                case .restart:
+                    return true
+                }
+            }
+            .map(\.service)
+    }
+
+    private func setPendingAction(
+        _ action: PendingServiceAction,
+        for services: [String],
+        project: ZapperProject,
+        instance: ZapperInstance
+    ) {
+        for service in services {
+            pendingServiceActions[serviceKey(project: project, instanceKey: instance.instanceKey, service: service)] = action
+        }
+    }
+
+    private func clearPendingActions(
+        for services: [String],
+        project: ZapperProject,
+        instance: ZapperInstance
+    ) {
+        for service in services {
+            pendingServiceActions.removeValue(
+                forKey: serviceKey(project: project, instanceKey: instance.instanceKey, service: service)
+            )
+        }
+    }
+
+    private func serviceKey(project: ZapperProject, instanceKey: String, service: String) -> String {
+        "\(stackServiceKeyPrefix(project: project, instanceKey: instanceKey))\(service)"
+    }
+
+    private func stackServiceKeyPrefix(project: ZapperProject, instanceKey: String) -> String {
+        "\(project.registryId):\(instanceKey):"
     }
 }

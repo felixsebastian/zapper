@@ -17,8 +17,15 @@ unpinned stacks. Unpinned stacks are grouped into Active and Inactive sections
 using the same state as the stack LED: running, pending, or errored stacks are
 active; gray LED stacks are inactive. Expanding a stack groups services by
 native and Docker runtime. Service start, stop, and restart controls live in
-each service overflow menu. The popover uses the native macOS popover material
-and grows to fit its content until it reaches a capped height, then scrolls.
+each service overflow menu. Start, stop, and restart actions show immediate
+stale-state feedback in the stack and service rows, then converge on the next
+real CLI refresh. Amber LEDs are reserved for real CLI-reported pending state;
+the spinner means the app knows the displayed state is stale. The open popover
+polls briefly at a faster cadence, settles to a slower idle cadence, and polls
+more frequently while action state is stale. During refresh, the header keeps
+showing the last service summary and uses a fixed-size spinner/check indicator
+to avoid layout shifts. The popover uses the native macOS popover material and
+grows to fit its content until it reaches a capped height, then scrolls.
 
 ## Build
 

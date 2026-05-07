@@ -112,12 +112,16 @@ struct ServiceCounts: Equatable {
     }
 
     init(service: ZapperService) {
-        guard service.enabled else {
+        self.init(status: service.status, enabled: service.enabled)
+    }
+
+    init(status: String, enabled: Bool) {
+        guard enabled else {
             self.init(up: 0, pending: 0, down: 0, disabled: 1)
             return
         }
 
-        switch service.status {
+        switch status {
         case "up":
             self.init(up: 1, pending: 0, down: 0, disabled: 0)
         case "pending":

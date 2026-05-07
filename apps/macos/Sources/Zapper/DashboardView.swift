@@ -162,8 +162,8 @@ struct DashboardView: View {
     private var stackSections: [StackSection] {
         let pinned = allStacks.filter { model.isPinned(stackID: $0.pinID) }
         let unpinned = allStacks.filter { !model.isPinned(stackID: $0.pinID) }
-        let active = unpinned.filter(\.isActive)
-        let inactive = unpinned.filter { !$0.isActive }
+        let active = unpinned.filter { model.isStackActive(instance: $0.instance, project: $0.project) }
+        let inactive = unpinned.filter { !model.isStackActive(instance: $0.instance, project: $0.project) }
 
         return [
             StackSection(title: "Pinned", stacks: pinned),
@@ -243,10 +243,6 @@ private struct ProjectStack: Identifiable {
     var counts: ServiceCounts {
         instance.counts
     }
-
-    var isActive: Bool {
-        project.error != nil || instance.error != nil || counts.pending > 0 || counts.up > 0
-    }
 }
 
 private struct ServiceGroup: Identifiable {
@@ -276,9 +272,12 @@ private struct HeaderView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Zapper")
                     .font(.headline)
-                Text(summary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 5) {
+                    HeaderRefreshIndicator(isRefreshing: model.isRefreshing)
+                    Text(summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
@@ -315,9 +314,6 @@ private struct HeaderView: View {
 
     private var summary: String {
         let counts = model.counts
-        if model.isRefreshing {
-            return "Refreshing..."
-        }
         if viewMode == .settings {
             return "Settings"
         }
@@ -325,6 +321,27 @@ private struct HeaderView: View {
             return "No services loaded"
         }
         return serviceSummary(counts)
+    }
+}
+
+private struct HeaderRefreshIndicator: View {
+    let isRefreshing: Bool
+
+    var body: some View {
+        Group {
+            if isRefreshing {
+                ProgressView()
+                    .controlSize(.small)
+                    .scaleEffect(0.45)
+            } else {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .opacity(0.72)
+            }
+        }
+        .frame(width: 9, height: 9)
+        .help(isRefreshing ? "Refreshing" : "Up to date")
     }
 }
 
@@ -455,8 +472,12 @@ private struct StackRow: View {
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
                             HStack(spacing: 5) {
-                                StatusLED(counts: stack.counts, error: stack.project.error ?? stack.instance.error)
-                                Text(serviceSummary(stack.counts))
+                                StatusIndicator(
+                                    counts: stackCounts,
+                                    error: stack.project.error ?? stack.instance.error,
+                                    isBusy: isBusy
+                                )
+                                Text(serviceSummary(stackCounts))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
@@ -531,6 +552,14 @@ private struct StackRow: View {
             transaction.animation = nil
         }
     }
+
+    private var stackCounts: ServiceCounts {
+        model.counts(for: stack.instance, in: stack.project)
+    }
+
+    private var isBusy: Bool {
+        model.isStackBusy(instance: stack.instance, project: stack.project)
+    }
 }
 
 private struct StackActions: View {
@@ -539,14 +568,14 @@ private struct StackActions: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            if stack.counts.up < stack.counts.total {
+            if stackCounts.up < stackCounts.total {
                 stackActionButton("Start") {
                     Task { await model.startInstance(stack.instance, in: stack.project) }
                 }
                 .disabled(model.actionInFlight != nil)
             }
 
-            if stack.counts.up > 0 {
+            if stackCounts.up > 0 {
                 stackActionButton("Stop") {
                     Task { await model.stopInstance(stack.instance, in: stack.project) }
                 }
@@ -571,6 +600,14 @@ private struct StackActions: View {
             .font(.system(size: stackActionFontSize))
             .foregroundStyle(.primary)
             .controlSize(.small)
+    }
+
+    private var stackCounts: ServiceCounts {
+        model.counts(for: stack.instance, in: stack.project)
+    }
+
+    private var isBusy: Bool {
+        model.isStackBusy(instance: stack.instance, project: stack.project)
     }
 }
 
@@ -729,19 +766,28 @@ private struct StackMoreButton: NSViewRepresentable {
     }
 }
 
-private struct StatusLED: View {
+private struct StatusIndicator: View {
     let counts: ServiceCounts
     let error: String?
+    let isBusy: Bool
 
     var body: some View {
-        Circle()
-            .fill(statusColor(counts: counts, error: error))
-            .frame(width: 7, height: 7)
-            .overlay {
+        Group {
+            if isBusy {
+                ProgressView()
+                    .controlSize(.small)
+                    .scaleEffect(0.45)
+            } else {
                 Circle()
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.3), lineWidth: 0.5)
+                    .fill(statusColor(counts: counts, error: error))
+                    .overlay {
+                        Circle()
+                            .stroke(Color(nsColor: .separatorColor).opacity(0.3), lineWidth: 0.5)
+                    }
             }
-            .help(statusHelp)
+        }
+        .frame(width: 7, height: 7)
+        .help(statusHelp)
     }
 
     private var statusHelp: String {
@@ -769,8 +815,16 @@ private struct ServiceRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(serviceStatusColor(service))
+            Group {
+                if isBusy {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.45)
+                } else {
+                    Circle()
+                        .fill(serviceStatusColor(status: status, enabled: service.enabled))
+                }
+            }
                 .frame(width: 7, height: 7)
             Text(service.service)
                 .font(.caption)
@@ -782,10 +836,20 @@ private struct ServiceRow: View {
                 service: service,
                 instance: instance,
                 project: project,
-                model: model
+                model: model,
+                status: status,
+                isBusy: isBusy
             )
         }
         .buttonStyle(.borderless)
+    }
+
+    private var status: String {
+        model.status(for: service, instance: instance, project: project)
+    }
+
+    private var isBusy: Bool {
+        model.isServiceBusy(service, instance: instance, project: project)
     }
 }
 
@@ -794,23 +858,25 @@ private struct ServiceInfoMenu: View {
     let instance: ZapperInstance
     let project: ZapperProject
     @ObservedObject var model: DashboardModel
+    let status: String
+    let isBusy: Bool
 
     var body: some View {
         Menu {
-            if service.status == "up" || service.status == "pending" {
+            if status == "up" || status == "pending" {
                 Button("Stop") {
                     Task {
                         await model.stopService(service, instance: instance, project: project)
                     }
                 }
-                .disabled(model.actionInFlight != nil)
+                .disabled(model.actionInFlight != nil || isBusy)
             } else {
                 Button("Start") {
                     Task {
                         await model.startService(service, instance: instance, project: project)
                     }
                 }
-                .disabled(model.actionInFlight != nil)
+                .disabled(model.actionInFlight != nil || isBusy)
             }
 
             Button("Restart") {
@@ -818,7 +884,7 @@ private struct ServiceInfoMenu: View {
                     await model.restartService(service, instance: instance, project: project)
                 }
             }
-            .disabled(model.actionInFlight != nil)
+            .disabled(model.actionInFlight != nil || isBusy)
 
             if let cwd = service.cwd {
                 Divider()
@@ -887,12 +953,12 @@ private func statusColor(counts: ServiceCounts, error: String?) -> Color {
     return .secondary
 }
 
-private func serviceStatusColor(_ service: ZapperService) -> Color {
-    guard service.enabled else {
+private func serviceStatusColor(status: String, enabled: Bool) -> Color {
+    guard enabled else {
         return .secondary
     }
 
-    switch service.status {
+    switch status {
     case "up":
         return .green
     case "pending":
