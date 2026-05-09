@@ -56,7 +56,7 @@ describe("SystemCommand", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("prunes missing projects before listing when --prune is set", async () => {
+  it("labels missing projects as stale even when --prune is set", async () => {
     const context = makeContext(projectRoot);
     touchSystemProject({ context, configPath: context.configPath! });
     fs.rmSync(projectRoot, { recursive: true, force: true });
@@ -67,11 +67,11 @@ describe("SystemCommand", () => {
       options: { prune: true },
     });
 
-    expect(result).toEqual({
-      kind: "system.projects",
-      projects: [],
-    });
-    expect(Object.keys(loadSystemRegistry().projects)).toHaveLength(0);
+    expect(result?.kind).toBe("system.projects");
+    if (result?.kind !== "system.projects") return;
+    expect(result.projects).toHaveLength(1);
+    expect(result.projects[0].state).toBe("stale");
+    expect(Object.keys(loadSystemRegistry().projects)).toHaveLength(1);
   });
 
   it("lists missing projects as stale when --prune is not set", async () => {

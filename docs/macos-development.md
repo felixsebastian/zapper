@@ -38,6 +38,6 @@ PACKAGE_ZAPPER_RUNTIME=0 apps/macos/bin/run
 ## Notes
 
 - The app shells out to its bundled `zap` wrapper for `zap system projects
-  --prune --json`, links, and start/stop/restart actions.
+  --json`, links, and start/stop/restart actions.
 - Use the gear menu to choose an external CLI only when debugging CLI selection.
 - If the popover still looks stale, open the app menu and refresh after launch.

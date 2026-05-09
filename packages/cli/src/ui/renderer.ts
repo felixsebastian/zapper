@@ -681,6 +681,56 @@ export const renderer = {
       return `Killed ${data.pm2Count} PM2 process(es) and ${data.containerCount} container(s) for project ${data.projectName} (${data.prefix}.).`;
     },
 
+    globalPrunePlanText(data: {
+      staleProjects: SystemRegistryProject[];
+      resources: SystemResourceAuditEntry[];
+    }): string {
+      const sections: string[] = [];
+
+      if (data.staleProjects.length > 0) {
+        sections.push(
+          [
+            header("Stale Registry Entries"),
+            "",
+            renderer.system.registryProjectsToText(data.staleProjects),
+          ].join("\n"),
+        );
+      }
+
+      if (data.resources.length > 0) {
+        sections.push(renderer.system.resourcesToText(data.resources));
+      }
+
+      return sections.join("\n\n");
+    },
+
+    globalPruneCompletedText(data: {
+      status: "aborted" | "completed";
+      staleProjects: SystemRegistryProject[];
+      removedProjects: SystemRegistryProject[];
+      resources: SystemResourceAuditEntry[];
+    }): string {
+      const resourceCount = data.resources.length;
+      if (data.status === "aborted") {
+        const projectCount = data.staleProjects.length;
+        return [
+          `Found ${projectCount} stale registry entr${projectCount === 1 ? "y" : "ies"} and ${resourceCount} orphaned resource${resourceCount === 1 ? "" : "s"}. Cleanup aborted.`,
+          "",
+          renderer.command.globalPrunePlanText({
+            staleProjects: data.staleProjects,
+            resources: data.resources,
+          }),
+        ].join("\n");
+      }
+
+      const projectCount = data.removedProjects.length;
+      return [
+        `Pruned ${projectCount} stale registry entr${projectCount === 1 ? "y" : "ies"} and cleaned ${resourceCount} orphaned resource${resourceCount === 1 ? "" : "s"}.`,
+        "",
+        renderer.system.resourcesToText(data.resources),
+      ].join("\n");
+    },
+
     initInstanceText(instanceKey: string, instanceId?: string): string {
       return `Initialized instance "${instanceKey}" (${instanceId})`;
     },

@@ -386,20 +386,23 @@ Add explicit maintenance commands:
 
 ```bash
 zap system projects
-zap system projects --prune
 zap system registry prune
 zap system registry forget <registry-id-or-path>
 zap system registry repair
 zap system resources audit
 zap system resources cleanup
+zap global list
+zap global ls
+zap global prune
+zap global prune --force
 ```
 
 Suggested behavior:
 
-- `system projects --prune` removes stale project registry entries before
-  returning the project list.
-- `prune` removes entries whose config path is missing and that have no matching
-  live resources.
+- `system projects` always validates registered project roots and config paths,
+  returning missing entries with `state: "stale"` without mutating the registry.
+- `prune` removes entries whose config path is missing after any matching live
+  resources have been cleaned up.
 - `forget` removes one entry without touching PM2 or Docker.
 - `repair` rewrites the registry from currently accessible entries and live
   metadata.
@@ -407,6 +410,13 @@ Suggested behavior:
   ambiguous resources without changing the registry.
 - `system resources cleanup` stops/removes selected audited resources after
   explicit confirmation.
+- `global list` and its `global ls` alias always list discovered global
+  PM2/container resources. `--all` is retained only as a compatibility no-op for
+  this command.
+- `global prune` audits stale registry entries and orphaned PM2 processes,
+  Docker containers, and generated Docker volumes before mutating anything.
+  After confirmation, it removes orphaned resources and then prunes stale
+  registry entries. `--force` (`-y`) skips the confirmation for automation.
 - Runtime orphan cleanup should be explicit and confirmation-heavy because it
   deletes live PM2/Docker resources that current project config may no longer
   describe.
@@ -416,6 +426,8 @@ Cleanup commands should remain separate:
 - `zap down` stops current configured resources for the selected repo/instance.
 - `zap kill` removes current project resources by project prefix.
 - `zap global kill` removes live resources by runtime discovery.
+- `zap global prune` removes live resources that no longer match the current
+  global registry, then removes stale registry entries.
 - `zap system registry forget` only edits the system registry.
 
 ## Privacy Controls

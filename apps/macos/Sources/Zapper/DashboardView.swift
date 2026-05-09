@@ -65,7 +65,8 @@ struct DashboardView: View {
     }
 
     private var estimatedDashboardContentHeight: CGFloat {
-        guard !allStacks.isEmpty else {
+        let sectionCount = stackSections.count + (missingProjects.isEmpty ? 0 : 1)
+        guard sectionCount > 0 else {
             return 220
         }
 
@@ -76,8 +77,13 @@ struct DashboardView: View {
             let rowSpacing = CGFloat(max(section.stacks.count - 1, 0)) * stackSpacing
             return partial + stackSectionHeaderHeight + rows + rowSpacing
         }
-        let sectionSpacing = CGFloat(max(stackSections.count - 1, 0)) * stackSectionSpacing
-        return dashboardPadding + sectionHeights + sectionSpacing
+        let missingRowsHeight = missingProjects.isEmpty
+            ? CGFloat(0)
+            : stackSectionHeaderHeight
+                + CGFloat(missingProjects.count) * collapsedStackRowHeight
+                + CGFloat(max(missingProjects.count - 1, 0)) * stackSpacing
+        let sectionSpacing = CGFloat(max(sectionCount - 1, 0)) * stackSectionSpacing
+        return dashboardPadding + sectionHeights + missingRowsHeight + sectionSpacing
     }
 
     private var maxDashboardContentHeight: CGFloat {
@@ -136,6 +142,10 @@ struct DashboardView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: stackSectionSpacing) {
+                    if !missingProjects.isEmpty {
+                        MissingStackSectionView(projects: missingProjects)
+                    }
+
                     ForEach(stackSections) { section in
                         StackSectionView(
                             section: section,
@@ -170,6 +180,14 @@ struct DashboardView: View {
         .sorted { lhs, rhs in
             lhs.sortTitle.localizedCaseInsensitiveCompare(rhs.sortTitle) == .orderedAscending
         }
+    }
+
+    private var missingProjects: [ZapperProject] {
+        model.projects
+            .filter { $0.state == "stale" }
+            .sorted { lhs, rhs in
+                lhs.project.localizedCaseInsensitiveCompare(rhs.project) == .orderedAscending
+            }
     }
 
     private var stackSections: [StackSection] {
@@ -213,6 +231,77 @@ private struct StackSectionView: View {
                     isExpanded: expandedBinding(stack)
                 )
             }
+        }
+    }
+}
+
+private struct MissingStackSectionView: View {
+    let projects: [ZapperProject]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: stackSpacing) {
+            Text("Missing Stacks")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .frame(maxWidth: .infinity, minHeight: stackSectionHeaderHeight, alignment: .leading)
+
+            ForEach(projects) { project in
+                MissingStackRow(project: project)
+            }
+        }
+    }
+}
+
+private struct MissingStackRow: View {
+    let project: ZapperProject
+    @State private var isHovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.orange)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(project.project)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text("Missing stack")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            Text(project.error ?? "Project root or config path no longer exists")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Text(project.projectRoot)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: collapsedStackRowHeight, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(isHovering ? 0.82 : 0.48))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color.orange.opacity(isHovering ? 0.34 : 0.2), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .onHover { hovering in
+            isHovering = hovering
         }
     }
 }

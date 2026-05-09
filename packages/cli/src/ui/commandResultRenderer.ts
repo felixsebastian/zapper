@@ -100,6 +100,17 @@ function toJsonPayload(result: CommandResult): unknown {
         allProjects: result.allProjects,
         projects: result.projects,
       };
+    case "global.prune":
+      return {
+        status: result.status,
+        staleProjects: renderer.system.registryProjectsToJson(
+          result.staleProjects,
+        ),
+        removedProjects: renderer.system.registryProjectsToJson(
+          result.removedProjects,
+        ),
+        resources: renderer.system.resourcesToJson(result.resources),
+      };
     case "system.projects":
       return { projects: renderer.system.projectsToJson(result.projects) };
     case "system.registry.prune":
@@ -344,6 +355,16 @@ export function renderCommandResult(
       }
       return;
     }
+    case "global.prune":
+      renderer.log.report(
+        renderer.command.globalPruneCompletedText({
+          status: result.status,
+          staleProjects: result.staleProjects,
+          removedProjects: result.removedProjects,
+          resources: result.resources,
+        }),
+      );
+      return;
     case "system.projects":
       renderer.log.report(renderer.system.projectsToText(result.projects));
       return;

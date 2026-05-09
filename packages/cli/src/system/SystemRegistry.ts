@@ -281,6 +281,17 @@ export function pruneSystemRegistry(): SystemRegistryProject[] {
   });
 }
 
+export function getStaleSystemRegistryProjects(): SystemRegistryProject[] {
+  const registry = loadSystemRegistry();
+  return Object.values(registry.projects)
+    .filter(
+      (project) =>
+        !fs.existsSync(project.projectRoot) ||
+        !fs.existsSync(project.configPath),
+    )
+    .sort((a, b) => a.project.localeCompare(b.project));
+}
+
 export function forgetSystemRegistryEntry(
   registryIdOrPath: string,
 ): SystemRegistryProject | null {

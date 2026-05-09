@@ -3,6 +3,7 @@ import { StatusResult } from "../core/getStatus";
 import { ServiceListResult } from "../core/getServiceList";
 import type {
   SystemProjectStatus,
+  SystemResourceAuditEntry,
   SystemResourceAuditResult,
   SystemRegistryProject,
 } from "../system";
@@ -152,6 +153,13 @@ export type CommandResult =
         pm2: string[];
         containers: string[];
       }>;
+    }
+  | {
+      kind: "global.prune";
+      status: "aborted" | "completed";
+      staleProjects: SystemRegistryProject[];
+      removedProjects: SystemRegistryProject[];
+      resources: SystemResourceAuditEntry[];
     }
   | {
       kind: "system.projects";

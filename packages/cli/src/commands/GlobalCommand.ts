@@ -7,6 +7,12 @@ import { Pm2Manager } from "../core/process/Pm2Manager";
 import { DockerManager } from "../core/docker/DockerManager";
 import { renderer } from "../ui/renderer";
 import { Zapper } from "../core/Zapper";
+import {
+  auditSystemResources,
+  cleanupSystemResources,
+  getStaleSystemRegistryProjects,
+  pruneSystemRegistry,
+} from "../system";
 
 export class GlobalCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<CommandResult> {
@@ -19,15 +25,21 @@ export class GlobalCommand extends CommandHandler {
 
     if (!subcommand) {
       throw new Error(
-        "Global command requires a subcommand: info, list, or kill",
+        "Global command requires a subcommand: info, list, prune, or kill",
       );
     }
 
     switch (subcommand) {
       case "info":
       case "list":
+      case "ls":
       case "l":
-        return await this.handleList(options.all, projectName, zapper);
+        return await this.handleList(projectName);
+      case "prune":
+        if (projectName) {
+          throw new Error("Global prune does not accept a project argument");
+        }
+        return await this.handlePrune(options.force);
       case "kill":
         return await this.handleKill(
           zapper,
@@ -37,24 +49,13 @@ export class GlobalCommand extends CommandHandler {
         );
       default:
         throw new Error(
-          `Unknown global subcommand: ${subcommand}. Use info, list, or kill.`,
+          `Unknown global subcommand: ${subcommand}. Use info, list, prune, or kill.`,
         );
     }
   }
 
-  private async handleList(
-    all?: boolean,
-    projectName?: string,
-    zapper?: Zapper,
-  ): Promise<CommandResult> {
-    if (all) {
-      const projects = await this.getAllProjects();
-      return {
-        kind: "global.list",
-        allProjects: true,
-        projects: projects,
-      };
-    } else if (projectName) {
+  private async handleList(projectName?: string): Promise<CommandResult> {
+    if (projectName) {
       // Show info for specific project
       const targets = await this.getProjectTargets(projectName);
       return {
@@ -69,43 +70,63 @@ export class GlobalCommand extends CommandHandler {
           },
         ],
       };
-    } else {
-      // Try to load config to get current project name
-      if (!zapper) {
-        throw new Error(
-          "Specify a project name or use --all flag to list all projects",
-        );
-      }
-
-      try {
-        await zapper.loadConfig();
-        const projectName = zapper.getProject();
-        if (!projectName) {
-          throw new Error(
-            "No project name provided and not in a project directory. Use --all flag or specify: zap global list <project>",
-          );
-        }
-
-        // Show current project
-        const targets = await this.getProjectTargets(projectName);
-        return {
-          kind: "global.list",
-          allProjects: false,
-          projects: [
-            {
-              name: targets.projectName,
-              prefix: targets.prefix,
-              pm2: targets.pm2,
-              containers: targets.containers,
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          "No project name provided and not in a project directory. Use --all flag or specify: zap global list <project>",
-        );
-      }
     }
+
+    const projects = await this.getAllProjects();
+    return {
+      kind: "global.list",
+      allProjects: true,
+      projects,
+    };
+  }
+
+  private async handlePrune(force?: boolean): Promise<CommandResult> {
+    const staleProjects = getStaleSystemRegistryProjects();
+    const audit = await auditSystemResources();
+    const resources = audit.resources;
+
+    if (staleProjects.length === 0 && resources.length === 0) {
+      return {
+        kind: "global.prune",
+        status: "completed",
+        staleProjects,
+        removedProjects: [],
+        resources: [],
+      };
+    }
+
+    renderer.log.report(
+      renderer.command.globalPrunePlanText({ staleProjects, resources }),
+    );
+
+    const proceed = await confirm(
+      renderer.confirm.deleteResourcesPromptText(),
+      { defaultYes: false, force },
+    );
+
+    if (!proceed) {
+      return {
+        kind: "global.prune",
+        status: "aborted",
+        staleProjects,
+        removedProjects: [],
+        resources,
+      };
+    }
+
+    const cleanup =
+      resources.length > 0
+        ? await cleanupSystemResources({ includeVolumes: true })
+        : { resources: [] };
+    const removedProjects = pruneSystemRegistry();
+
+    return {
+      kind: "global.prune",
+      status: "completed",
+      staleProjects,
+      removedProjects,
+      resources: cleanup.resources,
+    };
   }
 
   private async handleKill(

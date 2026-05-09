@@ -41,8 +41,9 @@ Unrecognized resources match the current project name but do not belong to any
 instance recorded in the local `.zap/state.json`. They usually come from another
 checkout, older state, or manual resource creation.
 
-Use `zap global list <project>` or `zap global kill <project>` when you want a
-project-wide view or cleanup across checkouts.
+Use `zap global list` (or `zap global ls`, `zap g ls`) for a machine-wide view
+of discovered Zapper PM2 and Docker container resources. Use
+`zap global kill <project>` when you want project-wide cleanup across checkouts.
 
 ## Cleanup Commands
 
@@ -51,6 +52,10 @@ project-wide view or cleanup across checkouts.
   project across instances.
 - `zap global kill <project>` deletes PM2 processes and Docker containers for a
   named project.
+- `zap global prune` audits stale registry entries and orphaned resources
+  before mutating anything. After confirmation, it deletes orphaned PM2
+  processes, Docker containers, and generated Docker volumes, then removes stale
+  registry entries. Use `--force` (`-y`) for non-interactive cleanup.
 - `zap volume prune` deletes stale generated Docker volumes for the selected
   instance.
 - `zap volume reset` forgets generated volume assignments in `.zap/state.json`

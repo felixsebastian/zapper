@@ -219,6 +219,12 @@ zap kill                    # Kill all PM2 processes and containers for current 
 zap kill my-old-project     # Kill all PM2 processes and containers for a specific project, across all instances
 zap kill --force            # Skip the interactive confirmation
 zap kill --json             # Output kill result as JSON
+zap global list             # List all discovered Zapper PM2/container resources
+zap global ls               # Alias for: zap global list
+zap g ls                    # Short alias for: zap global ls
+zap global prune            # Prune stale registry entries, then orphaned resources and generated volumes
+zap global prune --force    # Skip the interactive prune confirmation
+zap g kill --force          # Skip the interactive global kill confirmation
 zap clone                   # Clone all repos defined in config
 zap clone api               # Clone one repo
 zap clone api web           # Clone multiple repos
@@ -253,7 +259,6 @@ orphaned resource cleanup.
 ```bash
 zap system projects                  # List registered Zapper projects
 zap system projects --json           # Output registered projects as JSON
-zap system projects --prune --json   # Prune missing projects before listing
 zap system registry prune            # Remove stale system registry entries
 zap system registry forget <target>  # Forget one registry entry by id or path
 zap system registry repair           # Prune stale entries and show projects
@@ -261,6 +266,18 @@ zap system resources audit           # Show orphaned PM2/Docker resources
 zap system resources cleanup         # Delete audited orphaned resources
 zap system resources cleanup --include-volumes
 ```
+
+`zap system projects` always validates registered project roots and config paths.
+Missing projects stay in the registry and are returned with `state: "stale"` so
+the desktop app and CLI can show a single source of truth.
+
+`zap global prune` audits stale registry entries, PM2 processes, Docker
+containers, and generated Docker volumes while the registry metadata is still
+available. After confirmation, it deletes orphaned resources and then removes
+the stale registry entries. Use `--force` (`-y`) for non-interactive runs.
+
+For `zap global list`, `--all` is now a legacy no-op: the command always lists
+all discovered global Zapper resources unless you pass a project name.
 
 On macOS, the system registry defaults to
 `~/Library/Application Support/Zapper/registry.json`. On Linux, it defaults to
@@ -1382,8 +1399,9 @@ Unrecognized resources match the current project name but do not belong to any
 instance recorded in the local `.zap/state.json`. They usually come from another
 checkout, older state, or manual resource creation.
 
-Use `zap global list <project>` or `zap global kill <project>` when you want a
-project-wide view or cleanup across checkouts.
+Use `zap global list` (or `zap global ls`, `zap g ls`) for a machine-wide view
+of discovered Zapper PM2 and Docker container resources. Use
+`zap global kill <project>` when you want project-wide cleanup across checkouts.
 
 ## Cleanup Commands
 
@@ -1392,6 +1410,10 @@ project-wide view or cleanup across checkouts.
   project across instances.
 - `zap global kill <project>` deletes PM2 processes and Docker containers for a
   named project.
+- `zap global prune` audits stale registry entries and orphaned resources
+  before mutating anything. After confirmation, it deletes orphaned PM2
+  processes, Docker containers, and generated Docker volumes, then removes stale
+  registry entries. Use `--force` (`-y`) for non-interactive cleanup.
 - `zap volume prune` deletes stale generated Docker volumes for the selected
   instance.
 - `zap volume reset` forgets generated volume assignments in `.zap/state.json`
@@ -1814,20 +1836,23 @@ Add explicit maintenance commands:
 
 ```bash
 zap system projects
-zap system projects --prune
 zap system registry prune
 zap system registry forget <registry-id-or-path>
 zap system registry repair
 zap system resources audit
 zap system resources cleanup
+zap global list
+zap global ls
+zap global prune
+zap global prune --force
 ```
 
 Suggested behavior:
 
-- `system projects --prune` removes stale project registry entries before
-  returning the project list.
-- `prune` removes entries whose config path is missing and that have no matching
-  live resources.
+- `system projects` always validates registered project roots and config paths,
+  returning missing entries with `state: "stale"` without mutating the registry.
+- `prune` removes entries whose config path is missing after any matching live
+  resources have been cleaned up.
 - `forget` removes one entry without touching PM2 or Docker.
 - `repair` rewrites the registry from currently accessible entries and live
   metadata.
@@ -1835,6 +1860,13 @@ Suggested behavior:
   ambiguous resources without changing the registry.
 - `system resources cleanup` stops/removes selected audited resources after
   explicit confirmation.
+- `global list` and its `global ls` alias always list discovered global
+  PM2/container resources. `--all` is retained only as a compatibility no-op for
+  this command.
+- `global prune` audits stale registry entries and orphaned PM2 processes,
+  Docker containers, and generated Docker volumes before mutating anything.
+  After confirmation, it removes orphaned resources and then prunes stale
+  registry entries. `--force` (`-y`) skips the confirmation for automation.
 - Runtime orphan cleanup should be explicit and confirmation-heavy because it
   deletes live PM2/Docker resources that current project config may no longer
   describe.
@@ -1844,6 +1876,8 @@ Cleanup commands should remain separate:
 - `zap down` stops current configured resources for the selected repo/instance.
 - `zap kill` removes current project resources by project prefix.
 - `zap global kill` removes live resources by runtime discovery.
+- `zap global prune` removes live resources that no longer match the current
+  global registry, then removes stale registry entries.
 - `zap system registry forget` only edits the system registry.
 
 ## Privacy Controls
@@ -2498,7 +2532,7 @@ The Swift app invokes a bundled `zap` wrapper, which runs:
 ```text
 Zapper.app/Contents/Resources/ZapperRuntime/node/bin/node \
   Zapper.app/Contents/Resources/ZapperRuntime/cli/dist/index.js \
-  system projects --prune --json
+  system projects --json
 ```
 
 This removes the desktop app's dependency on the user's Node installation,

@@ -20,9 +20,6 @@ export class SystemCommand extends CommandHandler {
     const [area, action, target] = args;
 
     if (!area || area === "projects") {
-      if (context.options.prune) {
-        await pruneSystemRegistry();
-      }
       return {
         kind: "system.projects",
         projects: await getSystemProjects(),

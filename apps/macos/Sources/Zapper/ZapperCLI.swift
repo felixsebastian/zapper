@@ -44,7 +44,7 @@ struct ZapperCLI {
     func loadProjects() async throws -> [ZapperProject] {
         try await Task.detached(priority: .userInitiated) {
             let zapPath = try Self.resolveZapPath()
-            let output = try Self.run(executable: zapPath, arguments: ["system", "projects", "--prune", "--json"])
+            let output = try Self.run(executable: zapPath, arguments: ["system", "projects", "--json"])
             let decoder = JSONDecoder()
             do {
                 return try decoder.decode(SystemProjectsResponse.self, from: output).projects

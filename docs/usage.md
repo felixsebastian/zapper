@@ -162,6 +162,12 @@ zap kill                    # Kill all PM2 processes and containers for current 
 zap kill my-old-project     # Kill all PM2 processes and containers for a specific project, across all instances
 zap kill --force            # Skip the interactive confirmation
 zap kill --json             # Output kill result as JSON
+zap global list             # List all discovered Zapper PM2/container resources
+zap global ls               # Alias for: zap global list
+zap g ls                    # Short alias for: zap global ls
+zap global prune            # Prune stale registry entries, then orphaned resources and generated volumes
+zap global prune --force    # Skip the interactive prune confirmation
+zap g kill --force          # Skip the interactive global kill confirmation
 zap clone                   # Clone all repos defined in config
 zap clone api               # Clone one repo
 zap clone api web           # Clone multiple repos
@@ -196,7 +202,6 @@ orphaned resource cleanup.
 ```bash
 zap system projects                  # List registered Zapper projects
 zap system projects --json           # Output registered projects as JSON
-zap system projects --prune --json   # Prune missing projects before listing
 zap system registry prune            # Remove stale system registry entries
 zap system registry forget <target>  # Forget one registry entry by id or path
 zap system registry repair           # Prune stale entries and show projects
@@ -204,6 +209,18 @@ zap system resources audit           # Show orphaned PM2/Docker resources
 zap system resources cleanup         # Delete audited orphaned resources
 zap system resources cleanup --include-volumes
 ```
+
+`zap system projects` always validates registered project roots and config paths.
+Missing projects stay in the registry and are returned with `state: "stale"` so
+the desktop app and CLI can show a single source of truth.
+
+`zap global prune` audits stale registry entries, PM2 processes, Docker
+containers, and generated Docker volumes while the registry metadata is still
+available. After confirmation, it deletes orphaned resources and then removes
+the stale registry entries. Use `--force` (`-y`) for non-interactive runs.
+
+For `zap global list`, `--all` is now a legacy no-op: the command always lists
+all discovered global Zapper resources unless you pass a project name.
 
 On macOS, the system registry defaults to
 `~/Library/Application Support/Zapper/registry.json`. On Linux, it defaults to

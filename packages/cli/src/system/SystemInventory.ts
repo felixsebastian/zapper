@@ -151,16 +151,21 @@ function parseManagedVolumeName(
 function buildRegistryIndex(projects: SystemProjectStatus[]): {
   projectNames: Set<string>;
   instanceIds: Set<string>;
+  projectInstanceKeys: Set<string>;
   serviceKeys: Set<string>;
 } {
   const projectNames = new Set<string>();
   const instanceIds = new Set<string>();
+  const projectInstanceKeys = new Set<string>();
   const serviceKeys = new Set<string>();
 
   for (const project of projects) {
     projectNames.add(project.project);
     for (const instance of project.instances) {
-      if (instance.instanceId) instanceIds.add(instance.instanceId);
+      if (instance.instanceId) {
+        instanceIds.add(instance.instanceId);
+        projectInstanceKeys.add(`${project.project}:${instance.instanceId}`);
+      }
       for (const service of instance.list?.services || []) {
         serviceKeys.add(
           `${project.project}:${instance.instanceId}:${service.service}`,
@@ -169,7 +174,7 @@ function buildRegistryIndex(projects: SystemProjectStatus[]): {
     }
   }
 
-  return { projectNames, instanceIds, serviceKeys };
+  return { projectNames, instanceIds, projectInstanceKeys, serviceKeys };
 }
 
 function classifyServiceResource(
@@ -252,7 +257,9 @@ function classifyVolumeResource(
     };
   }
 
-  if (!index.instanceIds.has(parsed.instanceId)) {
+  if (
+    !index.projectInstanceKeys.has(`${parsed.project}:${parsed.instanceId}`)
+  ) {
     return {
       type: "volume",
       name,

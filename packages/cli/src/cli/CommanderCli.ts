@@ -487,13 +487,18 @@ export class CommanderCli {
     this.program
       .command("global <subcommand> [project]")
       .alias("g")
-      .description("Global operations across projects (info, list, kill)")
-      .option("-a, --all", "Apply to all projects (overrides project argument)")
+      .description(
+        "Global operations across projects (info, list, prune, kill)",
+      )
+      .option(
+        "-a, --all",
+        "Legacy no-op for list; apply to all projects for kill",
+      )
       .option("-y, --force", "Force the operation")
       .option("-j, --json", "Output command result as minified JSON")
       .action(async (subcommand, project, options, command) => {
         // Validate mutually exclusive options
-        if (options.all && project) {
+        if (subcommand === "kill" && options.all && project) {
           throw new Error(
             `Cannot specify both a project name ('${project}') and --all flag. Use either 'zap global ${subcommand} ${project}' or 'zap global ${subcommand} --all'.`,
           );
@@ -515,11 +520,10 @@ export class CommanderCli {
     this.program
       .command("glist")
       .alias("gl")
-      .description("List all projects (shorthand for 'global list --all')")
+      .description("List all projects (shorthand for 'global list')")
       .option("-j, --json", "Output command result as minified JSON")
       .action(async (options, command) => {
         const service = ["list"];
-        command.setOptionValue("all", true);
         await this.executeCommand("global", service, command);
       });
 
@@ -535,11 +539,20 @@ export class CommanderCli {
       });
 
     this.program
+      .command("gprune")
+      .description("Prune stale registry entries and orphaned resources")
+      .option("-y, --force", "Force the operation")
+      .option("-j, --json", "Output command result as minified JSON")
+      .action(async (options, command) => {
+        await this.executeCommand("global", ["prune"], command);
+      });
+
+    this.program
       .command("system [area] [action] [target]")
       .description(
         "Machine-wide Zapper project registry and orphaned resource audit",
       )
-      .option("--prune", "Remove stale project registry entries before listing")
+      .option("--prune", "Deprecated no-op; stale projects are always labeled")
       .option("--include-volumes", "Include generated Docker volumes")
       .option("-y, --force", "Force cleanup operations")
       .option("-j, --json", "Output command result as minified JSON")

@@ -4,7 +4,38 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DockerManager } from "../core/docker/DockerManager";
 import { Pm2Manager } from "../core/process/Pm2Manager";
+import type { Context } from "../types/Context";
 import { auditSystemResources } from "./SystemInventory";
+import { touchSystemProject } from "./SystemRegistry";
+
+function makeContext(projectRoot: string): Context {
+  return {
+    projectName: "registered",
+    projectRoot,
+    configPath: path.join(projectRoot, "zap.yaml"),
+    environments: [],
+    instanceKey: "default",
+    instanceId: "known123",
+    instance: {
+      key: "default",
+      id: "known123",
+      ports: {},
+    },
+    processes: [],
+    containers: [],
+    tasks: [],
+    links: [],
+    profiles: [],
+    state: {
+      instances: {
+        default: {
+          id: "known123",
+          ports: {},
+        },
+      },
+    },
+  };
+}
 
 describe("SystemInventory", () => {
   let tempDir: string;
@@ -79,5 +110,32 @@ describe("SystemInventory", () => {
         }),
       ]),
     );
+  });
+
+  it("treats generated volumes as dangling when the project is registered but the instance ID is not", async () => {
+    const projectRoot = path.join(tempDir, "registered");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, "zap.yaml"),
+      "project: registered\n",
+    );
+    const context = makeContext(projectRoot);
+    touchSystemProject({ context, configPath: context.configPath! });
+
+    vi.mocked(Pm2Manager.listProcesses).mockResolvedValue([]);
+    vi.mocked(DockerManager.listContainers).mockResolvedValue([]);
+    vi.mocked(DockerManager.listVolumes).mockResolvedValue([
+      { name: "zap.registered.unknown456.vol1" },
+    ]);
+
+    const audit = await auditSystemResources();
+
+    expect(audit.resources).toEqual([
+      expect.objectContaining({
+        type: "volume",
+        name: "zap.registered.unknown456.vol1",
+        classification: "dangling",
+      }),
+    ]);
   });
 });
