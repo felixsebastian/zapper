@@ -5,13 +5,16 @@ import { loadState, saveState } from "../config/stateLoader";
 export interface InstanceResolution {
   instanceKey: string;
   instanceId: string;
+  label?: string;
 }
 
 export const DEFAULT_INSTANCE_KEY = "default";
+export const MAX_INSTANCE_LABEL_LENGTH = 100;
 const INSTANCE_KEY_PATTERN = /^[a-z]+(?:-[a-z]+)*$/;
 
 interface InstanceEntry {
   id: string;
+  label?: string;
   ports?: Record<string, string>;
   volumes?: Record<string, StoredVolume>;
 }
@@ -49,6 +52,21 @@ export function validateInstanceKey(key: string): void {
       `Invalid instance key "${key}". Instance keys must contain only lowercase letters and hyphens.`,
     );
   }
+}
+
+export function validateInstanceLabel(label: string): void {
+  if (label.length > MAX_INSTANCE_LABEL_LENGTH) {
+    throw new Error(
+      `Instance label cannot exceed ${MAX_INSTANCE_LABEL_LENGTH} characters.`,
+    );
+  }
+}
+
+export function getInstanceDisplayLabel(instance: {
+  id: string;
+  label?: string;
+}): string {
+  return instance.label ?? instance.id;
 }
 
 function getLegacyInstanceId(projectRoot: string): string | undefined {
@@ -139,6 +157,35 @@ export function ensureInstance(
   return { id, created: true };
 }
 
+export function setInstanceLabel(
+  projectRoot: string,
+  instanceKey: string = DEFAULT_INSTANCE_KEY,
+  label: string,
+): { instanceKey: string; instanceId: string; label: string } {
+  validateInstanceLabel(label);
+  const resolvedInstanceKey = resolveDefaultInstanceKey(
+    instanceKey,
+    projectRoot,
+  );
+  validateInstanceKey(resolvedInstanceKey);
+  const { id } = ensureInstance(projectRoot, resolvedInstanceKey);
+  const state = loadState(projectRoot);
+  const existing = state.instances?.[resolvedInstanceKey];
+
+  saveState(projectRoot, {
+    instances: {
+      ...(state.instances || {}),
+      [resolvedInstanceKey]: {
+        ...existing,
+        id,
+        label,
+      },
+    },
+  });
+
+  return { instanceKey: resolvedInstanceKey, instanceId: id, label };
+}
+
 /**
  * Resolve instance configuration for the given project and key.
  */
@@ -156,7 +203,11 @@ export async function resolveInstance(
 
   const existing = state.instances?.[resolvedInstanceKey];
   if (existing?.id) {
-    return { instanceKey: resolvedInstanceKey, instanceId: existing.id };
+    return {
+      instanceKey: resolvedInstanceKey,
+      instanceId: existing.id,
+      label: existing.label,
+    };
   }
 
   // Legacy compatibility: treat top-level instanceId as default instance.
@@ -167,7 +218,12 @@ export async function resolveInstance(
 
   if (options.autoCreate) {
     const { id } = ensureInstance(projectRoot, resolvedInstanceKey);
-    return { instanceKey: resolvedInstanceKey, instanceId: id };
+    const instance = loadState(projectRoot).instances?.[resolvedInstanceKey];
+    return {
+      instanceKey: resolvedInstanceKey,
+      instanceId: id,
+      label: instance?.label,
+    };
   }
 
   throw new Error(

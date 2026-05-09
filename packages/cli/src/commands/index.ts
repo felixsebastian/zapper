@@ -24,6 +24,7 @@ export { LinksCommand } from "./LinksCommand";
 export { HomeCommand } from "./HomeCommand";
 export { NotesCommand } from "./NotesCommand";
 export { InitCommand } from "./InitCommand";
+export { InstanceCommand } from "./InstanceCommand";
 export { VolumeCommand } from "./VolumeCommand";
 export { GlobalCommand } from "./GlobalCommand";
 export { SystemCommand } from "./SystemCommand";

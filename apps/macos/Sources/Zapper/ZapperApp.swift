@@ -42,6 +42,7 @@ final class ZapperMenuBarApp: NSObject, NSApplicationDelegate {
             button.action = #selector(togglePopover(_:))
             button.target = self
             button.imagePosition = .imageLeading
+            button.imageHugsTitle = true
         }
         statusItem = item
     }
@@ -89,7 +90,7 @@ final class ZapperMenuBarApp: NSObject, NSApplicationDelegate {
             return
         }
 
-        button.title = " \(model.menuTitle)"
+        button.title = model.menuTitle
         button.image = NSImage(
             systemSymbolName: model.menuSystemImage,
             accessibilityDescription: "Zapper"

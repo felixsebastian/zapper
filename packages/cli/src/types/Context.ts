@@ -39,6 +39,7 @@ export interface Context {
   instance?: {
     key: string;
     id: string;
+    label?: string;
     ports: Record<string, string>;
     volumes?: Record<string, StoredVolume>;
   };

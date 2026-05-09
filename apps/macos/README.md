@@ -11,7 +11,9 @@ instances show as the project name; non-default instances show as
 LED and expose start, stop, and Open actions. Pinning lives in the stack
 overflow menu. The Open control is hidden
 when no homepage or project links are configured, opens directly when there is
-one target, and becomes a menu when there are multiple targets. Pinned stacks
+one target, and becomes a menu when there are multiple targets. The menu bar
+status item shows the bolt icon plus the count of running services only, keeping
+the item compact. Pinned stacks
 are stored as a local app preference and appear in a Pinned section above
 unpinned stacks. Unpinned stacks are grouped into Active and Inactive sections
 using the same state as the stack LED: running, pending, or errored stacks are

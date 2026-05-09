@@ -44,6 +44,7 @@ export interface ResourceInventory {
 export interface InstanceResourceInventory {
   instanceKey: string;
   instanceId: string;
+  label?: string;
   services: ServiceListEntry[];
   ports: PortListEntry[];
 }
@@ -157,6 +158,7 @@ async function getResourceInventory(
       instance: {
         key: instanceKey,
         id: instance.id,
+        label: instance.label,
         ports: instance.ports || {},
         volumes: instance.volumes || {},
       },
@@ -164,6 +166,7 @@ async function getResourceInventory(
     instances.set(instance.id, {
       instanceKey,
       instanceId: instance.id,
+      label: instance.label,
       services: buildServiceEntries(
         context,
         await getStatus(instanceContext, service, false),

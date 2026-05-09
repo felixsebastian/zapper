@@ -136,6 +136,14 @@ function toJsonPayload(result: CommandResult): unknown {
         randomized: result.randomized,
         warningShown: result.warningShown,
       };
+    case "instance.label":
+      return {
+        instanceKey: result.instanceKey,
+        instanceId: result.instanceId,
+        label: result.label ?? null,
+        displayLabel: result.displayLabel,
+        updated: result.updated,
+      };
     case "volume.reset":
       return {
         instanceKey: result.instanceKey,
@@ -382,6 +390,19 @@ export function renderCommandResult(
       );
       for (const [name, value] of Object.entries(result.ports)) {
         renderer.log.report(renderer.command.envAssignmentText(name, value));
+      }
+      return;
+    case "instance.label":
+      if (result.updated) {
+        renderer.log.info(
+          renderer.command.instanceLabeledText({
+            instanceKey: result.instanceKey,
+            instanceId: result.instanceId,
+            label: result.displayLabel,
+          }),
+        );
+      } else {
+        renderer.log.report(result.displayLabel);
       }
       return;
     case "volume.reset":

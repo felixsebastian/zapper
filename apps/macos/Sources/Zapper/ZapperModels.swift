@@ -40,10 +40,18 @@ struct ZapperProject: Decodable, Identifiable {
 struct ZapperInstance: Decodable, Identifiable {
     let instanceKey: String
     let instanceId: String
+    let label: String?
     let list: ZapperServiceList?
     let error: String?
 
     var id: String { "\(instanceKey):\(instanceId)" }
+
+    var displayLabel: String {
+        guard let label, !label.isEmpty else {
+            return instanceId
+        }
+        return label
+    }
 
     var services: [ZapperService] {
         list?.services ?? []

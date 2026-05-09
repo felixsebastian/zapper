@@ -6,6 +6,8 @@ import {
   clearIsolation,
   resolveInstance,
   DEFAULT_INSTANCE_KEY,
+  getInstanceDisplayLabel,
+  setInstanceLabel,
 } from "./instanceResolver";
 import { loadState, saveState } from "../config/stateLoader";
 
@@ -95,6 +97,32 @@ describe("instanceResolver", () => {
     });
 
     const result = await resolveInstance(testDir);
-    expect(result).toEqual({ instanceKey: "e-two", instanceId: "abc123" });
+    expect(result).toEqual({
+      instanceKey: "e-two",
+      instanceId: "abc123",
+      label: undefined,
+    });
+  });
+
+  it("sets and resolves an instance label", async () => {
+    const result = setInstanceLabel(testDir, "default", "local checkout");
+    const state = loadState(testDir);
+    const resolved = await resolveInstance(testDir);
+
+    expect(result).toEqual({
+      instanceKey: "default",
+      instanceId: state.instances?.default.id,
+      label: "local checkout",
+    });
+    expect(resolved.label).toBe("local checkout");
+    expect(getInstanceDisplayLabel(state.instances!.default)).toBe(
+      "local checkout",
+    );
+  });
+
+  it("rejects labels longer than 100 characters", () => {
+    expect(() => setInstanceLabel(testDir, "default", "x".repeat(101))).toThrow(
+      "Instance label cannot exceed 100 characters.",
+    );
   });
 });

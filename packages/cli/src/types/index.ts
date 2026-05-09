@@ -37,6 +37,7 @@ export type Command =
   | "home"
   | "notes"
   | "init"
+  | "instance"
   | "volume"
   | "global"
   | "system";

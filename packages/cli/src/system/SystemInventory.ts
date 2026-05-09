@@ -11,6 +11,7 @@ export type SystemProjectState = "active" | "inactive" | "stale" | "unresolved";
 export interface SystemProjectInstanceStatus {
   instanceKey: string;
   instanceId: string;
+  label?: string;
   list?: ServiceListResult;
   error?: string;
 }
@@ -58,7 +59,8 @@ async function loadProjectInstance(
   project: SystemRegistryProject,
   instanceKey: string,
 ): Promise<SystemProjectInstanceStatus> {
-  const instanceId = project.instances[instanceKey]?.id || "";
+  const registryInstance = project.instances[instanceKey];
+  const instanceId = registryInstance?.id || "";
   try {
     const zapper = new Zapper();
     await zapper.loadConfig(project.configPath, {
@@ -71,12 +73,14 @@ async function loadProjectInstance(
     return {
       instanceKey: context.instanceKey,
       instanceId: context.instanceId || instanceId,
+      label: context.instance?.label ?? registryInstance?.label,
       list: await getServiceList(context),
     };
   } catch (error) {
     return {
       instanceKey,
       instanceId,
+      label: registryInstance?.label,
       error: error instanceof Error ? error.message : String(error),
     };
   }

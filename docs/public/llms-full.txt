@@ -50,6 +50,9 @@ See the [full reference](usage.md) for every `zap.yaml` field and command.
 For packaging and local machine runtime plans, see
 [Local Runtime Compatibility](local-runtime.md).
 
+For the local menu bar app development loop, see
+[macOS Development](macos-development.md).
+
 # Source: docs/usage.md
 
 # Zapper Reference
@@ -224,6 +227,8 @@ zap init                    # Ensure local state exists for the default instance
 zap init --instance e2e     # Initialize/create a named instance
 zap init -R                 # Force full port re-randomization
 zap init --json             # Output as JSON
+zap instance label          # Print the selected instance display label
+zap instance label "local"  # Set a display label for the selected instance
 zap volume prune            # Delete stale generated Docker volumes for the selected instance
 zap volume reset            # Forget generated volume assignments for the selected instance
 zap launch                  # Open homepage (if configured)
@@ -248,6 +253,7 @@ orphaned resource cleanup.
 ```bash
 zap system projects                  # List registered Zapper projects
 zap system projects --json           # Output registered projects as JSON
+zap system projects --prune --json   # Prune missing projects before listing
 zap system registry prune            # Remove stale system registry entries
 zap system registry forget <target>  # Forget one registry entry by id or path
 zap system registry repair           # Prune stale entries and show projects
@@ -301,7 +307,7 @@ zap envset prod_dbs
 ### JSON Output
 
 Most non-streaming commands support `--json` and will print machine-readable JSON to stdout.
-Examples: `up`, `down`, `restart`, `clone`, `reset`, `kill`, `status`, `ls`, `task` (list/params), `profile`, `env`, `state`, `config`, `launch`, `links`, `home`, `notes`, `init`, `system`, and git subcommands.
+Examples: `up`, `down`, `restart`, `clone`, `reset`, `kill`, `status`, `ls`, `task` (list/params), `profile`, `env`, `state`, `config`, `launch`, `links`, `home`, `notes`, `init`, `instance`, `system`, and git subcommands.
 
 When `--json` is enabled, Zapper suppresses incidental human logs and warnings so the command output stays parseable. Command failures are still reported as errors.
 
@@ -706,9 +712,11 @@ or managed-volume collisions.
 zap up                                # Ensures default instance exists on first run
 zap up --instance e2e                 # Run a named instance
 zap init --instance e2e               # Explicitly create/init named instance state
+zap instance label                    # Print the selected instance display label
+zap instance label "local checkout"   # Label the selected instance for display
 ```
 
-If you omit `--instance`, Zapper targets `default`. Instance keys must use lowercase letters and hyphens only. See [Instances](instances.md) for full details.
+If you omit `--instance`, Zapper targets `default`. Instance keys must use lowercase letters and hyphens only. Instance labels can be any string up to 100 characters and are shown alongside the random instance ID in status and registry-backed desktop views. See [Instances](instances.md) for full details.
 
 ---
 
@@ -1250,6 +1258,7 @@ links:
 Zapper is instance-first. A project can have multiple stack instances, and each instance has:
 
 - Its own random `id` (used in PM2/Docker names)
+- An optional human `label` for display in status output and the desktop app
 - Its own assigned `ports` map
 - Its own generated Docker `volumes` map for path-only volume mounts
 
@@ -1275,7 +1284,15 @@ zap status
 zap up
 zap up --instance e2e
 zap init --instance e2e
+zap instance label
+zap instance label "local checkout"
+zap --instance e2e instance label "e2e stack"
 ```
+
+Labels can be any string up to 100 characters. They do not affect resource
+names; the random instance ID remains the runtime namespace. When a label is set,
+human status output shows both the label and the ID. Run `zap instance label`
+without a value to print the current display label for the selected instance.
 
 ## Naming
 
@@ -1293,6 +1310,7 @@ Zapper stores instance state in `.zap/state.json`:
   "instances": {
     "default": {
       "id": "a1b2c3",
+      "label": "local checkout",
       "ports": {
         "FRONTEND_PORT": "54321"
       },
@@ -1572,6 +1590,7 @@ Example:
       "instances": {
         "default": {
           "id": "a1b2c3",
+          "label": "local checkout",
           "lastSeenAt": "2026-05-05T10:20:30.000Z"
         }
       }
@@ -1600,6 +1619,7 @@ context to know:
 - `configPath`
 - selected `instanceKey`
 - selected `instanceId`
+- selected instance label, if set
 - Zapper version
 - command name, if available
 
@@ -1745,7 +1765,7 @@ commands. It should present three levels:
    project name, root path if known, state classification, active resource
    counts, last seen time.
 2. Instance rows:
-   instance key, instance ID, service status counts, assigned port count.
+   instance key, instance ID, optional label, service status counts, assigned port count.
 3. Service rows:
    type, service/resource name, Zapper status, enabled/profile-filter state,
    classification, reason.
@@ -1794,6 +1814,7 @@ Add explicit maintenance commands:
 
 ```bash
 zap system projects
+zap system projects --prune
 zap system registry prune
 zap system registry forget <registry-id-or-path>
 zap system registry repair
@@ -1803,6 +1824,8 @@ zap system resources cleanup
 
 Suggested behavior:
 
+- `system projects --prune` removes stale project registry entries before
+  returning the project list.
 - `prune` removes entries whose config path is missing and that have no matching
   live resources.
 - `forget` removes one entry without touching PM2 or Docker.
@@ -1902,7 +1925,7 @@ should wait until the command/env controls prove insufficient.
 Start with the smallest useful version:
 
 - Registry file with project root, config path, project name, last seen time,
-  instance key, and instance ID.
+  instance key, instance ID, and optional instance label.
 - Reliable writes from config-backed commands, with validation and atomic file
   replacement.
 - `zap system projects --json` output that starts from registered projects and
@@ -2475,7 +2498,7 @@ The Swift app invokes a bundled `zap` wrapper, which runs:
 ```text
 Zapper.app/Contents/Resources/ZapperRuntime/node/bin/node \
   Zapper.app/Contents/Resources/ZapperRuntime/cli/dist/index.js \
-  system projects --json
+  system projects --prune --json
 ```
 
 This removes the desktop app's dependency on the user's Node installation,

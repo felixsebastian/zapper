@@ -190,6 +190,14 @@ export type CommandResult =
       warningShown: boolean;
     }
   | {
+      kind: "instance.label";
+      instanceKey: string;
+      instanceId: string;
+      label?: string;
+      displayLabel: string;
+      updated: boolean;
+    }
+  | {
       kind: "volume.reset";
       instanceKey: string;
       volumes: Record<string, StoredVolume>;

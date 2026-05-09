@@ -12,6 +12,7 @@ import type {
 } from "../system";
 import { Context, Task } from "../types/Context";
 import { logger } from "../utils/logger";
+import { getInstanceDisplayLabel } from "../core/instanceResolver";
 
 /**
  * Renderer goals:
@@ -180,10 +181,13 @@ function serviceListRows(entries: ServiceListEntry[]): string[][] {
 function instanceServicesHeading(
   instanceId: string,
   instanceKey: string,
+  label?: string,
 ): string {
+  const displayLabel = getInstanceDisplayLabel({ id: instanceId, label });
+  const idSuffix = displayLabel === instanceId ? "" : ` (${instanceId})`;
   return instanceKey
-    ? `Instance ${instanceId} (${instanceKey})`
-    : `Instance ${instanceId}`;
+    ? `Instance ${displayLabel}${idSuffix} (${instanceKey})`
+    : `Instance ${displayLabel}${idSuffix}`;
 }
 
 function portListRows(result: Pick<ServiceListResult, "ports">): string[][] {
@@ -320,8 +324,15 @@ function table(rows: string[][], padding = 2): string {
 }
 
 function formatContextSubtitle(context: Context): string {
-  if (context.instanceId)
-    return `${context.projectName} · ${context.instanceId}`;
+  if (context.instanceId) {
+    const label = getInstanceDisplayLabel({
+      id: context.instanceId,
+      label: context.instance?.label,
+    });
+    const suffix =
+      label === context.instanceId ? label : `${label} (${context.instanceId})`;
+    return `${context.projectName} · ${suffix}`;
+  }
   return context.projectName;
 }
 
@@ -682,6 +693,14 @@ export const renderer = {
       return `${data.randomized ? "Randomized" : "Initialized"} ${data.portCount} port(s) in ${data.path}`;
     },
 
+    instanceLabeledText(data: {
+      instanceKey: string;
+      instanceId: string;
+      label: string;
+    }): string {
+      return `Labeled instance "${data.instanceKey}" as "${data.label}" (${data.instanceId}).`;
+    },
+
     envAssignmentText(name: string, value: string): string {
       return `  ${name}=${value}`;
     },
@@ -805,6 +824,7 @@ export const renderer = {
                 instanceServicesHeading(
                   instance.instanceId,
                   instance.instanceKey,
+                  instance.label,
                 ),
                 instance,
               ),

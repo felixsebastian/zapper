@@ -127,6 +127,8 @@ export class Zapper {
     this.context.instance = {
       key: instanceResolution.instanceKey,
       id: instanceResolution.instanceId,
+      label:
+        this.context.state.instances?.[instanceResolution.instanceKey]?.label,
       ports: loadPortsForInstance(projectRoot, instanceResolution.instanceKey),
       volumes: loadVolumesForInstance(
         projectRoot,

@@ -3,6 +3,7 @@
 Zapper is instance-first. A project can have multiple stack instances, and each instance has:
 
 - Its own random `id` (used in PM2/Docker names)
+- An optional human `label` for display in status output and the desktop app
 - Its own assigned `ports` map
 - Its own generated Docker `volumes` map for path-only volume mounts
 
@@ -28,7 +29,15 @@ zap status
 zap up
 zap up --instance e2e
 zap init --instance e2e
+zap instance label
+zap instance label "local checkout"
+zap --instance e2e instance label "e2e stack"
 ```
+
+Labels can be any string up to 100 characters. They do not affect resource
+names; the random instance ID remains the runtime namespace. When a label is set,
+human status output shows both the label and the ID. Run `zap instance label`
+without a value to print the current display label for the selected instance.
 
 ## Naming
 
@@ -46,6 +55,7 @@ Zapper stores instance state in `.zap/state.json`:
   "instances": {
     "default": {
       "id": "a1b2c3",
+      "label": "local checkout",
       "ports": {
         "FRONTEND_PORT": "54321"
       },

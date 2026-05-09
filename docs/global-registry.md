@@ -162,6 +162,7 @@ Example:
       "instances": {
         "default": {
           "id": "a1b2c3",
+          "label": "local checkout",
           "lastSeenAt": "2026-05-05T10:20:30.000Z"
         }
       }
@@ -190,6 +191,7 @@ context to know:
 - `configPath`
 - selected `instanceKey`
 - selected `instanceId`
+- selected instance label, if set
 - Zapper version
 - command name, if available
 
@@ -335,7 +337,7 @@ commands. It should present three levels:
    project name, root path if known, state classification, active resource
    counts, last seen time.
 2. Instance rows:
-   instance key, instance ID, service status counts, assigned port count.
+   instance key, instance ID, optional label, service status counts, assigned port count.
 3. Service rows:
    type, service/resource name, Zapper status, enabled/profile-filter state,
    classification, reason.
@@ -384,6 +386,7 @@ Add explicit maintenance commands:
 
 ```bash
 zap system projects
+zap system projects --prune
 zap system registry prune
 zap system registry forget <registry-id-or-path>
 zap system registry repair
@@ -393,6 +396,8 @@ zap system resources cleanup
 
 Suggested behavior:
 
+- `system projects --prune` removes stale project registry entries before
+  returning the project list.
 - `prune` removes entries whose config path is missing and that have no matching
   live resources.
 - `forget` removes one entry without touching PM2 or Docker.
@@ -492,7 +497,7 @@ should wait until the command/env controls prove insufficient.
 Start with the smallest useful version:
 
 - Registry file with project root, config path, project name, last seen time,
-  instance key, and instance ID.
+  instance key, instance ID, and optional instance label.
 - Reliable writes from config-backed commands, with validation and atomic file
   replacement.
 - `zap system projects --json` output that starts from registered projects and

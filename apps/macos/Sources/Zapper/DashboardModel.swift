@@ -58,12 +58,9 @@ final class DashboardModel: ObservableObject {
     var menuTitle: String {
         let counts = counts
         if counts.total == 0 {
-            return "Zapper"
+            return ""
         }
-        if counts.pending > 0 {
-            return "\(counts.up) up, \(counts.pending) pending"
-        }
-        return "\(counts.up) up"
+        return "\(counts.up)"
     }
 
     var menuSystemImage: String {

@@ -29,6 +29,7 @@ import {
   HomeCommand,
   NotesCommand,
   InitCommand,
+  InstanceCommand,
   VolumeCommand,
   GlobalCommand,
   SystemCommand,
@@ -116,6 +117,7 @@ export class CommanderCli {
     this.commandHandlers.set("home", new HomeCommand());
     this.commandHandlers.set("notes", new NotesCommand());
     this.commandHandlers.set("init", new InitCommand());
+    this.commandHandlers.set("instance", new InstanceCommand());
     this.commandHandlers.set("volume", new VolumeCommand());
     this.commandHandlers.set("global", new GlobalCommand());
     this.commandHandlers.set("system", new SystemCommand());
@@ -249,6 +251,18 @@ export class CommanderCli {
       .option("-j, --json", "Output command result as minified JSON")
       .action(async (options, command) => {
         await this.executeCommand("init", undefined, command);
+      });
+
+    this.program
+      .command("instance <action> [label...]")
+      .description("Manage the selected local instance")
+      .option("-j, --json", "Output command result as minified JSON")
+      .action(async (action, labelParts, options, command) => {
+        await this.executeCommand(
+          "instance",
+          [action, ...(labelParts || [])],
+          command,
+        );
       });
 
     this.program
@@ -525,6 +539,7 @@ export class CommanderCli {
       .description(
         "Machine-wide Zapper project registry and orphaned resource audit",
       )
+      .option("--prune", "Remove stale project registry entries before listing")
       .option("--include-volumes", "Include generated Docker volumes")
       .option("-y, --force", "Force cleanup operations")
       .option("-j, --json", "Output command result as minified JSON")

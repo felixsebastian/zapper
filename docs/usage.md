@@ -170,6 +170,8 @@ zap init                    # Ensure local state exists for the default instance
 zap init --instance e2e     # Initialize/create a named instance
 zap init -R                 # Force full port re-randomization
 zap init --json             # Output as JSON
+zap instance label          # Print the selected instance display label
+zap instance label "local"  # Set a display label for the selected instance
 zap volume prune            # Delete stale generated Docker volumes for the selected instance
 zap volume reset            # Forget generated volume assignments for the selected instance
 zap launch                  # Open homepage (if configured)
@@ -194,6 +196,7 @@ orphaned resource cleanup.
 ```bash
 zap system projects                  # List registered Zapper projects
 zap system projects --json           # Output registered projects as JSON
+zap system projects --prune --json   # Prune missing projects before listing
 zap system registry prune            # Remove stale system registry entries
 zap system registry forget <target>  # Forget one registry entry by id or path
 zap system registry repair           # Prune stale entries and show projects
@@ -247,7 +250,7 @@ zap envset prod_dbs
 ### JSON Output
 
 Most non-streaming commands support `--json` and will print machine-readable JSON to stdout.
-Examples: `up`, `down`, `restart`, `clone`, `reset`, `kill`, `status`, `ls`, `task` (list/params), `profile`, `env`, `state`, `config`, `launch`, `links`, `home`, `notes`, `init`, `system`, and git subcommands.
+Examples: `up`, `down`, `restart`, `clone`, `reset`, `kill`, `status`, `ls`, `task` (list/params), `profile`, `env`, `state`, `config`, `launch`, `links`, `home`, `notes`, `init`, `instance`, `system`, and git subcommands.
 
 When `--json` is enabled, Zapper suppresses incidental human logs and warnings so the command output stays parseable. Command failures are still reported as errors.
 
@@ -652,9 +655,11 @@ or managed-volume collisions.
 zap up                                # Ensures default instance exists on first run
 zap up --instance e2e                 # Run a named instance
 zap init --instance e2e               # Explicitly create/init named instance state
+zap instance label                    # Print the selected instance display label
+zap instance label "local checkout"   # Label the selected instance for display
 ```
 
-If you omit `--instance`, Zapper targets `default`. Instance keys must use lowercase letters and hyphens only. See [Instances](instances.md) for full details.
+If you omit `--instance`, Zapper targets `default`. Instance keys must use lowercase letters and hyphens only. Instance labels can be any string up to 100 characters and are shown alongside the random instance ID in status and registry-backed desktop views. See [Instances](instances.md) for full details.
 
 ---
 

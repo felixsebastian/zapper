@@ -14,6 +14,7 @@ private let collapsedStackRowHeight = CGFloat(58)
 private let expandedStackTopPadding = CGFloat(10)
 private let serviceGroupHeaderHeight = CGFloat(22)
 private let serviceRowHeight = CGFloat(28)
+private let detailRowHeight = CGFloat(18)
 private let errorRowHeight = CGFloat(24)
 private let emptyServiceRowHeight = CGFloat(22)
 private let stackActionFontSize = CGFloat(11)
@@ -101,6 +102,7 @@ struct DashboardView: View {
         if stack.instance.services.isEmpty {
             detailHeight += emptyServiceRowHeight
         }
+        detailHeight += CGFloat(stack.detailRows.count) * detailRowHeight
 
         height += expandedStackTopPadding + max(emptyServiceRowHeight, detailHeight)
         return height
@@ -149,10 +151,21 @@ struct DashboardView: View {
     }
 
     private var allStacks: [ProjectStack] {
-        model.projects.flatMap { project in
+        let stacks = model.projects.flatMap { project in
             project.instances.map { instance in
-                ProjectStack(project: project, instance: instance)
+                ProjectStack(project: project, instance: instance, showsInstanceLabel: false)
             }
+        }
+
+        let baseTitleCounts = Dictionary(grouping: stacks, by: \.baseTitle)
+            .mapValues(\.count)
+
+        return stacks.map { stack in
+            ProjectStack(
+                project: stack.project,
+                instance: stack.instance,
+                showsInstanceLabel: (baseTitleCounts[stack.baseTitle] ?? 0) > 1
+            )
         }
         .sorted { lhs, rhs in
             lhs.sortTitle.localizedCaseInsensitiveCompare(rhs.sortTitle) == .orderedAscending
@@ -224,25 +237,53 @@ private struct VisualEffectBackground: NSViewRepresentable {
 private struct ProjectStack: Identifiable {
     let project: ZapperProject
     let instance: ZapperInstance
+    let showsInstanceLabel: Bool
 
     var id: String { pinID }
 
     var pinID: String { "\(project.registryId):\(instance.instanceKey)" }
 
-    var title: String {
+    var baseTitle: String {
         if instance.instanceKey == "default" {
             return project.project
         }
         return "\(project.project) (\(instance.instanceKey))"
     }
 
+    var title: String {
+        guard showsInstanceLabel else {
+            return baseTitle
+        }
+        return "\(baseTitle) - \(instanceIdentity)"
+    }
+
     var sortTitle: String {
-        "\(project.project):\(instance.instanceKey)"
+        "\(project.project):\(instance.instanceKey):\(instance.displayLabel)"
     }
 
     var counts: ServiceCounts {
         instance.counts
     }
+
+    var detailRows: [StackDetailRow] {
+        [
+            StackDetailRow(label: "Path", value: project.projectRoot),
+            StackDetailRow(label: "Instance", value: instanceIdentity)
+        ]
+    }
+
+    private var instanceIdentity: String {
+        instance.displayLabel == instance.instanceId
+            ? instance.instanceId
+            : "\(instance.displayLabel) (\(instance.instanceId))"
+    }
+}
+
+private struct StackDetailRow: Identifiable {
+    let label: String
+    let value: String
+
+    var id: String { label }
 }
 
 private struct ServiceGroup: Identifiable {
@@ -508,6 +549,8 @@ private struct StackRow: View {
                             .foregroundStyle(.red)
                     }
 
+                    StackDetailRows(rows: stack.detailRows)
+
                     ForEach(serviceGroups(for: stack.instance.services)) { group in
                         VStack(alignment: .leading, spacing: 6) {
                             Text(group.title)
@@ -608,6 +651,29 @@ private struct StackActions: View {
 
     private var isBusy: Bool {
         model.isStackBusy(instance: stack.instance, project: stack.project)
+    }
+}
+
+private struct StackDetailRows: View {
+    let rows: [StackDetailRow]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(rows) { row in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(row.label)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 46, alignment: .leading)
+                    Text(row.value)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                }
+            }
+        }
     }
 }
 

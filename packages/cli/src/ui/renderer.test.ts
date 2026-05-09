@@ -4,7 +4,7 @@ import type { ServiceListResult } from "../core/getServiceList";
 import type { StatusResult } from "../core/getStatus";
 import { renderer } from "./renderer";
 
-function createContext(instanceId?: string | null): Context {
+function createContext(instanceId?: string | null, label?: string): Context {
   return {
     projectName: "demo",
     projectRoot: "/tmp/demo",
@@ -12,7 +12,16 @@ function createContext(instanceId?: string | null): Context {
     environments: [],
     gitMethod: "ssh",
     taskDelimiters: ["{{", "}}"],
+    instanceKey: "default",
     instanceId,
+    instance: instanceId
+      ? {
+          key: "default",
+          id: instanceId,
+          label,
+          ports: {},
+        }
+      : undefined,
     processes: [],
     containers: [],
     tasks: [],
@@ -94,6 +103,16 @@ describe("renderer", () => {
       renderer.status.contextHeaderText(createContext("inst123")),
     ).toContain("demo");
     expect(text).toContain("demo");
+    expect(text).toContain("inst123");
+  });
+
+  it("formats labeled status header with label and id", () => {
+    const text = renderer.status.toText(
+      createStatusResult(),
+      createContext("inst123", "local checkout"),
+    );
+
+    expect(text).toContain("local checkout");
     expect(text).toContain("inst123");
   });
 

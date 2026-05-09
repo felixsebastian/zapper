@@ -43,3 +43,6 @@ See the [full reference](usage.md) for every `zap.yaml` field and command.
 
 For packaging and local machine runtime plans, see
 [Local Runtime Compatibility](local-runtime.md).
+
+For the local menu bar app development loop, see
+[macOS Development](macos-development.md).

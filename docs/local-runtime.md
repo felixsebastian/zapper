@@ -66,7 +66,7 @@ The Swift app invokes a bundled `zap` wrapper, which runs:
 ```text
 Zapper.app/Contents/Resources/ZapperRuntime/node/bin/node \
   Zapper.app/Contents/Resources/ZapperRuntime/cli/dist/index.js \
-  system projects --json
+  system projects --prune --json
 ```
 
 This removes the desktop app's dependency on the user's Node installation,

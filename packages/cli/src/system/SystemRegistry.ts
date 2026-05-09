@@ -8,6 +8,7 @@ import { Context } from "../types/Context";
 const RegistryInstanceSchema = z
   .object({
     id: z.string(),
+    label: z.string().max(100).optional(),
     lastSeenAt: z.string(),
   })
   .strict();
@@ -227,6 +228,7 @@ export function touchSystemProject(
     for (const [key, instance] of Object.entries(stateInstances)) {
       instances[key] = {
         id: instance.id,
+        label: instance.label,
         lastSeenAt: instances[key]?.lastSeenAt || now,
       };
     }
@@ -234,6 +236,9 @@ export function touchSystemProject(
     if (input.context.instanceId) {
       instances[input.context.instanceKey] = {
         id: input.context.instanceId,
+        label:
+          input.context.instance?.label ??
+          stateInstances[input.context.instanceKey]?.label,
         lastSeenAt: now,
       };
     }
@@ -247,7 +252,7 @@ export function touchSystemProject(
       firstSeenAt: existing?.firstSeenAt || now,
       lastSeenAt: now,
       lastCommand: input.command,
-      zapperVersion: input.zapperVersion,
+      zapperVersion: input.zapperVersion ?? existing?.zapperVersion,
       instances,
     };
 

@@ -23,6 +23,7 @@ function makeContext(projectRoot: string): Context {
     instance: {
       key: "default",
       id: "abc123",
+      label: "local checkout",
       ports: {},
       volumes: {},
     },
@@ -35,6 +36,7 @@ function makeContext(projectRoot: string): Context {
       instances: {
         default: {
           id: "abc123",
+          label: "local checkout",
           ports: {},
           volumes: {},
         },
@@ -79,7 +81,7 @@ describe("SystemRegistry", () => {
       lastCommand: "status",
       zapperVersion: "1.2.3",
       instances: {
-        default: { id: "abc123" },
+        default: { id: "abc123", label: "local checkout" },
       },
     });
   });

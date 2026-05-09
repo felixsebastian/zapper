@@ -85,6 +85,9 @@ apps/macos/bin/run
 apps/macos/bin/clean
 ```
 
+For the short local rebuild/restart loop, see
+[macOS Development](macos-development.md).
+
 The build script uses `swiftc` and writes `apps/macos/build/Zapper.app`. By
 default it also packages a local Node runtime, the built CLI, production CLI
 dependencies, and PM2 under `Contents/Resources/ZapperRuntime`. Run
@@ -97,12 +100,17 @@ do not require a globally available `node`. `ZAPPER_CLI_PATH` and the in-app CLI
 picker in Settings remain available for development and diagnostics. The main
 dashboard lists stacks, where each stack is one project instance. Default
 instances show as the project name; non-default instances append the instance
-key in parentheses. Stack rows show running-service summaries with a small
-status LED and high-value actions. Pinning lives in the stack overflow menu.
+key in parentheses. If multiple stacks would render with the same name, the row
+also includes the instance label and random instance ID, falling back to just the
+ID when no label is set. Stack rows show running-service summaries with a small
+status LED and high-value actions. Expanded stack rows include project path and
+instance identity. Pinning lives in the stack overflow menu.
 The Open control is hidden when no homepage or project links are configured,
 opens directly when there is one target, and becomes a menu when there are
 multiple targets. Pinned stacks are stored in local app preferences and appear
 in a Pinned section above unpinned stacks.
+The menu bar status item stays compact: it shows the bolt icon and the running
+service count, without status words.
 Unpinned stacks are grouped into Active and Inactive sections using the same
 state as the stack LED: running, pending, or errored stacks are active; gray LED
 stacks are inactive. Expanded stack details group services by native and Docker

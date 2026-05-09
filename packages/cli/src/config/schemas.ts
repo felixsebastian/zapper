@@ -221,6 +221,7 @@ export const ZapperStateSchema = z.object({
       z.string(),
       z.object({
         id: z.string(),
+        label: z.string().max(100).optional(),
         ports: z.record(z.string(), z.string()).optional(),
         volumes: z.record(z.string(), StoredVolumeSchema).optional(),
       }),
