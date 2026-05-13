@@ -23,6 +23,7 @@ import {
   GitStatusCommand,
   GitStashCommand,
   ConfigCommand,
+  ValidateCommand,
   EnvCommand,
   LaunchCommand,
   LinksCommand,
@@ -111,6 +112,7 @@ export class CommanderCli {
     this.commandHandlers.set("git:status", new GitStatusCommand());
     this.commandHandlers.set("git:stash", new GitStashCommand());
     this.commandHandlers.set("config", new ConfigCommand());
+    this.commandHandlers.set("validate", new ValidateCommand());
     this.commandHandlers.set("env", new EnvCommand());
     this.commandHandlers.set("launch", new LaunchCommand());
     this.commandHandlers.set("links", new LinksCommand());
@@ -431,6 +433,17 @@ export class CommanderCli {
       });
 
     this.program
+      .command("validate")
+      .description("Validate zap.yaml without initializing local state")
+      .option(
+        "-j, --json",
+        "Output validation result and full Zod issues as JSON",
+      )
+      .action(async (options, command) => {
+        await this.executeCommand("validate", undefined, command);
+      });
+
+    this.program
       .command("env")
       .description(
         "Manage environments or show resolved environment variables for a service",
@@ -600,7 +613,8 @@ export class CommanderCli {
           typeof service === "string" &&
           service.trim().length > 0) ||
         command === "global" ||
-        command === "system";
+        command === "system" ||
+        command === "validate";
 
       const zapper = new Zapper();
       if (!skipConfigLoad) {
@@ -636,6 +650,9 @@ export class CommanderCli {
         renderCommandResult(result, {
           json: jsonMode,
         });
+        if (result.kind === "validate" && !result.valid) {
+          process.exitCode = 1;
+        }
       }
     } finally {
       renderer.output.setJsonMode(false);

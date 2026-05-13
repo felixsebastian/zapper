@@ -25,6 +25,12 @@ function toJsonPayload(result: CommandResult): unknown {
       return result.state;
     case "config":
       return result.filteredConfig;
+    case "validate":
+      return {
+        valid: result.valid,
+        configPath: result.configPath,
+        error: result.error,
+      };
     case "services.action":
       return {
         action: result.action,
@@ -210,6 +216,9 @@ export function renderCommandResult(
       return;
     case "config":
       renderer.machine.json(result.filteredConfig, result.pretty);
+      return;
+    case "validate":
+      renderer.machine.line(result.valid ? "valid" : "invalid");
       return;
     case "launch.opened":
       renderer.log.info(renderer.command.openingText(result.url));

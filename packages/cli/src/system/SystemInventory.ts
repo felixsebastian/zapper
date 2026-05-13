@@ -42,6 +42,7 @@ export interface SystemResourceAuditEntry {
   instanceId?: string;
   service?: string;
   classification: SystemResourceClassification;
+  location: string;
   reason: string;
 }
 
@@ -153,18 +154,27 @@ function buildRegistryIndex(projects: SystemProjectStatus[]): {
   instanceIds: Set<string>;
   projectInstanceKeys: Set<string>;
   serviceKeys: Set<string>;
+  projectLocations: Map<string, string>;
+  instanceLocations: Map<string, string>;
 } {
   const projectNames = new Set<string>();
   const instanceIds = new Set<string>();
   const projectInstanceKeys = new Set<string>();
   const serviceKeys = new Set<string>();
+  const projectLocations = new Map<string, string>();
+  const instanceLocations = new Map<string, string>();
 
   for (const project of projects) {
     projectNames.add(project.project);
+    projectLocations.set(project.project, project.projectRoot);
     for (const instance of project.instances) {
       if (instance.instanceId) {
         instanceIds.add(instance.instanceId);
         projectInstanceKeys.add(`${project.project}:${instance.instanceId}`);
+        instanceLocations.set(
+          `${project.project}:${instance.instanceId}`,
+          `${project.projectRoot} (${instance.instanceKey})`,
+        );
       }
       for (const service of instance.list?.services || []) {
         serviceKeys.add(
@@ -174,7 +184,46 @@ function buildRegistryIndex(projects: SystemProjectStatus[]): {
     }
   }
 
-  return { projectNames, instanceIds, projectInstanceKeys, serviceKeys };
+  return {
+    projectNames,
+    instanceIds,
+    projectInstanceKeys,
+    serviceKeys,
+    projectLocations,
+    instanceLocations,
+  };
+}
+
+function resourceNameLocation(data: {
+  project: string;
+  instanceId?: string;
+  service?: string;
+}): string {
+  return [
+    data.project,
+    data.instanceId ? `instance ${data.instanceId}` : undefined,
+    data.service,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(" / ");
+}
+
+function registryProjectLocation(
+  project: string,
+  index: ReturnType<typeof buildRegistryIndex>,
+): string {
+  return index.projectLocations.get(project) || project;
+}
+
+function registryInstanceLocation(
+  project: string,
+  instanceId: string,
+  index: ReturnType<typeof buildRegistryIndex>,
+): string {
+  return (
+    index.instanceLocations.get(`${project}:${instanceId}`) ||
+    `${registryProjectLocation(project, index)} / instance ${instanceId}`
+  );
 }
 
 function classifyServiceResource(
@@ -192,6 +241,10 @@ function classifyServiceResource(
       project: parsed.project,
       service: parsed.service,
       classification: "legacy",
+      location: resourceNameLocation({
+        project: parsed.project,
+        service: parsed.service,
+      }),
       reason: "Resource uses legacy name without an instance ID",
     };
   }
@@ -204,6 +257,7 @@ function classifyServiceResource(
       instanceId: parsed.instanceId,
       service: parsed.service,
       classification: "live-unregistered",
+      location: resourceNameLocation(parsed),
       reason: "No registered project matches this resource name",
     };
   }
@@ -216,6 +270,7 @@ function classifyServiceResource(
       instanceId: parsed.instanceId,
       service: parsed.service,
       classification: "live-unregistered",
+      location: `${registryProjectLocation(parsed.project, index)} / instance ${parsed.instanceId} / ${parsed.service}`,
       reason: "Project is registered, but this instance ID is unknown",
     };
   }
@@ -232,6 +287,7 @@ function classifyServiceResource(
       instanceId: parsed.instanceId,
       service: parsed.service,
       classification: "dangling",
+      location: `${registryInstanceLocation(parsed.project, parsed.instanceId, index)} / ${parsed.service}`,
       reason: "Service is not in the current registered project config",
     };
   }
@@ -253,6 +309,7 @@ function classifyVolumeResource(
       project: parsed.project,
       instanceId: parsed.instanceId,
       classification: "live-unregistered",
+      location: resourceNameLocation(parsed),
       reason: "No registered project matches this generated volume",
     };
   }
@@ -266,6 +323,7 @@ function classifyVolumeResource(
       project: parsed.project,
       instanceId: parsed.instanceId,
       classification: "dangling",
+      location: `${registryProjectLocation(parsed.project, index)} / instance ${parsed.instanceId}`,
       reason: "Generated volume belongs to an unknown instance ID",
     };
   }

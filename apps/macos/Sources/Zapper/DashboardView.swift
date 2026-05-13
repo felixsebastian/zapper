@@ -17,6 +17,8 @@ private let serviceRowHeight = CGFloat(28)
 private let detailRowHeight = CGFloat(18)
 private let errorRowHeight = CGFloat(24)
 private let emptyServiceRowHeight = CGFloat(22)
+private let missingStacksWarningCollapsedHeight = CGFloat(54)
+private let missingStacksWarningConfirmHeight = CGFloat(120)
 private let stackActionFontSize = CGFloat(11)
 
 struct DashboardView: View {
@@ -24,6 +26,8 @@ struct DashboardView: View {
     var onHeightChange: ((CGFloat) -> Void)?
     @State private var viewMode: DashboardViewMode = .dashboard
     @State private var expandedStackIDs = Set<String>()
+    @State private var missingStacksExpanded = false
+    @State private var confirmingMissingStackPrune = false
 
     var body: some View {
         ZStack {
@@ -45,6 +49,9 @@ struct DashboardView: View {
         }
         .onChange(of: desiredPopoverHeight) { height in
             onHeightChange?(height)
+        }
+        .onChange(of: missingProjectIDs) { _ in
+            resetMissingStackWarningState()
         }
     }
 
@@ -80,10 +87,22 @@ struct DashboardView: View {
         let missingRowsHeight = missingProjects.isEmpty
             ? CGFloat(0)
             : stackSectionHeaderHeight
-                + CGFloat(missingProjects.count) * collapsedStackRowHeight
-                + CGFloat(max(missingProjects.count - 1, 0)) * stackSpacing
+                + missingStackWarningHeight
         let sectionSpacing = CGFloat(max(sectionCount - 1, 0)) * stackSectionSpacing
         return dashboardPadding + sectionHeights + missingRowsHeight + sectionSpacing
+    }
+
+    private var missingStackWarningHeight: CGFloat {
+        if confirmingMissingStackPrune {
+            return missingStacksWarningConfirmHeight
+        }
+
+        if missingStacksExpanded {
+            return missingStacksWarningCollapsedHeight
+                + CGFloat(missingProjects.count) * detailRowHeight
+        }
+
+        return missingStacksWarningCollapsedHeight
     }
 
     private var maxDashboardContentHeight: CGFloat {
@@ -143,7 +162,12 @@ struct DashboardView: View {
             ScrollView {
                 LazyVStack(spacing: stackSectionSpacing) {
                     if !missingProjects.isEmpty {
-                        MissingStackSectionView(projects: missingProjects)
+                        MissingStackSectionView(
+                            projects: missingProjects,
+                            model: model,
+                            isExpanded: $missingStacksExpanded,
+                            isConfirmingPrune: $confirmingMissingStackPrune
+                        )
                     }
 
                     ForEach(stackSections) { section in
@@ -188,6 +212,15 @@ struct DashboardView: View {
             .sorted { lhs, rhs in
                 lhs.project.localizedCaseInsensitiveCompare(rhs.project) == .orderedAscending
             }
+    }
+
+    private var missingProjectIDs: [String] {
+        missingProjects.map(\.registryId)
+    }
+
+    private func resetMissingStackWarningState() {
+        missingStacksExpanded = false
+        confirmingMissingStackPrune = false
     }
 
     private var stackSections: [StackSection] {
@@ -237,6 +270,10 @@ private struct StackSectionView: View {
 
 private struct MissingStackSectionView: View {
     let projects: [ZapperProject]
+    @ObservedObject var model: DashboardModel
+    @Binding var isExpanded: Bool
+    @Binding var isConfirmingPrune: Bool
+    @State private var isHovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: stackSpacing) {
@@ -246,63 +283,141 @@ private struct MissingStackSectionView: View {
                 .textCase(.uppercase)
                 .frame(maxWidth: .infinity, minHeight: stackSectionHeaderHeight, alignment: .leading)
 
-            ForEach(projects) { project in
-                MissingStackRow(project: project)
+            VStack(alignment: .leading, spacing: 8) {
+                if isConfirmingPrune {
+                    confirmationContent
+                } else {
+                    warningContent
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(isHovering ? 0.82 : 0.48))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.orange.opacity(isHovering ? 0.34 : 0.2), lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .onHover { hovering in
+                isHovering = hovering
             }
         }
     }
-}
 
-private struct MissingStackRow: View {
-    let project: ZapperProject
-    @State private var isHovering = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+    private var warningContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
+                Button {
+                    isExpanded.toggle()
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 14, height: 18)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                }
+                .buttonStyle(.plain)
+                .help(isExpanded ? "Hide paths" : "Show paths")
+
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.orange)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(project.project)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Text("Missing stack")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                Text("\(projects.count) missing \(projects.count == 1 ? "stack" : "stacks")")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                if isPruning {
+                    HStack(spacing: 5) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .scaleEffect(0.48)
+                        Text("Pruning")
+                            .font(.system(size: stackActionFontSize))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(height: 20)
+                } else {
+                    Button("Prune") {
+                        isConfirmingPrune = true
+                    }
+                    .font(.system(size: stackActionFontSize))
+                    .foregroundStyle(.primary)
+                    .controlSize(.small)
+                    .disabled(model.actionInFlight != nil)
+                }
+            }
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(projects) { project in
+                        Text(project.projectRoot)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                    }
+                }
+                .padding(.leading, 22)
+            }
+        }
+    }
+
+    private var confirmationContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.orange)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Delete orphaned resources?")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Text("This will remove missing stack registry entries and delete matching PM2 processes, Docker containers, and generated Docker volumes.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 Spacer(minLength: 0)
             }
 
-            Text(project.error ?? "Project root or config path no longer exists")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
 
-            Text(project.projectRoot)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .textSelection(.enabled)
+                Button("Cancel") {
+                    isConfirmingPrune = false
+                }
+                .font(.system(size: stackActionFontSize))
+                .controlSize(.small)
+                .disabled(model.actionInFlight != nil)
+
+                Button("Delete") {
+                    isConfirmingPrune = false
+                    isExpanded = false
+                    Task { await model.pruneMissingStacks() }
+                }
+                .font(.system(size: stackActionFontSize))
+                .foregroundStyle(.red)
+                .controlSize(.small)
+                .disabled(model.actionInFlight != nil)
+            }
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, minHeight: collapsedStackRowHeight, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(isHovering ? 0.82 : 0.48))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.orange.opacity(isHovering ? 0.34 : 0.2), lineWidth: 1)
-        }
-        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .onHover { hovering in
-            isHovering = hovering
-        }
+    }
+
+    private var isPruning: Bool {
+        model.actionInFlight == "global-prune"
     }
 }
 

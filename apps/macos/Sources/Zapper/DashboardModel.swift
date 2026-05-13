@@ -77,8 +77,18 @@ final class DashboardModel: ObservableObject {
         return "bolt.fill"
     }
 
-    func refresh() async {
+    func refresh(waitForInFlight: Bool = false) async {
         if isRefreshing {
+            guard waitForInFlight else {
+                return
+            }
+
+            while isRefreshing && !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+        }
+
+        if Task.isCancelled {
             return
         }
 
@@ -205,6 +215,26 @@ final class DashboardModel: ObservableObject {
             pinnedStackIDs.insert(stackID)
         }
         UserDefaults.standard.set(Array(pinnedStackIDs).sorted(), forKey: Self.pinnedStackIDsKey)
+    }
+
+    func pruneMissingStacks() async {
+        if actionInFlight != nil {
+            return
+        }
+
+        actionInFlight = "global-prune"
+        actionMessage = "Pruning missing stacks"
+        defer {
+            actionInFlight = nil
+        }
+
+        do {
+            try await cli.pruneGlobalResources()
+            actionMessage = "Pruned missing stacks"
+            await refresh(waitForInFlight: true)
+        } catch {
+            actionMessage = error.localizedDescription
+        }
     }
 
     private func runAction(

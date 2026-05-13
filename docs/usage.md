@@ -172,6 +172,8 @@ zap clone                   # Clone all repos defined in config
 zap clone api               # Clone one repo
 zap clone api web           # Clone multiple repos
 zap clone --json            # Output command result as JSON
+zap validate                # Print valid/invalid after checking zap.yaml
+zap validate --json         # Output validation result and full Zod issues as JSON
 zap init                    # Ensure local state exists for the default instance (and run init_task if configured)
 zap init --instance e2e     # Initialize/create a named instance
 zap init -R                 # Force full port re-randomization

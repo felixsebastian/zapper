@@ -143,7 +143,7 @@ final class ZapperMenuBarApp: NSObject, NSApplicationDelegate {
         }
 
         guard popover.isShown else {
-            return 0
+            return 8
         }
 
         if Date() < recentlyOpenedUntil {

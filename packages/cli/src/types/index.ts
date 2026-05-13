@@ -31,6 +31,7 @@ export type Command =
   | "git:status"
   | "git:stash"
   | "config"
+  | "validate"
   | "env"
   | "launch"
   | "links"

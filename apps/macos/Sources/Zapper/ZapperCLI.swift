@@ -115,6 +115,16 @@ struct ZapperCLI {
         }.value
     }
 
+    func pruneGlobalResources() async throws {
+        try await Task.detached(priority: .userInitiated) {
+            let zapPath = try Self.resolveZapPath()
+            _ = try Self.run(
+                executable: zapPath,
+                arguments: ["global", "prune", "--force", "--json"]
+            )
+        }.value
+    }
+
     private static func resolveZapPath() throws -> String {
         let environment = ProcessInfo.processInfo.environment
         if let explicitPath = environment["ZAPPER_CLI_PATH"], isExecutable(explicitPath) {

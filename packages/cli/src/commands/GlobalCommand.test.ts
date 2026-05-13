@@ -130,6 +130,7 @@ describe("GlobalCommand", () => {
       instanceId: "abc123",
       service: "api",
       classification: "live-unregistered" as const,
+      location: "/tmp/old / instance abc123 / api",
       reason: "No registered project matches this resource name",
     };
     mockedGetStaleSystemRegistryProjects.mockReturnValue([removedProject]);
@@ -180,6 +181,7 @@ describe("GlobalCommand", () => {
       project: "old",
       instanceId: "abc123",
       classification: "live-unregistered" as const,
+      location: "old / instance abc123",
       reason: "No registered project matches this generated volume",
     };
     mockedPruneSystemRegistry.mockReturnValue([]);

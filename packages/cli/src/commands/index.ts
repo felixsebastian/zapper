@@ -18,6 +18,7 @@ export { PullCommand } from "./PullCommand";
 export { GitStatusCommand } from "./GitStatusCommand";
 export { GitStashCommand } from "./GitStashCommand";
 export { ConfigCommand } from "./ConfigCommand";
+export { ValidateCommand } from "./ValidateCommand";
 export { EnvCommand } from "./EnvCommand";
 export { LaunchCommand } from "./LaunchCommand";
 export { LinksCommand } from "./LinksCommand";

@@ -57,6 +57,17 @@ export type CommandResult =
       pretty: boolean;
     }
   | {
+      kind: "validate";
+      valid: boolean;
+      configPath: string | null;
+      error?: {
+        name: string;
+        message: string;
+        issues?: string[];
+        zodIssues?: unknown[];
+      };
+    }
+  | {
       kind: "services.action";
       action: "up" | "down" | "restart";
       services?: string[];

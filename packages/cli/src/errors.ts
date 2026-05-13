@@ -1,4 +1,5 @@
 import { renderer } from "./ui/renderer";
+import type { ZodIssue } from "zod";
 
 export class ConfigFileNotFoundError extends Error {
   constructor(
@@ -22,12 +23,23 @@ export class ConfigParseError extends Error {
 }
 
 export class ConfigValidationError extends Error {
+  public zodIssues?: ZodIssue[];
+
   constructor(
     public issues: string[],
+    zodIssuesOrMessage?: ZodIssue[] | string,
     message?: string,
   ) {
-    super(message || `Configuration validation failed: ${issues.join(", ")}`);
+    const resolvedMessage =
+      typeof zodIssuesOrMessage === "string" ? zodIssuesOrMessage : message;
+    super(
+      resolvedMessage ||
+        `Configuration validation failed: ${issues.join(", ")}`,
+    );
     this.name = "ConfigValidationError";
+    if (Array.isArray(zodIssuesOrMessage)) {
+      this.zodIssues = zodIssuesOrMessage;
+    }
   }
 }
 

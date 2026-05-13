@@ -340,7 +340,7 @@ commands. It should present three levels:
    instance key, instance ID, optional label, service status counts, assigned port count.
 3. Service rows:
    type, service/resource name, Zapper status, enabled/profile-filter state,
-   classification, reason.
+   classification, last known location, reason.
 
 For privacy and performance, the first load should not parse every `zap.yaml`.
 Only parse project config when:
@@ -470,13 +470,15 @@ should wait until the command/env controls prove insufficient.
    - Start from registry entries.
    - Load project contexts when service/config details are needed.
    - Reuse existing status/list/config code for registered project details.
-   - Return structured JSON with classification reasons.
+   - Return structured JSON with classification, last known location, and
+     reasons.
 5. Build an orphaned resource audit service.
    - Scan PM2, Docker containers, and Docker volumes directly.
    - Compare live resources against registry entries and current project
      state.
    - Keep cleanup separate from registry maintenance.
-   - Return structured JSON with classification reasons.
+   - Return structured JSON with classification, last known location, and
+     reasons.
 6. Upgrade global commands.
    - Make `zap system projects --json` use the project registry service.
    - Add `zap system resources audit --json` for orphaned resources.

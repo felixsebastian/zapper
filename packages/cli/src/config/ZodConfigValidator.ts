@@ -16,7 +16,7 @@ export class ZodConfigValidator {
           return `${path}${err.message}`;
         });
 
-        throw new ConfigValidationError(errorMessages);
+        throw new ConfigValidationError(errorMessages, error.issues);
       }
 
       throw error;

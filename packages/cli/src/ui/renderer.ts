@@ -249,12 +249,12 @@ function registryProjectRows(projects: SystemRegistryProject[]): string[][] {
 
 function auditResourceRows(resources: SystemResourceAuditEntry[]): string[][] {
   return [
-    [bold("TYPE"), bold("RESOURCE"), bold("CLASSIFICATION"), bold("WHY")],
+    [bold("TYPE"), bold("RESOURCE"), bold("CLASSIFICATION"), bold("LOCATION")],
     ...resources.map((resource) => [
       resource.type,
       resource.name,
       resource.classification,
-      resource.reason,
+      resource.location,
     ]),
   ];
 }

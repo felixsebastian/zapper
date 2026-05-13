@@ -92,6 +92,7 @@ describe("SystemInventory", () => {
           type: "pm2",
           name: "zap.unregistered.abc123.api",
           classification: "live-unregistered",
+          location: "unregistered / instance abc123 / api",
         }),
         expect.objectContaining({
           type: "pm2",
@@ -135,6 +136,7 @@ describe("SystemInventory", () => {
         type: "volume",
         name: "zap.registered.unknown456.vol1",
         classification: "dangling",
+        location: expect.stringContaining("registered / instance unknown456"),
       }),
     ]);
   });
