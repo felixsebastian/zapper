@@ -3,6 +3,7 @@ import { renderer } from "./renderer";
 
 export interface RenderCommandResultOptions {
   json: boolean;
+  jsonl?: boolean;
 }
 
 function toJsonPayload(result: CommandResult): unknown {
@@ -32,24 +33,22 @@ function toJsonPayload(result: CommandResult): unknown {
         error: result.error,
       };
     case "services.action":
-      return {
-        action: result.action,
-        services: result.services,
-      };
+      return result.report;
     case "clone.completed":
-      return { services: result.services };
+      return result.report;
     case "reset":
-      return { status: result.status };
+      return result.report;
     case "kill":
       return {
         status: result.status,
+        action: "kill",
         projectName: result.projectName,
         prefix: result.prefix,
         pm2: result.pm2,
         containers: result.containers,
       };
     case "launch.opened":
-      return { url: result.url };
+      return result.report;
     case "links.list":
       return renderer.links.toJson(result.links);
     case "home.value":
@@ -57,13 +56,17 @@ function toJsonPayload(result: CommandResult): unknown {
     case "notes.value":
       return { value: result.value };
     case "git.checkout.completed":
-      return { branch: result.branch };
+      return {
+        status: "success",
+        action: "git.checkout",
+        branch: result.branch,
+      };
     case "git.pull.completed":
-      return { action: "pull" };
+      return { status: "success", action: "git.pull" };
     case "git.status.completed":
-      return { action: "status" };
+      return { status: "success", action: "git.status" };
     case "git.stash.completed":
-      return { action: "stash" };
+      return { status: "success", action: "git.stash" };
     case "profiles.picker":
       return {
         profiles: result.profiles,
@@ -71,13 +74,15 @@ function toJsonPayload(result: CommandResult): unknown {
       };
     case "profiles.enabled":
       return {
-        action: "enabled",
+        status: "success",
+        action: "profile.enable",
         profile: result.profile,
         startedServices: result.startedServices,
       };
     case "profiles.disabled":
       return {
-        action: "disabled",
+        status: "success",
+        action: "profile.disable",
         activeProfile: result.activeProfile,
       };
     case "environments.picker":
@@ -87,12 +92,14 @@ function toJsonPayload(result: CommandResult): unknown {
       };
     case "environments.enabled":
       return {
-        action: "enabled",
+        status: "success",
+        action: "environment.enable",
         environment: result.environment,
       };
     case "environments.disabled":
       return {
-        action: "disabled",
+        status: "success",
+        action: "environment.disable",
         activeEnvironment: result.activeEnvironment,
       };
     case "global.list":
@@ -103,12 +110,14 @@ function toJsonPayload(result: CommandResult): unknown {
     case "global.kill":
       return {
         status: result.status,
+        action: "global.kill",
         allProjects: result.allProjects,
         projects: result.projects,
       };
     case "global.prune":
       return {
         status: result.status,
+        action: "global.prune",
         staleProjects: renderer.system.registryProjectsToJson(
           result.staleProjects,
         ),
@@ -121,16 +130,22 @@ function toJsonPayload(result: CommandResult): unknown {
       return { projects: renderer.system.projectsToJson(result.projects) };
     case "system.registry.prune":
       return {
+        status: "success",
+        action: "system.registry.prune",
         removed: renderer.system.registryProjectsToJson(result.removed),
       };
     case "system.registry.forget":
       return {
+        status: "success",
+        action: "system.registry.forget",
         removed: result.removed
           ? renderer.system.registryProjectsToJson([result.removed])[0]
           : null,
       };
     case "system.registry.repair":
       return {
+        status: "success",
+        action: "system.registry.repair",
         removed: renderer.system.registryProjectsToJson(result.removed),
         projects: renderer.system.projectsToJson(result.projects),
       };
@@ -141,10 +156,13 @@ function toJsonPayload(result: CommandResult): unknown {
     case "system.resources.cleanup":
       return {
         status: result.status,
+        action: "system.resources.cleanup",
         resources: renderer.system.resourcesToJson(result.cleanup.resources),
       };
     case "init":
       return {
+        status: "success",
+        action: "init",
         isolated: result.isolated,
         instanceKey: result.instanceKey,
         instanceId: result.instanceId,
@@ -155,6 +173,8 @@ function toJsonPayload(result: CommandResult): unknown {
       };
     case "instance.label":
       return {
+        status: "success",
+        action: result.updated ? "instance.label.set" : "instance.label.get",
         instanceKey: result.instanceKey,
         instanceId: result.instanceId,
         label: result.label ?? null,
@@ -163,12 +183,15 @@ function toJsonPayload(result: CommandResult): unknown {
       };
     case "volume.reset":
       return {
+        status: "success",
+        action: "volume.reset",
         instanceKey: result.instanceKey,
         volumes: result.volumes,
       };
     case "volume.prune":
       return {
         status: result.status,
+        action: "volume.prune",
         instanceKey: result.instanceKey,
         volumes: result.volumes,
       };
@@ -179,6 +202,21 @@ export function renderCommandResult(
   result: CommandResult,
   options: RenderCommandResultOptions,
 ): void {
+  if (options.jsonl) {
+    if (result.kind === "services.action") {
+      renderer.machine.json({
+        type: "command.completed",
+        status: result.report.status,
+        action: result.action,
+        report: result.report,
+      });
+      return;
+    }
+
+    renderer.machine.json(toJsonPayload(result));
+    return;
+  }
+
   // Preserve existing behavior for command modes that are intentionally machine-first.
   if (
     options.json ||
@@ -450,6 +488,14 @@ export function renderCommandResult(
       );
       return;
     case "services.action":
+      if (result.report.opened?.status === "success") {
+        renderer.log.info(
+          renderer.command.openingText(result.report.opened.url),
+        );
+      } else if (result.report.opened?.status === "skipped") {
+        renderer.log.warn(result.report.opened.reason);
+      }
+      return;
     case "clone.completed":
     case "git.checkout.completed":
     case "git.pull.completed":

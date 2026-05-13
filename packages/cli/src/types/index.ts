@@ -51,6 +51,8 @@ export interface CliOptions {
   force?: boolean;
   follow?: boolean;
   config?: string;
+  json?: boolean;
+  jsonl?: boolean;
   verbose?: boolean;
   quiet?: boolean;
   debug?: boolean;

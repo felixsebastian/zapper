@@ -335,6 +335,7 @@ native:
           "test-project",
           tempDir,
           mockPlan,
+          undefined,
         );
       });
 
@@ -397,6 +398,7 @@ native:
           "test-project",
           tempDir,
           mockPlan,
+          undefined,
         );
       });
 
@@ -428,6 +430,7 @@ native:
           "test-project",
           tempDir,
           mockPlan,
+          undefined,
         );
       });
 

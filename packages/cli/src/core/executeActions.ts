@@ -1,8 +1,18 @@
 import { ZapperConfig } from "../utils";
 import { DockerManager } from "./docker";
-import { renderer } from "../ui/renderer";
 import { Pm2Executor } from "./process/Pm2Executor";
-import { Action, ActionPlan, ExecutionWave } from "../types";
+import {
+  Action,
+  ActionPlan,
+  ExecutionWave,
+  ServiceActionEvent,
+  ServiceActionReporter,
+  ServiceExecutionReport,
+} from "../types";
+import {
+  applyServiceActionEventToExecutionReport,
+  emptyServiceExecutionReport,
+} from "../utils/serviceActionReport";
 import { findProcess } from "./findProcess";
 import { findContainer } from "./findContainer";
 import { buildServiceName } from "../utils/nameBuilder";
@@ -27,7 +37,10 @@ async function checkHealthUrl(url: string): Promise<boolean> {
   }
 }
 
-async function waitForHealth(action: Action): Promise<void> {
+async function waitForHealth(
+  action: Action,
+  reporter?: ServiceActionReporter,
+): Promise<void> {
   if (action.type !== "start") return;
 
   const { healthcheck } = action;
@@ -39,38 +52,44 @@ async function waitForHealth(action: Action): Promise<void> {
       if (await checkHealthUrl(healthcheck)) return;
       await sleep(1000);
     }
-    renderer.log.warn(`Healthcheck timeout for ${action.name}: ${healthcheck}`);
+    reporter?.onEvent({
+      type: "service.healthcheck.timeout",
+      service: action.name,
+      healthcheck,
+    });
   }
 }
 
 /**
- * Formats wave output as a user-friendly message.
+ * Converts a wave into a structured progress event.
  * Groups actions by type and sorts alphabetically.
- * Output format: "Stopped service1, service2" or "Starting service1, service2"
  */
-function formatWaveOutput(wave: ExecutionWave): string[] {
-  const lines: string[] = [];
-
-  // Group actions by type
-  const startActions = wave.actions
+function waveToEvent(wave: ExecutionWave) {
+  const start = wave.actions
     .filter((a) => a.type === "start")
     .map((a) => a.name)
     .sort();
 
-  const stopActions = wave.actions
+  const stop = wave.actions
     .filter((a) => a.type === "stop")
     .map((a) => a.name)
     .sort();
 
-  if (stopActions.length > 0) {
-    lines.push(`Stopped ${stopActions.join(", ")}`);
-  }
+  return { type: "services.wave" as const, start, stop };
+}
 
-  if (startActions.length > 0) {
-    lines.push(`Starting ${startActions.join(", ")}`);
-  }
+function waveCompletedEvent(wave: ExecutionWave): ServiceActionEvent {
+  const started = wave.actions
+    .filter((a) => a.type === "start")
+    .map((a) => a.name)
+    .sort();
 
-  return lines;
+  const stopped = wave.actions
+    .filter((a) => a.type === "stop")
+    .map((a) => a.name)
+    .sort();
+
+  return { type: "services.wave.completed", started, stopped };
 }
 
 async function executeAction(
@@ -165,17 +184,19 @@ export async function executeActions(
   projectName: string,
   configDir: string | null,
   plan: ActionPlan,
-): Promise<void> {
+  reporter?: ServiceActionReporter,
+): Promise<ServiceExecutionReport> {
   const instanceId = (config as ZapperConfig & { instanceId?: string })
     .instanceId;
   const pm2 = new Pm2Executor(projectName, configDir || undefined, instanceId);
+  const report = emptyServiceExecutionReport();
+  const emit = (event: ServiceActionEvent) => {
+    applyServiceActionEventToExecutionReport(report, event);
+    reporter?.onEvent(event);
+  };
 
   for (const wave of plan.waves) {
-    // Output wave-level message before executing
-    const messages = formatWaveOutput(wave);
-    for (const msg of messages) {
-      renderer.log.info(msg);
-    }
+    emit(waveToEvent(wave));
 
     // Execute all actions in the wave in parallel
     await Promise.all(
@@ -184,7 +205,13 @@ export async function executeActions(
       ),
     );
 
+    emit(waveCompletedEvent(wave));
+
     // Wait for health checks in parallel
-    await Promise.all(wave.actions.map((action) => waitForHealth(action)));
+    await Promise.all(
+      wave.actions.map((action) => waitForHealth(action, reporter)),
+    );
   }
+
+  return report;
 }

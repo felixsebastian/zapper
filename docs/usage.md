@@ -107,17 +107,22 @@ zap --verbose --config custom.yaml task build
 
 ```bash
 zap up                      # Start all services
+zap up --open               # Start all services, then open homepage
+zap up -o                   # Short alias for: zap up --open
 zap up backend              # Start one service (and its dependencies)
 zap up api worker db        # Start multiple services
 zap up --json               # Output command result as JSON
+zap up --jsonl              # Stream action events as JSON Lines
 zap down                    # Stop all services
 zap down backend            # Stop one service
 zap down api worker db      # Stop multiple services
 zap down backend --json     # Output command result as JSON
+zap down --jsonl            # Stream action events as JSON Lines
 zap restart                 # Restart all services
 zap restart api             # Restart one service (does not restart its dependencies)
 zap restart api worker db   # Restart multiple services
 zap r api worker            # Short alias for: zap restart api worker
+zap restart --jsonl         # Stream action events as JSON Lines
 ```
 
 ### Status and logs
@@ -194,6 +199,9 @@ zap notes --json            # Output notes value as JSON
 zap open                    # Alias for: zap launch
 zap o "API Docs"            # Short alias for: zap launch "API Docs"
 ```
+
+For the command result and rendering contract, including the difference between
+query data and action reports, see [Command Output](output.md).
 
 ### System Registry
 

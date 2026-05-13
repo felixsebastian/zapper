@@ -145,7 +145,9 @@ export class CommanderCli {
       .alias("u")
       .description("Start all processes or specific processes")
       .argument("[services...]", "Services to start (space-separated)")
+      .option("-o, --open", "Open the configured homepage after starting")
       .option("-j, --json", "Output command result as minified JSON")
+      .option("--jsonl", "Stream command events as JSON Lines")
       .action(async (services, options, command) => {
         await this.executeCommand("up", services, command);
       });
@@ -158,6 +160,7 @@ export class CommanderCli {
       .argument("[services...]", "Services to stop (space-separated)")
       .option("-y, --force", "Force the operation")
       .option("-j, --json", "Output command result as minified JSON")
+      .option("--jsonl", "Stream command events as JSON Lines")
       .action(async (services, options, command) => {
         await this.executeCommand("down", services, command);
       });
@@ -183,6 +186,7 @@ export class CommanderCli {
       .description("Restart all processes or specific processes")
       .argument("[services...]", "Services to restart (space-separated)")
       .option("-j, --json", "Output command result as minified JSON")
+      .option("--jsonl", "Stream command events as JSON Lines")
       .action(async (services, options, command) => {
         await this.executeCommand("restart", services, command);
       });
@@ -592,7 +596,15 @@ export class CommanderCli {
     };
 
     const jsonMode = !!allOptions.json;
-    renderer.output.setJsonMode(jsonMode);
+    const jsonlMode = !!allOptions.jsonl;
+    if (jsonMode && jsonlMode) {
+      throw new Error("Cannot specify both --json and --jsonl");
+    }
+    if (jsonlMode) {
+      renderer.output.setJsonlMode(true);
+    } else {
+      renderer.output.setJsonMode(jsonMode);
+    }
 
     try {
       if (allOptions.debug) {
@@ -604,7 +616,7 @@ export class CommanderCli {
       }
 
       // Keep JSON output parseable by suppressing incidental human logs.
-      if (jsonMode) {
+      if (jsonMode || jsonlMode) {
         logger.setLevel(LogLevel.ERROR);
       }
 
@@ -649,6 +661,7 @@ export class CommanderCli {
       if (result) {
         renderCommandResult(result, {
           json: jsonMode,
+          jsonl: jsonlMode,
         });
         if (result.kind === "validate" && !result.valid) {
           process.exitCode = 1;

@@ -10,7 +10,9 @@ A lightweight dev environment runner. Define your local dev setup in a single `z
 
 * **[Usage](docs/usage.md)** — Comprehensive docs, keep this up to date
 
-* **[Development](docs/development.md)** — To see how we run/test/build the app
+* **[CLI Development](docs/cli-development.md)** — To see how we run/test/build the CLI
+
+* **[macOS Development](docs/macos-development.md)** — To see how we build/test the menu bar app
 
 * **[Docs site](docs/index.md)** — VitePress entrypoint; raw agent docs are generated as `/llms.txt` and `/llms-full.txt`
 
@@ -20,7 +22,7 @@ A lightweight dev environment runner. Define your local dev setup in a single `z
 
 * If `zap.yaml` behavior or supported fields change, update `docs/usage.md` before finishing.
 
-* If release/development workflow changes, update `docs/releases.md` and `docs/development.md`.
+* If release/development workflow changes, update `docs/releases.md`, `docs/cli-development.md`, and `docs/macos-development.md`.
 
 * Treat `packages/cli/src/config/schemas.ts` as the source of truth for config keys.
 

@@ -60,12 +60,12 @@ const ansi = {
 const ansiEscape = String.fromCharCode(27);
 
 type Tone = "info" | "ok" | "warn" | "error" | "muted" | "accent";
-type OutputMode = "text" | "json";
+type OutputMode = "text" | "json" | "jsonl";
 
 let outputMode: OutputMode = "text";
 
 function isJsonOutputMode(): boolean {
-  return outputMode === "json";
+  return outputMode === "json" || outputMode === "jsonl";
 }
 
 function renderHumanOutput(fn: () => void): void {
@@ -403,8 +403,14 @@ export const renderer = {
     setJsonMode(enabled: boolean): void {
       outputMode = enabled ? "json" : "text";
     },
+    setJsonlMode(enabled: boolean): void {
+      outputMode = enabled ? "jsonl" : "text";
+    },
     isJsonMode(): boolean {
-      return isJsonOutputMode();
+      return outputMode === "json";
+    },
+    isJsonlMode(): boolean {
+      return outputMode === "jsonl";
     },
   },
 

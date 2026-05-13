@@ -14,6 +14,11 @@ export class CloneCommand extends CommandHandler {
     return {
       kind: "clone.completed",
       services,
+      report: {
+        status: "success",
+        action: "clone",
+        services,
+      },
     };
   }
 }

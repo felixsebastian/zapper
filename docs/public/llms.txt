@@ -11,3 +11,6 @@ Raw documentation for agents and automation:
 - project-roots.md: /project-roots
 - env-var-mgmt.md: /env-var-mgmt
 - local-runtime.md: /local-runtime
+- output.md: /output
+- cli-development.md: /cli-development
+- macos-development.md: /macos-development

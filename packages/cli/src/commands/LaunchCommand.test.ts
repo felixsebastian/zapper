@@ -46,6 +46,14 @@ describe("LaunchCommand", () => {
     expect(result).toEqual({
       kind: "launch.opened",
       url: "http://localhost:3000",
+      report: {
+        status: "success",
+        action: "launch",
+        opened: {
+          status: "success",
+          url: "http://localhost:3000",
+        },
+      },
     });
     expect(mockExec).toHaveBeenCalledWith(
       `${getOpenCommand()} "http://localhost:3000"`,
@@ -78,6 +86,14 @@ describe("LaunchCommand", () => {
     expect(result).toEqual({
       kind: "launch.opened",
       url: "http://localhost:3001/docs",
+      report: {
+        status: "success",
+        action: "launch",
+        opened: {
+          status: "success",
+          url: "http://localhost:3001/docs",
+        },
+      },
     });
     expect(mockExec).toHaveBeenCalledWith(
       `${getOpenCommand()} "http://localhost:3001/docs"`,

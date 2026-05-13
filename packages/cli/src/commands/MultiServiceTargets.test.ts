@@ -40,15 +40,22 @@ describe("Multi-service command targets", () => {
       options: {},
     });
 
-    expect(restartProcesses).toHaveBeenCalledWith([
-      "api",
-      "worker",
-      "database",
-    ]);
+    expect(restartProcesses).toHaveBeenCalledWith(
+      ["api", "worker", "database"],
+      expect.objectContaining({ onEvent: expect.any(Function) }),
+    );
     expect(result).toEqual({
       kind: "services.action",
       action: "restart",
       services: ["api", "worker", "database"],
+      report: {
+        status: "success",
+        action: "restart",
+        services: ["api", "worker", "database"],
+        started: [],
+        stopped: [],
+        failed: [],
+      },
     });
   });
 
@@ -66,6 +73,11 @@ describe("Multi-service command targets", () => {
     expect(result).toEqual({
       kind: "clone.completed",
       services: ["api", "web"],
+      report: {
+        status: "success",
+        action: "clone",
+        services: ["api", "web"],
+      },
     });
   });
 

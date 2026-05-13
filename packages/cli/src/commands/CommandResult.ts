@@ -7,6 +7,7 @@ import type {
   SystemResourceAuditResult,
   SystemRegistryProject,
 } from "../system";
+import type { ServiceActionName, ServiceActionReport } from "../types";
 import { Context, Task } from "../types/Context";
 
 export interface ProjectLinkResult {
@@ -69,16 +70,26 @@ export type CommandResult =
     }
   | {
       kind: "services.action";
-      action: "up" | "down" | "restart";
+      action: ServiceActionName;
       services?: string[];
+      report: ServiceActionReport;
     }
   | {
       kind: "clone.completed";
       services?: string[];
+      report: {
+        status: "success";
+        action: "clone";
+        services?: string[];
+      };
     }
   | {
       kind: "reset";
       status: "aborted" | "completed";
+      report: {
+        status: "aborted" | "completed";
+        action: "reset";
+      };
     }
   | {
       kind: "kill";
@@ -91,6 +102,14 @@ export type CommandResult =
   | {
       kind: "launch.opened";
       url: string;
+      report: {
+        status: "success";
+        action: "launch";
+        opened: {
+          status: "success";
+          url: string;
+        };
+      };
     }
   | {
       kind: "links.list";

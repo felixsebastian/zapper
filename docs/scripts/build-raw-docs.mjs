@@ -13,6 +13,9 @@ const sourceOrder = [
   "project-roots.md",
   "env-var-mgmt.md",
   "local-runtime.md",
+  "output.md",
+  "cli-development.md",
+  "macos-development.md",
 ];
 
 const entries = (

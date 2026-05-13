@@ -20,7 +20,8 @@ Infrastructure as code for your local development environment.
 
 - **[Docs](docs/index.md)** — Quick start, reference, and maintainer docs
 - **[Usage](docs/usage.md)** — Installation, configuration, CLI reference
-- **[Development](docs/development.md)** — Contributing, testing, releases
+- **[CLI Development](docs/cli-development.md)** — CLI contributing, testing, and release workflow
+- **[macOS Development](docs/macos-development.md)** — Menu bar app development and packaging
 
 ## Repository Layout
 

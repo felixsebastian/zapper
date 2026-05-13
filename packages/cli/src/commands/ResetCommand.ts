@@ -15,12 +15,20 @@ export class ResetCommand extends CommandHandler {
       return {
         kind: "reset",
         status: "aborted",
+        report: {
+          status: "aborted",
+          action: "reset",
+        },
       };
     }
     await zapper.reset(true);
     return {
       kind: "reset",
       status: "completed",
+      report: {
+        status: "completed",
+        action: "reset",
+      },
     };
   }
 }

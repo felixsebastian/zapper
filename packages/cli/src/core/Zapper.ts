@@ -6,6 +6,8 @@ import { Pm2Manager } from "./process/Pm2Manager";
 import { DockerManager } from "./docker";
 import { ZapperConfig } from "../config/schemas";
 import { Context, Process, Container } from "../types/Context";
+import type { ServiceActionReport, ServiceActionReporter } from "../types";
+import { emptyServiceActionReport } from "../utils/serviceActionReport";
 import { createContext } from "./createContext";
 import path from "path";
 import { renderer } from "../ui/renderer";
@@ -289,7 +291,10 @@ export class Zapper {
     } as ZapperConfig & { instanceId?: string | null; configPath?: string };
   }
 
-  async startProcesses(processNames?: string[]): Promise<void> {
+  async startProcesses(
+    processNames?: string[],
+    reporter?: ServiceActionReporter,
+  ): Promise<ServiceActionReport> {
     if (!this.context) throw new ContextNotLoadedError();
 
     const allProcesses = this.getProcesses();
@@ -330,15 +335,24 @@ export class Zapper {
       }
     }
 
-    await executeActions(
+    const executionReport = await executeActions(
       legacyConfig,
       this.context.projectName,
       this.context.projectRoot,
       plan,
+      reporter,
     );
+
+    return {
+      ...emptyServiceActionReport("up", processNames),
+      ...executionReport,
+    };
   }
 
-  async stopProcesses(processNames?: string[]): Promise<void> {
+  async stopProcesses(
+    processNames?: string[],
+    reporter?: ServiceActionReporter,
+  ): Promise<ServiceActionReport> {
     if (!this.context) throw new ContextNotLoadedError();
 
     const legacyConfig = this.createLegacyConfig();
@@ -370,15 +384,24 @@ export class Zapper {
       }
     }
 
-    await executeActions(
+    const executionReport = await executeActions(
       legacyConfig,
       this.context.projectName,
       this.context.projectRoot,
       plan,
+      reporter,
     );
+
+    return {
+      ...emptyServiceActionReport("down", processNames),
+      ...executionReport,
+    };
   }
 
-  async restartProcesses(processNames?: string[]): Promise<void> {
+  async restartProcesses(
+    processNames?: string[],
+    reporter?: ServiceActionReporter,
+  ): Promise<ServiceActionReport> {
     if (!this.context) throw new ContextNotLoadedError();
     const legacyConfig = this.createLegacyConfig();
     const planner = new Planner(legacyConfig);
@@ -391,12 +414,18 @@ export class Zapper {
       this.context.state.activeProfile,
     );
 
-    await executeActions(
+    const executionReport = await executeActions(
       legacyConfig,
       this.context.projectName,
       this.context.projectRoot,
       plan,
+      reporter,
     );
+
+    return {
+      ...emptyServiceActionReport("restart", processNames),
+      ...executionReport,
+    };
   }
 
   private resolveProjectNameForKill(projectName?: string): string {
