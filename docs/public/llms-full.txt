@@ -3083,6 +3083,9 @@ The Open control is hidden when no homepage or project links are configured,
 opens directly when there is one target, and becomes a menu when there are
 multiple targets. Pinned stacks are stored in local app preferences and appear
 in a Pinned section above unpinned stacks.
+Missing registry entries appear as one compact, expandable warning with a Prune
+button. Clicking Prune replaces the warning with an inline destructive
+confirmation; accepting runs `zap global prune`.
 The menu bar status item stays compact: it shows the bolt icon and the running
 service count, without status words.
 Unpinned stacks are grouped into Active and Inactive sections using the same
@@ -3093,7 +3096,8 @@ menu, and actions show immediate stale-state feedback in the stack and service
 rows before converging on the next real CLI refresh. Amber LEDs are reserved for
 real CLI-reported pending state; the spinner means the app knows the displayed
 state is stale. The open popover polls briefly at a faster cadence, settles to a
-slower idle cadence, and polls more frequently while action state is stale.
+slower idle cadence, polls at least every 8 seconds while closed, and polls more
+frequently while action state is stale.
 During refresh, the header keeps showing the last service summary and uses a
 fixed-size spinner/check indicator to avoid layout shifts. Paths, runtime
 metadata, last update time, last action, CLI override controls, refresh, and
