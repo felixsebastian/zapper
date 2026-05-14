@@ -10,8 +10,12 @@ const navLinks = [
     label: "Docs",
     href: "https://docs.zapper.mp-lb.dev",
   },
-  { label: "GitHub", href: "https://github.com/felixsebastian/zapper" },
+  {
+    label: "Agent docs",
+    href: "https://docs.zapper.mp-lb.dev/llms-full.txt",
+  },
   { label: "Mac app", href: "#macos" },
+  { label: "GitHub", href: "https://github.com/felixsebastian/zapper" },
   { label: "Discord", href: "https://discord.gg/2zdyJMce" },
 ];
 
@@ -242,16 +246,20 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="mt-8 grid items-center gap-6 lg:grid-cols-[1fr_auto]">
-              <p className="font-mono-tight text-sm text-muted-foreground">
-                Bonus: nearly every command takes{" "}
-                <code className="text-foreground">--json</code>. Pipe it
-                straight into the next agent step.
-              </p>
-              <div className="flex w-fit items-center gap-3 rounded-md border border-[hsl(var(--term-border))] bg-[hsl(var(--term-bg))] px-4 py-2.5 font-mono-tight text-xs text-[hsl(var(--term-fg))]">
-                <span className="text-[hsl(var(--term-prompt))]">$</span>
-                <span>zap ls --json | jq &apos;.services&apos;</span>
-              </div>
+            <div className="mt-8">
+              <Button
+                asChild
+                variant="outline"
+                className="h-10 font-mono-tight"
+              >
+                <a
+                  href="https://docs.zapper.mp-lb.dev/llms-full.txt"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Read the agent docs →
+                </a>
+              </Button>
             </div>
           </div>
         </section>
