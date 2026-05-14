@@ -41,19 +41,16 @@ env-file secret:
 
 ## Release Auth Prerequisite
 
-Before attempting a release, make sure npm publishing auth is configured correctly for CI. As of March 25, 2026, npm recommends trusted publishing for GitHub Actions and requires one of these for non-interactive publishes:
+Before attempting a release, make sure npm trusted publishing auth is configured correctly for CI. As of March 25, 2026, npm recommends trusted publishing for GitHub Actions.
 
-- Preferred: npm trusted publishing configured for `mp-lb/zapper` and `.github/workflows/release.yml`
-- Fallback: `NPM_TOKEN` must be a granular write token created with **Bypass two-factor authentication** enabled
+- Required: npm trusted publishing configured for `mp-lb/zapper` and `.github/workflows/release.yml`
 
 Important details:
 
-- A regular token that still requires 2FA will fail in CI with `EOTP This operation requires a one-time password`.
-- The release workflow passes `secrets.NPM_TOKEN` to Changesets when that secret exists; if it is absent, Changesets can fall back to OIDC trusted publishing.
-- The release workflow logs the token length, a short SHA-256 token fingerprint, `npm whoami`, and package collaborator access before publishing. It does not print token characters.
+- `NPM_TOKEN` is ignored by the release workflow. If the secret still exists, the workflow logs only the token length and a short SHA-256 fingerprint for cleanup/debugging. It does not print token characters.
 - npm trusted publishing currently requires Node `22.14.0+` and npm CLI `11.5.1+`.
 - For GitHub-based trusted publishing, npm also requires `packages/cli/package.json` `repository.url` to exactly match the GitHub repository URL.
-- Once trusted publishing is working, remove or revoke old write tokens when possible.
+- Remove or revoke old write tokens when possible.
 
 ## 1. Create release branch
 
@@ -351,9 +348,8 @@ pnpm --filter @mp-lb/zapper publish     # Publish to npm
 - Verify `packages/cli/package.json` has correct name and version
 - Ensure no duplicate version exists on npm
 - Check if there are publishing restrictions
-- If CI shows `EOTP`, replace `NPM_TOKEN` with a granular write token that has **Bypass two-factor authentication** enabled, or finish migrating to npm trusted publishing for `.github/workflows/release.yml`
-- If you are using trusted publishing only, remove the `NPM_TOKEN` repository secret for this job; otherwise `changesets/action` will create `.npmrc` and force token-based publish instead of OIDC
-- If local publish succeeds with a token but CI fails, compare the workflow's logged `NPM_TOKEN sha256 prefix` with the same fingerprint generated locally. Do not print token characters in CI logs.
+- If CI shows token or 2FA errors, confirm the workflow is not passing `NPM_TOKEN` to Changesets and finish migrating to npm trusted publishing for `.github/workflows/release.yml`.
+- If a legacy `NPM_TOKEN` repository secret still exists, compare the workflow's logged `NPM_TOKEN sha256 prefix` with the same fingerprint generated locally before revoking it. Do not print token characters in CI logs.
 - If trusted publishing is configured but publish still fails, confirm these values match exactly on npm:
   - GitHub org/user: `mp-lb`
   - Repository: `zapper`
@@ -361,8 +357,7 @@ pnpm --filter @mp-lb/zapper publish     # Publish to npm
   - `packages/cli/package.json` `repository.url`: `git+https://github.com/mp-lb/zapper.git`
 - If publish fails with `E404 Not Found - PUT https://registry.npmjs.org/@mp-lb%2fzapper`, verify the npm scope owner exists and the publishing identity has rights to it:
   - `mp-lb` must exist on npm as the owning user or organization
-  - the account connected to the trusted publisher, or the fallback token's owner, must have publish access to the `@mp-lb` scope
-  - if `npm whoami` and collaborator access look correct but the fingerprint differs from a known-good local token, update the GitHub `NPM_TOKEN` secret before rerunning the workflow
+  - the account connected to the trusted publisher must have publish access to the `@mp-lb` scope
 
 **If the Version Packages PR doesn't appear:**
 - Verify you committed changeset files (should be in `.changeset/` directory)

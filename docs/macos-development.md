@@ -27,6 +27,10 @@ apps/macos/bin/run     # Build, stop running Zapper apps, start the local app
 apps/macos/bin/clean   # Remove apps/macos/build
 ```
 
+CLI npm release publishing is handled by `.github/workflows/release.yml` using
+npm trusted publishing. The macOS app release workflow is separate and starts
+from pushed `v*` tags after the CLI package version is final.
+
 By default the app build packages the built CLI, Node runtime, production CLI
 dependencies, and PM2 into the app bundle. If you only changed Swift code and
 want a faster local-only build, you can skip runtime packaging:

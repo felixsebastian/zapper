@@ -53,21 +53,16 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ -z "${NPM_TOKEN:-}" ]; then
-            echo "NPM_TOKEN: absent; Changesets will try OIDC trusted publishing"
+            echo "NPM_TOKEN: absent; Changesets will use OIDC trusted publishing"
             exit 0
           fi
 
           token_len=${#NPM_TOKEN}
           token_fingerprint=$(printf '%s' "$NPM_TOKEN" | shasum -a 256 | cut -c1-12)
-          tmp_npmrc="$(mktemp)"
-          trap 'rm -f "$tmp_npmrc"' EXIT
-          printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$tmp_npmrc"
 
           echo "NPM_TOKEN length: ${token_len}"
           echo "NPM_TOKEN sha256 prefix: ${token_fingerprint}"
-          echo "npm whoami: $(NPM_CONFIG_USERCONFIG="$tmp_npmrc" npm whoami)"
-          echo "npm package collaborators:"
-          NPM_CONFIG_USERCONFIG="$tmp_npmrc" npm access list collaborators @mp-lb/zapper --json
+          echo "NPM_TOKEN is ignored by this workflow; Changesets will use OIDC trusted publishing"
 
       - name: Create Release Pull Request or Publish
         id: changesets
@@ -78,4 +73,3 @@ jobs:
           commit: "chore: release"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
