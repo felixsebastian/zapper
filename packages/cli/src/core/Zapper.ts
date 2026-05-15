@@ -47,6 +47,19 @@ import {
 } from "../system/SystemRegistry";
 import packageJson from "../../package.json";
 
+const READ_ONLY_STATE_COMMANDS = new Set([
+  "config",
+  "git:status",
+  "home",
+  "links",
+  "logs",
+  "ls",
+  "notes",
+  "startup-log",
+  "state",
+  "status",
+]);
+
 export interface ProjectKillTargets {
   projectName: string;
   prefix: string;
@@ -92,11 +105,15 @@ export class Zapper {
     }
 
     const commandName = cliOptions?.__command;
+    const readOnlyStateCommand =
+      typeof commandName === "string" &&
+      READ_ONLY_STATE_COMMANDS.has(commandName);
     const instanceResolution = await resolveInstance(
       projectRoot,
       selectedInstanceKey,
       {
-        autoCreate: true,
+        autoCreate: !readOnlyStateCommand,
+        allowMissing: readOnlyStateCommand,
       },
     );
     this.context.instanceKey = instanceResolution.instanceKey;
@@ -105,7 +122,7 @@ export class Zapper {
     // Centralized command boot sequence hook:
     // Ensure instance-scoped ports exist before env resolution for any
     // config-backed command so startup does not depend on `up` running first.
-    if (commandName || !this.context.instance) {
+    if (!readOnlyStateCommand && (commandName || !this.context.instance)) {
       initializePorts(
         projectRoot,
         this.context.ports || [],

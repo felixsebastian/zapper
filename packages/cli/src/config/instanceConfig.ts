@@ -1,4 +1,4 @@
-import { loadState, saveState } from "./stateLoader";
+import { loadState, updateState } from "./stateLoader";
 import { DEFAULT_INSTANCE_KEY } from "../core/instanceResolver";
 
 export interface InstanceConfig {
@@ -30,25 +30,26 @@ export function saveInstanceConfig(
   projectRoot: string,
   config: InstanceConfig,
 ): void {
-  const existing = loadState(projectRoot);
-  const nextInstances = { ...(existing.instances || {}) };
+  updateState(projectRoot, (existing) => {
+    const nextInstances = { ...(existing.instances || {}) };
 
-  if (config.instanceId) {
-    nextInstances[DEFAULT_INSTANCE_KEY] = {
-      id: config.instanceId,
-      ports:
-        existing.instances?.[DEFAULT_INSTANCE_KEY]?.ports ||
-        existing.ports ||
-        {},
+    if (config.instanceId) {
+      nextInstances[DEFAULT_INSTANCE_KEY] = {
+        id: config.instanceId,
+        ports:
+          existing.instances?.[DEFAULT_INSTANCE_KEY]?.ports ||
+          existing.ports ||
+          {},
+      };
+    } else {
+      delete nextInstances[DEFAULT_INSTANCE_KEY];
+    }
+
+    return {
+      instances: nextInstances,
+      instanceId: config.instanceId ?? undefined,
+      mode: config.instanceId ? "isolate" : "normal",
+      ports: undefined,
     };
-  } else {
-    delete nextInstances[DEFAULT_INSTANCE_KEY];
-  }
-
-  saveState(projectRoot, {
-    instances: nextInstances,
-    instanceId: config.instanceId ?? undefined,
-    mode: config.instanceId ? "isolate" : "normal",
-    ports: undefined,
   });
 }

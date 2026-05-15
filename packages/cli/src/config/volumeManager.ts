@@ -1,5 +1,5 @@
 import { Container, StoredVolume, Volume } from "./schemas";
-import { loadState, saveState } from "./stateLoader";
+import { loadState, updateState } from "./stateLoader";
 import { DEFAULT_INSTANCE_KEY, ensureInstance } from "../core/instanceResolver";
 
 export interface ManagedVolumeSpec {
@@ -70,15 +70,18 @@ export function saveVolumesForInstance(
   const refreshedInstance = refreshed.instances?.[instanceKey];
   const refreshedId = refreshedInstance?.id || ensured.id;
 
-  saveState(projectRoot, {
-    instances: {
-      ...(refreshed.instances || {}),
-      [instanceKey]: {
-        ...(refreshedInstance || {}),
-        id: refreshedId,
-        volumes,
+  updateState(projectRoot, (latest) => {
+    const latestInstance = latest.instances?.[instanceKey];
+    return {
+      instances: {
+        ...(latest.instances || {}),
+        [instanceKey]: {
+          ...(latestInstance || refreshedInstance || {}),
+          id: latestInstance?.id || refreshedId,
+          volumes,
+        },
       },
-    },
+    };
   });
 }
 

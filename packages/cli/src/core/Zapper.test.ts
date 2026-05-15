@@ -196,13 +196,14 @@ native:
       expect(context?.gitMethod).toBeUndefined();
     });
 
-    it("auto-creates instance state for non-up commands too", async () => {
+    it("does not auto-create instance state for read-only status", async () => {
       const configPath = createMinimalTempConfig();
 
       await zapper.loadConfig(configPath, { __command: "status" });
 
       expect(mockResolveInstance).toHaveBeenCalledWith(tempDir, undefined, {
-        autoCreate: true,
+        autoCreate: false,
+        allowMissing: true,
       });
     });
   });

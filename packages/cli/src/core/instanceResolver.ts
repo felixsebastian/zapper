@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { StoredVolume } from "../config/schemas";
-import { loadState, saveState } from "../config/stateLoader";
+import { loadState, updateState } from "../config/stateLoader";
 
 export interface InstanceResolution {
   instanceKey: string;
@@ -69,11 +69,6 @@ export function getInstanceDisplayLabel(instance: {
   return instance.label ?? instance.id;
 }
 
-function getLegacyInstanceId(projectRoot: string): string | undefined {
-  const state = loadState(projectRoot);
-  return state.instanceId;
-}
-
 export function createInstance(
   projectRoot: string,
   instanceKey: string = DEFAULT_INSTANCE_KEY,
@@ -83,39 +78,43 @@ export function createInstance(
     projectRoot,
   );
   validateInstanceKey(resolvedInstanceKey);
-  const existingState = loadState(projectRoot);
-  const existing = existingState.instances?.[resolvedInstanceKey];
-  if (existing?.id) {
-    return existing.id;
-  }
+  let resolvedId = "";
 
-  const legacyId =
-    resolvedInstanceKey === DEFAULT_INSTANCE_KEY
-      ? getLegacyInstanceId(projectRoot)
-      : undefined;
-  const instanceId = generateInstanceId();
-  const id = legacyId || instanceId;
-  const nextInstances: Record<string, InstanceEntry> = {
-    ...(existingState.instances || {}),
-    [resolvedInstanceKey]: {
-      id,
-      ports:
-        existingState.instances?.[resolvedInstanceKey]?.ports ||
-        (resolvedInstanceKey === DEFAULT_INSTANCE_KEY
-          ? existingState.ports
-          : undefined),
-    },
-  };
+  updateState(projectRoot, (existingState) => {
+    const existing = existingState.instances?.[resolvedInstanceKey];
+    if (existing?.id) {
+      resolvedId = existing.id;
+      return {};
+    }
 
-  saveState(projectRoot, {
-    defaultInstance: existingState.defaultInstance || resolvedInstanceKey,
-    instances: nextInstances,
-    // Remove legacy top-level instance identity to avoid dual sources of truth.
-    instanceId: undefined,
-    mode: undefined,
-    ports: undefined,
+    const legacyId =
+      resolvedInstanceKey === DEFAULT_INSTANCE_KEY
+        ? existingState.instanceId
+        : undefined;
+    resolvedId = legacyId || generateInstanceId();
+    const nextInstances: Record<string, InstanceEntry> = {
+      ...(existingState.instances || {}),
+      [resolvedInstanceKey]: {
+        id: resolvedId,
+        ports:
+          existingState.instances?.[resolvedInstanceKey]?.ports ||
+          (resolvedInstanceKey === DEFAULT_INSTANCE_KEY
+            ? existingState.ports
+            : undefined),
+      },
+    };
+
+    return {
+      defaultInstance: existingState.defaultInstance || resolvedInstanceKey,
+      instances: nextInstances,
+      // Remove legacy top-level instance identity to avoid dual sources of truth.
+      instanceId: undefined,
+      mode: undefined,
+      ports: undefined,
+    };
   });
-  return id;
+
+  return resolvedId;
 }
 
 // Backward-compatible alias used by older tests/callers.
@@ -128,15 +127,16 @@ export function isolateProject(
 
 // Backward-compatible clear operation for the default instance.
 export function clearIsolation(projectRoot: string): void {
-  const state = loadState(projectRoot);
-  const nextInstances = { ...(state.instances || {}) };
-  delete nextInstances[DEFAULT_INSTANCE_KEY];
+  updateState(projectRoot, (state) => {
+    const nextInstances = { ...(state.instances || {}) };
+    delete nextInstances[DEFAULT_INSTANCE_KEY];
 
-  saveState(projectRoot, {
-    instances: nextInstances,
-    instanceId: undefined,
-    mode: undefined,
-    ports: undefined,
+    return {
+      instances: nextInstances,
+      instanceId: undefined,
+      mode: undefined,
+      ports: undefined,
+    };
   });
 }
 
@@ -169,18 +169,19 @@ export function setInstanceLabel(
   );
   validateInstanceKey(resolvedInstanceKey);
   const { id } = ensureInstance(projectRoot, resolvedInstanceKey);
-  const state = loadState(projectRoot);
-  const existing = state.instances?.[resolvedInstanceKey];
 
-  saveState(projectRoot, {
-    instances: {
-      ...(state.instances || {}),
-      [resolvedInstanceKey]: {
-        ...existing,
-        id,
-        label,
+  updateState(projectRoot, (state) => {
+    const existing = state.instances?.[resolvedInstanceKey];
+    return {
+      instances: {
+        ...(state.instances || {}),
+        [resolvedInstanceKey]: {
+          ...existing,
+          id,
+          label,
+        },
       },
-    },
+    };
   });
 
   return { instanceKey: resolvedInstanceKey, instanceId: id, label };
@@ -192,7 +193,7 @@ export function setInstanceLabel(
 export async function resolveInstance(
   projectRoot: string,
   instanceKey?: string,
-  options: { autoCreate?: boolean } = {},
+  options: { autoCreate?: boolean; allowMissing?: boolean } = {},
 ): Promise<InstanceResolution> {
   const resolvedInstanceKey = resolveDefaultInstanceKey(
     instanceKey,
@@ -223,6 +224,13 @@ export async function resolveInstance(
       instanceKey: resolvedInstanceKey,
       instanceId: id,
       label: instance?.label,
+    };
+  }
+
+  if (options.allowMissing) {
+    return {
+      instanceKey: resolvedInstanceKey,
+      instanceId: "",
     };
   }
 

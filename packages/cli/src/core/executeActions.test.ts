@@ -21,6 +21,25 @@ vi.mock("../config/stateLoader", () => ({
     },
   })),
   saveState: vi.fn(),
+  updateState: vi.fn((projectRoot, updater) => {
+    void projectRoot;
+    return {
+      instances: {
+        default: {
+          id: "default",
+          volumes: {},
+        },
+      },
+      ...updater({
+        instances: {
+          default: {
+            id: "default",
+            volumes: {},
+          },
+        },
+      }),
+    };
+  }),
   updateServiceState: vi.fn(),
   clearServiceState: vi.fn(),
 }));

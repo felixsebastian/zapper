@@ -2,10 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   loadState,
   saveState,
+  updateState,
   updateServiceState,
   clearServiceState,
 } from "./stateLoader";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
+import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "fs";
 import path from "path";
 import { tmpdir } from "os";
 
@@ -75,6 +76,52 @@ describe("stateLoader", () => {
     expect(state.activeEnvironment).toBe("staging");
     expect(state.lastUpdated).toBeDefined();
     expect(state.lastUpdated).toBeTruthy();
+  });
+
+  it("updates state from the latest file contents while holding the state lock", () => {
+    updateState(testDir, () => ({
+      instances: {
+        default: {
+          id: "abc123",
+          ports: { API_PORT: "5000" },
+        },
+      },
+    }));
+
+    updateState(testDir, (state) => ({
+      instances: {
+        ...(state.instances || {}),
+        default: {
+          ...state.instances?.default,
+          id: state.instances?.default?.id || "missing",
+          volumes: {
+            "zap.demo.abc123.vol1": {
+              service: "db",
+              internal_dir: "/var/lib/postgresql/data",
+            },
+          },
+        },
+      },
+    }));
+
+    const state = loadState(testDir);
+    expect(state.instances?.default?.ports).toEqual({ API_PORT: "5000" });
+    expect(state.instances?.default?.volumes).toEqual({
+      "zap.demo.abc123.vol1": {
+        service: "db",
+        internal_dir: "/var/lib/postgresql/data",
+      },
+    });
+  });
+
+  it("does not replace corrupt state with defaults on a write path", () => {
+    const zapDir = path.join(testDir, ".zap");
+    const statePath = path.join(zapDir, "state.json");
+    mkdirSync(zapDir);
+    writeFileSync(statePath, "{ invalid json");
+
+    expect(() => saveState(testDir, { activeProfile: "dev" })).toThrow();
+    expect(readFileSync(statePath, "utf8")).toBe("{ invalid json");
   });
 
   it("does not persist service lifecycle state", () => {

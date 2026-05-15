@@ -614,7 +614,9 @@ zap init --instance e2e         # Ensures ports/volumes/state exist for named in
 zap init -R                     # Re-randomizes all configured ports in selected instance
 ```
 
-Most config-backed commands now perform this initialization step automatically if the target instance has not been created yet, so your first command no longer needs to be `zap up`.
+Most config-backed commands now perform this initialization step automatically if the target instance has not been created yet, so your first command no longer needs to be `zap up`. Read-only inspection commands such as `zap ps`/`zap status`, `zap ls`, `zap state`, `zap logs`, and `zap startup-log` do not create or update `.zap/state.json` just by loading the project.
+
+State writes are protected by a local lock and saved atomically with a temporary file followed by rename. If an existing `.zap/state.json` is malformed, commands that need to update state fail instead of replacing it with default state.
 
 If `init_task` is set, `zap init` runs that task after initialization completes.
 This is equivalent to running `zap init` first and then `zap task <init_task>`.

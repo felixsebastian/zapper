@@ -1,5 +1,5 @@
 import * as path from "path";
-import { loadState, saveState } from "./stateLoader";
+import { loadState, updateState } from "./stateLoader";
 import { DEFAULT_INSTANCE_KEY, ensureInstance } from "../core/instanceResolver";
 
 const STATE_FILE_NAME = "state.json";
@@ -47,16 +47,19 @@ export function savePortsForInstance(
   const refreshedInstance = refreshed.instances?.[instanceKey];
   const refreshedId = refreshedInstance?.id || ensured.id;
 
-  saveState(projectRoot, {
-    instances: {
-      ...(refreshed.instances || {}),
-      [instanceKey]: {
-        ...(refreshedInstance || {}),
-        id: refreshedId,
-        ports,
+  updateState(projectRoot, (latest) => {
+    const latestInstance = latest.instances?.[instanceKey];
+    return {
+      instances: {
+        ...(latest.instances || {}),
+        [instanceKey]: {
+          ...(latestInstance || refreshedInstance || {}),
+          id: latestInstance?.id || refreshedId,
+          ports,
+        },
       },
-    },
-    ports: undefined,
+      ports: undefined,
+    };
   });
 }
 
