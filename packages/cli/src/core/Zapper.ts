@@ -211,6 +211,25 @@ export class Zapper {
     return resolveAliasesToCanonical(names, buildServiceAliasMap(this.context));
   }
 
+  private resolveActionTargets(names?: string[]): string[] | undefined {
+    if (!names || !this.context) return names;
+
+    const aliasMap = buildServiceAliasMap(this.context);
+    const existingServices = new Set([
+      ...this.context.processes.map((p) => p.name),
+      ...this.context.containers.map((c) => c.name),
+    ]);
+
+    for (const requestedName of names) {
+      const canonicalName = aliasMap[requestedName] || requestedName;
+      if (!existingServices.has(canonicalName)) {
+        renderer.log.warn(`Service not found: ${requestedName}. Skipping.`);
+      }
+    }
+
+    return resolveAliasesToCanonical(names, aliasMap);
+  }
+
   resolveServiceName(name: string): string {
     const resolved = this.resolveAliasesToCanonical([name]);
     return resolved && resolved.length > 0 ? resolved[0] : name;
@@ -308,7 +327,7 @@ export class Zapper {
     // For now, we'll need a temporary legacy config for backwards compatibility
     const legacyConfig = this.createLegacyConfig();
     const planner = new Planner(legacyConfig);
-    const canonical = this.resolveAliasesToCanonical(processNames);
+    const canonical = this.resolveActionTargets(processNames);
     const plan = await planner.plan(
       "start",
       canonical,
@@ -316,24 +335,6 @@ export class Zapper {
       false,
       this.context.state.activeProfile,
     );
-
-    const hasActions = plan.waves.some((w) => w.actions.length > 0);
-    if (canonical && canonical.length > 0 && !hasActions) {
-      // Only throw error if no services were found at all, not if they're already running
-      const allProcesses = this.getProcesses();
-      const allContainers = this.getContainers();
-      const existingServices = new Set([
-        ...allProcesses.map((p) => p.name),
-        ...allContainers.map(([name]) => name),
-      ]);
-
-      const nonExistentServices = canonical.filter(
-        (name) => !existingServices.has(name),
-      );
-      if (nonExistentServices.length > 0) {
-        throw new ServiceNotFoundError(nonExistentServices.join(", "));
-      }
-    }
 
     const executionReport = await executeActions(
       legacyConfig,
@@ -357,7 +358,7 @@ export class Zapper {
 
     const legacyConfig = this.createLegacyConfig();
     const planner = new Planner(legacyConfig);
-    const canonical = this.resolveAliasesToCanonical(processNames);
+    const canonical = this.resolveActionTargets(processNames);
     const plan = await planner.plan(
       "stop",
       canonical,
@@ -365,24 +366,6 @@ export class Zapper {
       false,
       this.context.state.activeProfile,
     );
-
-    const hasActions = plan.waves.some((w) => w.actions.length > 0);
-    if (canonical && canonical.length > 0 && !hasActions) {
-      // Only throw error if no services were found at all, not if they're already stopped
-      const allProcesses = this.getProcesses();
-      const allContainers = this.getContainers();
-      const existingServices = new Set([
-        ...allProcesses.map((p) => p.name),
-        ...allContainers.map(([name]) => name),
-      ]);
-
-      const nonExistentServices = canonical.filter(
-        (name) => !existingServices.has(name),
-      );
-      if (nonExistentServices.length > 0) {
-        throw new ServiceNotFoundError(nonExistentServices.join(", "));
-      }
-    }
 
     const executionReport = await executeActions(
       legacyConfig,
@@ -405,7 +388,7 @@ export class Zapper {
     if (!this.context) throw new ContextNotLoadedError();
     const legacyConfig = this.createLegacyConfig();
     const planner = new Planner(legacyConfig);
-    const canonical = this.resolveAliasesToCanonical(processNames);
+    const canonical = this.resolveActionTargets(processNames);
     const plan = await planner.plan(
       "restart",
       canonical,

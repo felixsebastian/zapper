@@ -14,6 +14,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { tmpdir } from "os";
 import { parseYamlFile } from "../config/yamlParser";
+import { renderer } from "../ui/renderer";
 
 // Mock external dependencies
 vi.mock("./Planner");
@@ -370,11 +371,42 @@ native:
         );
       });
 
-      it("should throw ServiceNotFoundError when specific process not found", async () => {
+      it("should warn and skip when specific process not found", async () => {
+        const warnSpy = vi
+          .spyOn(renderer.log, "warn")
+          .mockImplementation(() => {});
         mockPlan.waves = []; // No actions planned
 
-        await expect(zapper.startProcesses(["nonexistent"])).rejects.toThrow(
-          ServiceNotFoundError,
+        await zapper.startProcesses(["nonexistent"]);
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          "Service not found: nonexistent. Skipping.",
+        );
+        expect(mockPlannerInstance.plan).toHaveBeenCalledWith(
+          "start",
+          ["nonexistent"],
+          "test-project",
+          false,
+          undefined,
+        );
+      });
+
+      it("should warn for invalid requested services while planning valid ones", async () => {
+        const warnSpy = vi
+          .spyOn(renderer.log, "warn")
+          .mockImplementation(() => {});
+
+        await zapper.startProcesses(["api", "missing"]);
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          "Service not found: missing. Skipping.",
+        );
+        expect(mockPlannerInstance.plan).toHaveBeenCalledWith(
+          "start",
+          ["api", "missing"],
+          "test-project",
+          false,
+          undefined,
         );
       });
     });
@@ -402,11 +434,16 @@ native:
         );
       });
 
-      it("should throw ServiceNotFoundError when no actions planned for specific services", async () => {
+      it("should warn and skip when no requested stop services exist", async () => {
+        const warnSpy = vi
+          .spyOn(renderer.log, "warn")
+          .mockImplementation(() => {});
         mockPlan.waves = []; // No actions planned
 
-        await expect(zapper.stopProcesses(["nonexistent"])).rejects.toThrow(
-          ServiceNotFoundError,
+        await zapper.stopProcesses(["nonexistent"]);
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          "Service not found: nonexistent. Skipping.",
         );
       });
     });
@@ -440,6 +477,25 @@ native:
         expect(mockPlannerInstance.plan).toHaveBeenCalledWith(
           "restart",
           undefined,
+          "test-project",
+          false,
+          undefined,
+        );
+      });
+
+      it("should warn and skip unknown restart services", async () => {
+        const warnSpy = vi
+          .spyOn(renderer.log, "warn")
+          .mockImplementation(() => {});
+
+        await zapper.restartProcesses(["api", "missing"]);
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          "Service not found: missing. Skipping.",
+        );
+        expect(mockPlannerInstance.plan).toHaveBeenCalledWith(
+          "restart",
+          ["api", "missing"],
           "test-project",
           false,
           undefined,

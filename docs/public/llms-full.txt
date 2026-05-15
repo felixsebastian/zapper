@@ -188,6 +188,10 @@ zap r api worker            # Short alias for: zap restart api worker
 zap restart --jsonl         # Stream action events as JSON Lines
 ```
 
+When you pass service names to `up`, `down`, or `restart`, Zapper warns for
+each name that does not match a configured service or alias and continues with
+the valid services in the same command.
+
 ### Status and logs
 
 ```bash
