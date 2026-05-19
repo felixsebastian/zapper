@@ -18,12 +18,39 @@ function toJsonPayload(result: CommandResult): unknown {
       return renderer.tasks.paramsToJson(result.task, result.delimiters);
     case "profiles.list":
       return renderer.profiles.toJson(result.profiles);
-    case "environments.list":
-      return renderer.environments.toJson(result.environments);
+    case "profiles.current":
+      return {
+        profile: result.profile ?? null,
+        selectedProfile: result.selectedProfile ?? null,
+        overrideProfile: result.overrideProfile ?? null,
+      };
+    case "profiles.selected":
+      return {
+        status: "success",
+        action: "profile.use",
+        profile: result.profile,
+      };
+    case "profiles.reset":
+      return {
+        status: "success",
+        action: "profile.reset",
+        profile: result.profile,
+      };
     case "env.service":
       return result.resolvedEnv;
     case "state":
       return result.state;
+    case "stack.id":
+      return {
+        stackId: result.stackId,
+        profile: result.profile,
+      };
+    case "stack.current":
+      return result.stack;
+    case "stack.list":
+      return {
+        stacks: result.stacks,
+      };
     case "config":
       return result.filteredConfig;
     case "validate":
@@ -67,41 +94,6 @@ function toJsonPayload(result: CommandResult): unknown {
       return { status: "success", action: "git.status" };
     case "git.stash.completed":
       return { status: "success", action: "git.stash" };
-    case "profiles.picker":
-      return {
-        profiles: result.profiles,
-        activeProfile: result.activeProfile,
-      };
-    case "profiles.enabled":
-      return {
-        status: "success",
-        action: "profile.enable",
-        profile: result.profile,
-        startedServices: result.startedServices,
-      };
-    case "profiles.disabled":
-      return {
-        status: "success",
-        action: "profile.disable",
-        activeProfile: result.activeProfile,
-      };
-    case "environments.picker":
-      return {
-        environments: result.environments,
-        activeEnvironment: result.activeEnvironment,
-      };
-    case "environments.enabled":
-      return {
-        status: "success",
-        action: "environment.enable",
-        environment: result.environment,
-      };
-    case "environments.disabled":
-      return {
-        status: "success",
-        action: "environment.disable",
-        activeEnvironment: result.activeEnvironment,
-      };
     case "global.list":
       return {
         allProjects: result.allProjects,
@@ -195,6 +187,17 @@ function toJsonPayload(result: CommandResult): unknown {
         instanceKey: result.instanceKey,
         volumes: result.volumes,
       };
+    case "volume.list":
+      return {
+        status: "success",
+        action: "volume.list",
+        instanceKey: result.instanceKey,
+        service: result.service,
+        managedOnly: result.managedOnly,
+        idOnly: result.idOnly,
+        volumeIds: result.volumes.map((volume) => volume.name),
+        volumes: result.volumes,
+      };
   }
 }
 
@@ -246,11 +249,33 @@ export function renderCommandResult(
     case "profiles.list":
       renderer.log.report(renderer.profiles.toText(result.profiles));
       return;
-    case "environments.list":
-      renderer.log.report(renderer.environments.toText(result.environments));
+    case "profiles.current":
+      renderer.log.report(result.profile ?? "default");
+      return;
+    case "profiles.selected":
+      renderer.log.info(`Selected profile: ${result.profile}`);
+      return;
+    case "profiles.reset":
+      renderer.log.info(`Selected profile reset to ${result.profile}`);
       return;
     case "env.service":
       renderer.machine.envMap(result.resolvedEnv);
+      return;
+    case "stack.id":
+      renderer.log.report(result.stackId);
+      return;
+    case "stack.current":
+      renderer.log.report(`${result.stack.profile}\t${result.stack.stackId}`);
+      return;
+    case "stack.list":
+      if (result.stacks.length === 0) {
+        renderer.log.info("No stacks initialized.");
+        return;
+      }
+      for (const stack of result.stacks) {
+        const marker = stack.current ? "*" : " ";
+        renderer.log.report(`${marker} ${stack.profile}\t${stack.stackId}`);
+      }
       return;
     case "config":
       renderer.machine.json(result.filteredConfig, result.pretty);
@@ -297,58 +322,6 @@ export function renderCommandResult(
           containerCount: result.containers.length,
         }),
       );
-      return;
-    case "profiles.picker":
-      renderer.log.report(
-        renderer.profiles.pickerText(result.profiles, result.activeProfile),
-      );
-      return;
-    case "profiles.enabled":
-      renderer.log.info(renderer.command.profileEnabledText(result.profile));
-      if (result.startedServices.length === 0) {
-        renderer.log.info(
-          renderer.command.profileNoServicesText(result.profile),
-        );
-      } else {
-        renderer.log.info(
-          renderer.command.profileStartingServicesText(result.startedServices),
-        );
-      }
-      return;
-    case "profiles.disabled":
-      if (!result.activeProfile) {
-        renderer.log.info(renderer.command.noActiveProfileToDisableText());
-      } else {
-        renderer.log.info(
-          renderer.command.profileDisablingText(result.activeProfile),
-        );
-        renderer.log.info(renderer.command.profileDisabledText());
-        renderer.log.info(renderer.command.profileAdjustingServicesText());
-      }
-      return;
-    case "environments.picker":
-      renderer.log.report(
-        renderer.environments.pickerText(
-          result.environments,
-          result.activeEnvironment,
-        ),
-      );
-      return;
-    case "environments.enabled":
-      renderer.log.info(
-        renderer.command.environmentEnabledText(result.environment),
-      );
-      renderer.log.info(renderer.command.environmentUpdatedText());
-      return;
-    case "environments.disabled":
-      if (!result.activeEnvironment) {
-        renderer.log.info(renderer.command.noActiveEnvironmentToDisableText());
-      } else {
-        renderer.log.info(
-          renderer.command.environmentDisablingText(result.activeEnvironment),
-        );
-        renderer.log.info(renderer.command.environmentResetText());
-      }
       return;
     case "global.list":
       if (result.projects.length === 0) {
@@ -486,6 +459,25 @@ export function renderCommandResult(
       renderer.log.info(
         `Pruned ${Object.keys(result.volumes).length} stale managed volume(s) for instance "${result.instanceKey}".`,
       );
+      return;
+    case "volume.list":
+      if (result.volumes.length === 0) {
+        renderer.log.info(
+          `No Docker volumes configured for service "${result.service}".`,
+        );
+        return;
+      }
+      for (const volume of result.volumes) {
+        if (result.idOnly) {
+          renderer.log.report(volume.name);
+          continue;
+        }
+        const mode = volume.mode ? `:${volume.mode}` : "";
+        const kind = volume.managed ? "managed" : "named";
+        renderer.log.report(
+          `${volume.name}:${volume.internalDir}${mode} (${kind})`,
+        );
+      }
       return;
     case "services.action":
       if (result.report.opened?.status === "success") {

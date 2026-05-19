@@ -10,7 +10,7 @@ export interface InstanceResolution {
 
 export const DEFAULT_INSTANCE_KEY = "default";
 export const MAX_INSTANCE_LABEL_LENGTH = 100;
-const INSTANCE_KEY_PATTERN = /^[a-z]+(?:-[a-z]+)*$/;
+const INSTANCE_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 interface InstanceEntry {
   id: string;
@@ -49,7 +49,7 @@ function generateInstanceId(): string {
 export function validateInstanceKey(key: string): void {
   if (!INSTANCE_KEY_PATTERN.test(key)) {
     throw new Error(
-      `Invalid instance key "${key}". Instance keys must contain only lowercase letters and hyphens.`,
+      `Invalid instance key "${key}". Instance keys must contain only lowercase letters, numbers, and hyphens.`,
     );
   }
 }

@@ -87,9 +87,8 @@ describe("renderCommandResult", () => {
     );
     renderCommandResult(
       {
-        kind: "profiles.enabled",
+        kind: "profiles.selected",
         profile: "dev",
-        startedServices: ["api"],
       },
       { json: true },
     );
@@ -111,9 +110,8 @@ describe("renderCommandResult", () => {
       2,
       JSON.stringify({
         status: "success",
-        action: "profile.enable",
+        action: "profile.use",
         profile: "dev",
-        startedServices: ["api"],
       }),
     );
     expect(logSpy).toHaveBeenNthCalledWith(
@@ -125,5 +123,31 @@ describe("renderCommandResult", () => {
         volumes: {},
       }),
     );
+  });
+
+  it("prints only volume names for id-only volume lists", () => {
+    const reportSpy = vi
+      .spyOn(renderer.log, "report")
+      .mockImplementation(() => {});
+
+    renderCommandResult(
+      {
+        kind: "volume.list",
+        instanceKey: "default",
+        service: "postgres",
+        managedOnly: true,
+        idOnly: true,
+        volumes: [
+          {
+            name: "zap.myproject.abc123.vol1",
+            internalDir: "/var/lib/postgresql/data",
+            managed: true,
+          },
+        ],
+      },
+      { json: false },
+    );
+
+    expect(reportSpy).toHaveBeenCalledWith("zap.myproject.abc123.vol1");
   });
 });

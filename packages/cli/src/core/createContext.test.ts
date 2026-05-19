@@ -86,6 +86,186 @@ describe("createContext", () => {
     });
   });
 
+  describe("stack profiles", () => {
+    it("uses default stack profile env files and service selection", () => {
+      const config: ZapperConfig = {
+        project: "test-project",
+        profiles: {
+          default: {
+            env_files: [".env.local", ".env"],
+            services: ["api", "postgres"],
+            isolate: false,
+          },
+          e2e: {
+            env_files: [".env.e2e"],
+            services: ["api"],
+            isolate: true,
+          },
+        },
+        native: {
+          api: { cmd: "npm run dev" },
+          worker: { cmd: "npm run worker" },
+        },
+        docker: {
+          postgres: { image: "postgres:15" },
+        },
+      };
+
+      mockLoadState.mockReturnValue({
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
+
+      const result = createContext(config, testDir);
+
+      expect(result.profile).toEqual({
+        name: "default",
+        envFiles: [
+          path.join(testDir, ".env.local"),
+          path.join(testDir, ".env"),
+        ],
+        services: ["api", "postgres"],
+        isolate: false,
+      });
+      expect(result.envFiles).toEqual([
+        path.join(testDir, ".env.local"),
+        path.join(testDir, ".env"),
+      ]);
+      expect(result.profiles).toEqual(["default", "e2e"]);
+      expect(result.processes.map((process) => process.name)).toEqual(["api"]);
+      expect(result.containers.map((container) => container.name)).toEqual([
+        "postgres",
+      ]);
+    });
+
+    it("uses selectedProfile from state", () => {
+      const config: ZapperConfig = {
+        project: "test-project",
+        profiles: {
+          default: {
+            env_files: [".env"],
+            services: "*",
+            isolate: false,
+          },
+          e2e: {
+            env_files: [".env.e2e"],
+            services: ["api"],
+            isolate: true,
+          },
+        },
+        native: {
+          api: { cmd: "npm run dev" },
+          worker: { cmd: "npm run worker" },
+        },
+      };
+
+      mockLoadState.mockReturnValue({
+        selectedProfile: "e2e",
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
+
+      const result = createContext(config, testDir);
+
+      expect(result.profile?.name).toBe("e2e");
+      expect(result.profile?.isolate).toBe(true);
+      expect(result.envFiles).toEqual([path.join(testDir, ".env.e2e")]);
+      expect(result.processes.map((process) => process.name)).toEqual(["api"]);
+    });
+
+    it("uses explicit profile option before selectedProfile state", () => {
+      const config: ZapperConfig = {
+        project: "test-project",
+        profiles: {
+          default: {
+            env_files: [".env"],
+            services: "*",
+            isolate: false,
+          },
+          e2e: {
+            env_files: [".env.e2e"],
+            services: ["api"],
+            isolate: true,
+          },
+          proddata: {
+            env_files: [".env.proddata"],
+            services: ["worker"],
+            isolate: false,
+          },
+        },
+        native: {
+          api: { cmd: "npm run dev" },
+          worker: { cmd: "npm run worker" },
+        },
+      };
+
+      mockLoadState.mockReturnValue({
+        selectedProfile: "proddata",
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
+
+      const result = createContext(config, testDir, { profileName: "e2e" });
+
+      expect(result.profile?.name).toBe("e2e");
+      expect(result.envFiles).toEqual([path.join(testDir, ".env.e2e")]);
+      expect(result.processes.map((process) => process.name)).toEqual(["api"]);
+    });
+
+    it("does not mutate selectedProfile state when using explicit profile option", () => {
+      const config: ZapperConfig = {
+        project: "test-project",
+        profiles: {
+          default: {
+            env_files: [],
+            services: "*",
+            isolate: false,
+          },
+          e2e: {
+            env_files: [],
+            services: "*",
+            isolate: true,
+          },
+        },
+        native: {
+          api: { cmd: "npm run dev" },
+        },
+      };
+
+      mockLoadState.mockReturnValue({
+        selectedProfile: "default",
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
+
+      const result = createContext(config, testDir, { profileName: "e2e" });
+
+      expect(result.profile?.name).toBe("e2e");
+      expect(result.state.selectedProfile).toBe("default");
+    });
+
+    it("throws when selectedProfile references an unknown profile", () => {
+      const config: ZapperConfig = {
+        project: "test-project",
+        profiles: {
+          default: {
+            env_files: [],
+            services: "*",
+            isolate: false,
+          },
+        },
+        native: {
+          api: { cmd: "npm run dev" },
+        },
+      };
+
+      mockLoadState.mockReturnValue({
+        selectedProfile: "missing",
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      });
+
+      expect(() => createContext(config, testDir)).toThrow(
+        "Profile not found: missing. Available profiles: default",
+      );
+    });
+  });
+
   describe("legacy processes array format", () => {
     it("should extract processes from processes array", () => {
       const config: ZapperConfig = {
@@ -330,7 +510,7 @@ describe("createContext", () => {
           path.join(testDir, ".env"),
           path.join(testDir, "config/.env.local"),
         ]);
-        expect(result.environments).toEqual(["default"]);
+        expect(result.environments).toEqual([]);
       });
 
       it("should keep absolute paths unchanged", () => {
@@ -367,137 +547,27 @@ describe("createContext", () => {
         expect(result.envFiles).toBeUndefined();
         expect(result.environments).toEqual([]);
       });
-
-      it("should throw error for invalid active environment with array format", () => {
-        const config: ZapperConfig = {
-          project: "test-project",
-          env_files: [".env"],
-        };
-
-        mockLoadState.mockReturnValue({
-          lastUpdated: "2024-01-01T00:00:00.000Z",
-          activeEnvironment: "production",
-        });
-
-        expect(() => createContext(config, testDir)).toThrow(
-          "Environment not found: production. Available environments: default",
-        );
-      });
-    });
-
-    describe("named sets format", () => {
-      it("should use default environment when none specified in state", () => {
-        const config: ZapperConfig = {
-          project: "test-project",
-          env_files: {
-            default: [".env"],
-            production: [".env.prod"],
-          },
-        };
-
-        mockLoadState.mockReturnValue({
-          lastUpdated: "2024-01-01T00:00:00.000Z",
-        });
-
-        const result = createContext(config, testDir);
-
-        expect(result.envFiles).toEqual([path.join(testDir, ".env")]);
-        expect(result.environments).toEqual(["default", "production"]);
-      });
-
-      it("should use active environment from state", () => {
-        const config: ZapperConfig = {
-          project: "test-project",
-          env_files: {
-            default: [".env"],
-            production: [".env.prod", ".env.secrets"],
-          },
-        };
-
-        mockLoadState.mockReturnValue({
-          lastUpdated: "2024-01-01T00:00:00.000Z",
-          activeEnvironment: "production",
-        });
-
-        const result = createContext(config, testDir);
-
-        expect(result.envFiles).toEqual([
-          path.join(testDir, ".env.prod"),
-          path.join(testDir, ".env.secrets"),
-        ]);
-        expect(result.environments).toEqual(["default", "production"]);
-      });
-
-      it("should throw error for invalid active environment", () => {
-        const config: ZapperConfig = {
-          project: "test-project",
-          env_files: {
-            default: [".env"],
-            production: [".env.prod"],
-          },
-        };
-
-        mockLoadState.mockReturnValue({
-          lastUpdated: "2024-01-01T00:00:00.000Z",
-          activeEnvironment: "staging",
-        });
-
-        expect(() => createContext(config, testDir)).toThrow(
-          "Environment not found: staging. Available environments: default, production",
-        );
-      });
-
-      it("should handle missing default environment gracefully", () => {
-        const config: ZapperConfig = {
-          project: "test-project",
-          env_files: {
-            production: [".env.prod"],
-          },
-        };
-
-        mockLoadState.mockReturnValue({
-          lastUpdated: "2024-01-01T00:00:00.000Z",
-        });
-
-        const result = createContext(config, testDir);
-
-        expect(result.envFiles).toBeUndefined();
-        expect(result.environments).toEqual(["production"]);
-      });
-
-      it("should resolve relative paths to absolute paths in named sets", () => {
-        const config: ZapperConfig = {
-          project: "test-project",
-          env_files: {
-            default: ["config/.env", "/absolute/.env"],
-          },
-        };
-
-        mockLoadState.mockReturnValue({
-          lastUpdated: "2024-01-01T00:00:00.000Z",
-        });
-
-        const result = createContext(config, testDir);
-
-        expect(result.envFiles).toEqual([
-          path.join(testDir, "config/.env"),
-          "/absolute/.env",
-        ]);
-      });
     });
   });
 
-  describe("profile extraction", () => {
-    it("should extract unique profiles from processes and containers", () => {
+  describe("profile listing", () => {
+    it("should list top-level stack profiles", () => {
       const config: ZapperConfig = {
         project: "test-project",
-        native: {
-          api: { cmd: "npm run dev", profiles: ["web", "dev"] },
-          worker: { cmd: "npm run worker", profiles: ["background"] },
+        profiles: {
+          default: {
+            env_files: [],
+            services: "*",
+            isolate: false,
+          },
+          e2e: {
+            env_files: [],
+            services: "*",
+            isolate: true,
+          },
         },
-        docker: {
-          postgres: { image: "postgres:13", profiles: ["db", "dev"] },
-          redis: { image: "redis:alpine", profiles: ["cache"] },
+        native: {
+          api: { cmd: "npm run dev" },
         },
       };
 
@@ -507,16 +577,10 @@ describe("createContext", () => {
 
       const result = createContext(config, testDir);
 
-      expect(result.profiles).toEqual([
-        "background",
-        "cache",
-        "db",
-        "dev",
-        "web",
-      ]);
+      expect(result.profiles).toEqual(["default", "e2e"]);
     });
 
-    it("should handle processes and containers without profiles", () => {
+    it("should return no profiles when top-level profiles are not configured", () => {
       const config: ZapperConfig = {
         project: "test-project",
         native: {
@@ -535,48 +599,12 @@ describe("createContext", () => {
 
       expect(result.profiles).toEqual([]);
     });
-
-    it("should handle empty profiles arrays", () => {
-      const config: ZapperConfig = {
-        project: "test-project",
-        native: {
-          api: { cmd: "npm run dev", profiles: [] },
-        },
-      };
-
-      mockLoadState.mockReturnValue({
-        lastUpdated: "2024-01-01T00:00:00.000Z",
-      });
-
-      const result = createContext(config, testDir);
-
-      expect(result.profiles).toEqual([]);
-    });
-
-    it("should deduplicate profiles", () => {
-      const config: ZapperConfig = {
-        project: "test-project",
-        native: {
-          api: { cmd: "npm run dev", profiles: ["web", "dev"] },
-          frontend: { cmd: "npm run frontend", profiles: ["web", "dev"] },
-        },
-      };
-
-      mockLoadState.mockReturnValue({
-        lastUpdated: "2024-01-01T00:00:00.000Z",
-      });
-
-      const result = createContext(config, testDir);
-
-      expect(result.profiles).toEqual(["dev", "web"]);
-    });
   });
 
   describe("state loading", () => {
     it("should load state from stateLoader", () => {
       const mockState: ZapperState = {
         lastUpdated: "2024-01-01T00:00:00.000Z",
-        activeEnvironment: "production",
         services: {
           api: { status: "running", pid: 1234 },
         },
@@ -749,16 +777,13 @@ describe("createContext", () => {
         project: "complex-project",
         git_method: "cli",
         task_delimiters: ["{%", "%}"],
-        env_files: {
-          default: [".env", ".env.local"],
-          production: [".env.prod"],
-        },
+        env_files: [".env", ".env.local"],
         native: {
-          api: { cmd: "npm run dev", profiles: ["web"] },
+          api: { cmd: "npm run dev" },
         },
         processes: [{ name: "legacy", cmd: "legacy command" }],
         docker: {
-          postgres: { image: "postgres:13", profiles: ["db"] },
+          postgres: { image: "postgres:13" },
         },
         tasks: {
           build: { cmd: "npm run build" },
@@ -770,7 +795,6 @@ describe("createContext", () => {
 
       mockLoadState.mockReturnValue({
         lastUpdated: "2024-01-01T00:00:00.000Z",
-        activeEnvironment: "production",
       });
 
       const result = createContext(config, testDir);
@@ -779,15 +803,18 @@ describe("createContext", () => {
       expect(result.projectRoot).toBe(testDir);
       expect(result.gitMethod).toBe("cli");
       expect(result.taskDelimiters).toEqual(["{%", "%}"]);
-      expect(result.envFiles).toEqual([path.join(testDir, ".env.prod")]);
-      expect(result.environments).toEqual(["default", "production"]);
+      expect(result.envFiles).toEqual([
+        path.join(testDir, ".env"),
+        path.join(testDir, ".env.local"),
+      ]);
+      expect(result.environments).toEqual([]);
       expect(result.processes).toHaveLength(2);
       expect(result.containers).toHaveLength(1);
       expect(result.tasks).toHaveLength(1);
       expect(result.homepage).toBe("http://localhost:3000");
       expect(result.notes).toBe("Run migrations after startup");
       expect(result.links).toHaveLength(1);
-      expect(result.profiles).toEqual(["db", "web"]);
+      expect(result.profiles).toEqual([]);
     });
   });
 
@@ -870,41 +897,6 @@ describe("createContext", () => {
 
       expect(() => createContext(config, testDir)).toThrow(
         "Process in processes array missing name field",
-      );
-    });
-
-    it("should handle invalid active environment with array env_files", () => {
-      const config: ZapperConfig = {
-        project: "test-project",
-        env_files: [".env"],
-      };
-
-      mockLoadState.mockReturnValue({
-        lastUpdated: "2024-01-01T00:00:00.000Z",
-        activeEnvironment: "invalid",
-      });
-
-      expect(() => createContext(config, testDir)).toThrow(
-        "Environment not found: invalid. Available environments: default",
-      );
-    });
-
-    it("should handle invalid active environment with named env_files", () => {
-      const config: ZapperConfig = {
-        project: "test-project",
-        env_files: {
-          dev: [".env.dev"],
-          prod: [".env.prod"],
-        },
-      };
-
-      mockLoadState.mockReturnValue({
-        lastUpdated: "2024-01-01T00:00:00.000Z",
-        activeEnvironment: "staging",
-      });
-
-      expect(() => createContext(config, testDir)).toThrow(
-        "Environment not found: staging. Available environments: dev, prod",
       );
     });
   });

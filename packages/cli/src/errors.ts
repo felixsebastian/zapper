@@ -56,6 +56,18 @@ export class ServiceNotFoundError extends Error {
   }
 }
 
+export class TaskNotFoundError extends Error {
+  constructor(
+    public taskName: string,
+    message?: string,
+  ) {
+    super(
+      message || `Task not found: ${taskName}. Check task names or aliases`,
+    );
+    this.name = "TaskNotFoundError";
+  }
+}
+
 export class WhitelistReferenceError extends Error {
   constructor(
     public whitelistName: string,

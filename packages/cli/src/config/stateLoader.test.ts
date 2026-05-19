@@ -54,28 +54,106 @@ describe("stateLoader", () => {
     writeFileSync(
       statePath,
       JSON.stringify({
-        activeProfile: "dev",
+        selectedProfile: "dev",
         activeInstance: "default",
         services: { "zap.demo.default.api": { startPid: 1234 } },
       }),
     );
 
     const state = loadState(testDir);
-    expect(state.activeProfile).toBe("dev");
+    expect(state.selectedProfile).toBe("dev");
     expect((state as Record<string, unknown>).activeInstance).toBeUndefined();
     expect((state as Record<string, unknown>).services).toBeUndefined();
   });
 
   it("merges top-level properties and updates timestamp", () => {
-    saveState(testDir, { activeProfile: "dev" });
+    saveState(testDir, { selectedProfile: "dev" });
 
-    saveState(testDir, { activeEnvironment: "staging" });
+    saveState(testDir, {
+      stacks: {
+        dev: {
+          stackId: "abc123",
+          profile: "dev",
+        },
+      },
+    });
     const state = loadState(testDir);
 
-    expect(state.activeProfile).toBe("dev");
-    expect(state.activeEnvironment).toBe("staging");
+    expect(state.selectedProfile).toBe("dev");
+    expect(state.stacks?.dev?.stackId).toBe("abc123");
     expect(state.lastUpdated).toBeDefined();
     expect(state.lastUpdated).toBeTruthy();
+  });
+
+  it("loads new profile stack state", () => {
+    const zapDir = path.join(testDir, ".zap");
+    const statePath = path.join(zapDir, "state.json");
+    mkdirSync(zapDir);
+
+    writeFileSync(
+      statePath,
+      JSON.stringify({
+        selectedProfile: "e2e",
+        stacks: {
+          default: {
+            stackId: "abc123",
+            profile: "default",
+            ports: { API_PORT: "54321" },
+          },
+          e2e: {
+            stackId: "def456",
+            profile: "e2e",
+            volumes: {
+              "zap.demo.def456.vol1": {
+                service: "db",
+                internal_dir: "/var/lib/postgresql/data",
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    const state = loadState(testDir);
+    expect(state.selectedProfile).toBe("e2e");
+    expect(state.stacks?.default?.stackId).toBe("abc123");
+    expect(state.stacks?.default?.ports).toEqual({ API_PORT: "54321" });
+    expect(state.stacks?.e2e?.volumes).toEqual({
+      "zap.demo.def456.vol1": {
+        service: "db",
+        internal_dir: "/var/lib/postgresql/data",
+      },
+    });
+  });
+
+  it("updates new stack state while preserving sibling stacks", () => {
+    updateState(testDir, () => ({
+      selectedProfile: "default",
+      stacks: {
+        default: {
+          stackId: "abc123",
+          profile: "default",
+          ports: { API_PORT: "5000" },
+        },
+      },
+    }));
+
+    updateState(testDir, (state) => ({
+      selectedProfile: "e2e",
+      stacks: {
+        ...(state.stacks || {}),
+        e2e: {
+          stackId: "def456",
+          profile: "e2e",
+          ports: { API_PORT: "6000" },
+        },
+      },
+    }));
+
+    const state = loadState(testDir);
+    expect(state.selectedProfile).toBe("e2e");
+    expect(state.stacks?.default?.ports).toEqual({ API_PORT: "5000" });
+    expect(state.stacks?.e2e?.ports).toEqual({ API_PORT: "6000" });
   });
 
   it("updates state from the latest file contents while holding the state lock", () => {
@@ -120,7 +198,7 @@ describe("stateLoader", () => {
     mkdirSync(zapDir);
     writeFileSync(statePath, "{ invalid json");
 
-    expect(() => saveState(testDir, { activeProfile: "dev" })).toThrow();
+    expect(() => saveState(testDir, { selectedProfile: "dev" })).toThrow();
     expect(readFileSync(statePath, "utf8")).toBe("{ invalid json");
   });
 

@@ -9,6 +9,14 @@ const validNameSchema = z
     "Name must contain only alphanumeric characters, underscores, and hyphens",
   );
 
+const stackNameSchema = z
+  .string()
+  .min(1, "Stack profile name cannot be empty")
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Stack profile names must contain only lowercase letters, numbers, and hyphens",
+  );
+
 export const VolumeSchema = z
   .object({
     name: z.string().min(1, "Volume name cannot be empty").optional(),
@@ -63,9 +71,20 @@ const EnvFilePathSchema = z
 
 const EnvFilesArraySchema = z.array(EnvFilePathSchema);
 
-const EnvFilesMapSchema = z.record(validNameSchema, EnvFilesArraySchema);
+const EnvFilesSchema = EnvFilesArraySchema;
 
-const EnvFilesSchema = z.union([EnvFilesArraySchema, EnvFilesMapSchema]);
+const ProfileServicesSchema = z.union([
+  z.literal("*"),
+  z.array(validNameSchema),
+]);
+
+export const StackProfileSchema = z
+  .object({
+    env_files: EnvFilesArraySchema.default([]),
+    services: ProfileServicesSchema.default("*"),
+    isolate: z.boolean().default(false),
+  })
+  .strict();
 
 // Service env: pass-all, service file stack, or strict whitelist file path.
 const EnvSchema = z.union([
@@ -98,9 +117,6 @@ export const ProcessSchema = z
     resolvedEnv: z.record(z.string(), z.string()).optional(),
     source: z.string().optional(),
     repo: z.string().optional(),
-    profiles: z
-      .array(z.string().min(1, "Profile name cannot be empty"))
-      .optional(),
     healthcheck: HealthcheckSchema,
     depends_on: z.array(validNameSchema).optional(),
   })
@@ -119,9 +135,6 @@ export const ContainerSchema = z
     command: z.string().optional(),
     aliases: z.array(validNameSchema).optional(),
     resolvedEnv: z.record(z.string(), z.string()).optional(),
-    profiles: z
-      .array(z.string().min(1, "Profile name cannot be empty"))
-      .optional(),
     healthcheck: HealthcheckSchema,
     depends_on: z.array(validNameSchema).optional(),
   })
@@ -131,7 +144,26 @@ export const TaskCmdSchema = z.union([
   z.string(),
   z
     .object({
+      cmd: z.string().min(1, "Command cannot be empty"),
+      silent: z.boolean().optional(),
+      interactive: z.boolean().optional(),
+    })
+    .strict(),
+  z
+    .object({
       task: z.string().min(1, "Task name cannot be empty"),
+      vars: z.record(validNameSchema, z.string()).optional(),
+      silent: z.boolean().optional(),
+    })
+    .strict(),
+]);
+
+export const TaskPreconditionSchema = z.union([
+  z.string().min(1, "Precondition cannot be empty"),
+  z
+    .object({
+      sh: z.string().min(1, "Precondition command cannot be empty"),
+      msg: z.string().min(1, "Precondition message cannot be empty").optional(),
     })
     .strict(),
 ]);
@@ -155,6 +187,12 @@ export const TaskSchema = z
     aliases: z.array(validNameSchema).optional(),
     resolvedEnv: z.record(z.string(), z.string()).optional(),
     params: z.array(TaskParamSchema).optional(),
+    silent: z.boolean().optional(),
+    interactive: z.boolean().optional(),
+    preconditions: z.array(TaskPreconditionSchema).optional(),
+    status: z
+      .array(z.string().min(1, "Status command cannot be empty"))
+      .optional(),
   })
   .strict();
 
@@ -179,6 +217,7 @@ export const ZapperConfigSchema = processValidation(
         project: validNameSchema,
         env: EnvFilesSchema.optional(),
         env_files: EnvFilesSchema.optional(),
+        profiles: z.record(stackNameSchema, StackProfileSchema).optional(),
         ports: z.array(PortNameSchema).optional(),
         init_task: validNameSchema.optional(),
         git_method: z.enum(["http", "ssh", "cli"]).optional(),
@@ -212,9 +251,18 @@ export const StoredVolumeSchema = z
   })
   .strict();
 
+export const StackStateSchema = z
+  .object({
+    stackId: z.string().min(1),
+    profile: stackNameSchema,
+    ports: z.record(z.string(), z.string()).optional(),
+    volumes: z.record(z.string(), StoredVolumeSchema).optional(),
+  })
+  .strict();
+
 export const ZapperStateSchema = z.object({
-  activeProfile: z.string().optional(),
-  activeEnvironment: z.string().optional(),
+  selectedProfile: stackNameSchema.optional(),
+  stacks: z.record(stackNameSchema, StackStateSchema).optional(),
   defaultInstance: z.string().optional(),
   instances: z
     .record(
@@ -239,9 +287,11 @@ export type Volume = z.infer<typeof VolumeSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type TaskParam = z.infer<typeof TaskParamSchema>;
 export type Link = z.infer<typeof LinkSchema>;
+export type StackProfile = z.infer<typeof StackProfileSchema>;
 export type ZapperConfig = z.infer<typeof ZapperConfigSchema>;
 export type ServiceState = z.infer<typeof ServiceStateSchema>;
 export type StoredVolume = z.infer<typeof StoredVolumeSchema>;
+export type StackState = z.infer<typeof StackStateSchema>;
 export type ZapperState = z.infer<typeof ZapperStateSchema>;
 
 // Resolved types after whitelist resolution - env fields are guaranteed to be arrays

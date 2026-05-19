@@ -11,6 +11,7 @@
 export interface RawConfig {
   project?: string;
   env_files?: string[] | Record<string, string[]>;
+  profiles?: Record<string, unknown>;
   git_method?: "http" | "ssh" | "cli";
   init_task?: string;
   whitelists?: Record<string, string[]>;

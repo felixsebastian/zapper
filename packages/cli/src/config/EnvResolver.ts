@@ -28,9 +28,7 @@ export class EnvResolver {
     // Load ports from .zap/state.json if projectRoot is provided
     const assignedPorts = projectRoot ? loadPorts(projectRoot) : {};
 
-    const defaultEnvFiles = this.pickDefaultEnvFiles(
-      resolvedConfig.env ?? resolvedConfig.env_files,
-    );
+    const defaultEnvFiles = resolvedConfig.env ?? resolvedConfig.env_files;
     const hasGlobalEnvSource =
       Array.isArray(defaultEnvFiles) && defaultEnvFiles.length > 0;
     const mergedEnvFromFiles = this.loadAndMergeEnvFiles(
@@ -435,14 +433,6 @@ export class EnvResolver {
   ): string[] | undefined {
     if (!Array.isArray(ports)) return ports;
     return ports.map((port) => this.expandString(port, env));
-  }
-
-  private static pickDefaultEnvFiles(
-    envFiles?: ZapperConfig["env"] | ZapperConfig["env_files"],
-  ): string[] | undefined {
-    if (!envFiles) return undefined;
-    if (Array.isArray(envFiles)) return envFiles;
-    return envFiles.default;
   }
 
   static getProcessEnv(

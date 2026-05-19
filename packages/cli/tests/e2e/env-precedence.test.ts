@@ -56,12 +56,6 @@ function parseJsonFromOutput(output: string): Record<string, string> {
   throw new Error(`Could not parse JSON from output:\n${output}`);
 }
 
-function readStateFile(fixtureDir: string): Record<string, unknown> | null {
-  const statePath = path.join(fixtureDir, ".zap", "state.json");
-  if (!fs.existsSync(statePath)) return null;
-  return JSON.parse(fs.readFileSync(statePath, "utf8"));
-}
-
 describe("E2E: Environment File Precedence", () => {
   let testProjectName: string;
   let fixtureDir: string;
@@ -117,18 +111,8 @@ describe("E2E: Environment File Precedence", () => {
       SECRET_TOKEN: "local-secret",
     });
 
-    const switchOutput = runZapCommand(
-      `env remote --config zap-${testProjectName}.yaml`,
-      fixtureDir,
-    );
-    expect(switchOutput).toMatch(/remote|environment/i);
-
-    const stateAfterSwitch = readStateFile(fixtureDir);
-    expect(stateAfterSwitch).not.toBeNull();
-    expect(stateAfterSwitch?.activeEnvironment).toBe("remote");
-
     const remoteOutput = runZapCommand(
-      `env --service app --json --config zap-${testProjectName}.yaml`,
+      `--profile remote env --service app --json --config zap-${testProjectName}.yaml`,
       fixtureDir,
     );
     const remoteResolvedEnv = parseJsonFromOutput(remoteOutput);
@@ -140,11 +124,6 @@ describe("E2E: Environment File Precedence", () => {
       MODE: "remote",
       SECRET_TOKEN: "remote-secret",
     });
-
-    runZapCommand(
-      `env --disable --config zap-${testProjectName}.yaml`,
-      fixtureDir,
-    );
 
     const resetOutput = runZapCommand(
       `env --service app --json --config zap-${testProjectName}.yaml`,

@@ -25,6 +25,7 @@ import {
 import {
   ContextNotLoadedError,
   ServiceNotFoundError,
+  TaskNotFoundError,
   ContainerNotRunningError,
 } from "../errors";
 import { buildPrefix, buildServiceName } from "../utils/nameBuilder";
@@ -32,9 +33,10 @@ import {
   resolveInstance,
   createInstance,
   validateInstanceKey,
+  DEFAULT_INSTANCE_KEY,
 } from "./instanceResolver";
 import { initializePorts, loadPortsForInstance } from "../config/portsManager";
-import { loadState } from "../config/stateLoader";
+import { loadState, updateState } from "../config/stateLoader";
 import {
   collectManagedVolumeSpecs,
   initializeManagedVolumes,
@@ -91,14 +93,26 @@ export class Zapper {
     const configWithOverrides = this.applyCliOverrides(config, cliOptions);
 
     // Create context from config
-    this.context = createContext(configWithOverrides, projectRoot);
+    const profileName =
+      typeof cliOptions?.profile === "string" &&
+      cliOptions.profile.trim().length > 0
+        ? cliOptions.profile.trim()
+        : undefined;
+
+    this.context = createContext(configWithOverrides, projectRoot, {
+      profileName,
+    });
     this.context.configPath = absoluteConfigPath;
 
+    const profileStackKey = this.context.profile?.isolate
+      ? this.context.profile.name
+      : DEFAULT_INSTANCE_KEY;
     const rawInstanceOpt = cliOptions?.instance;
-    const selectedInstanceKey =
+    const explicitInstanceKey =
       typeof rawInstanceOpt === "string" && rawInstanceOpt.trim().length > 0
         ? rawInstanceOpt.trim()
         : undefined;
+    const selectedInstanceKey = explicitInstanceKey ?? profileStackKey;
     if (selectedInstanceKey) {
       validateInstanceKey(selectedInstanceKey);
       this.context.instanceKey = selectedInstanceKey;
@@ -142,6 +156,26 @@ export class Zapper {
     // Refresh state after any implicit initialization so commands like `state`
     // observe the latest persisted instance/port data on first run.
     this.context.state = loadState(projectRoot);
+
+    if (!readOnlyStateCommand && instanceResolution.instanceId) {
+      const stackKey = explicitInstanceKey ?? profileStackKey;
+      const stackProfile = this.context.profile?.name ?? DEFAULT_INSTANCE_KEY;
+      updateState(projectRoot, (state) => {
+        const instance = state.instances?.[instanceResolution.instanceKey];
+        return {
+          stacks: {
+            ...(state.stacks || {}),
+            [stackKey]: {
+              stackId: instanceResolution.instanceId,
+              profile: stackProfile,
+              ports: instance?.ports,
+              volumes: instance?.volumes,
+            },
+          },
+        };
+      });
+      this.context.state = loadState(projectRoot);
+    }
 
     this.context.instance = {
       key: instanceResolution.instanceKey,
@@ -350,7 +384,6 @@ export class Zapper {
       canonical,
       this.context.projectName,
       false,
-      this.context.state.activeProfile,
     );
 
     const executionReport = await executeActions(
@@ -381,7 +414,6 @@ export class Zapper {
       canonical,
       this.context.projectName,
       false,
-      this.context.state.activeProfile,
     );
 
     const executionReport = await executeActions(
@@ -411,7 +443,6 @@ export class Zapper {
       canonical,
       this.context.projectName,
       false,
-      this.context.state.activeProfile,
     );
 
     const executionReport = await executeActions(
@@ -602,11 +633,12 @@ export class Zapper {
   async runTask(
     taskName: string,
     params?: { named: Record<string, string>; rest: string[] },
+    options?: { force?: boolean },
   ): Promise<void> {
     if (!this.context) throw new ContextNotLoadedError();
 
     if (!this.context.tasks || this.context.tasks.length === 0) {
-      throw new ServiceNotFoundError(taskName, "No tasks defined in config");
+      throw new TaskNotFoundError(taskName, "No tasks defined in config");
     }
 
     // Build task alias map for resolution
@@ -614,7 +646,7 @@ export class Zapper {
     const resolvedTaskName = taskAliasMap[taskName];
 
     if (!resolvedTaskName) {
-      throw new ServiceNotFoundError(taskName);
+      throw new TaskNotFoundError(taskName);
     }
 
     // Convert tasks array back to object format for TaskRunner
@@ -625,10 +657,16 @@ export class Zapper {
 
     // Use TaskRunner for execution with interpolation support
     const { TaskRunner } = await import("./tasks/TaskRunner");
-    TaskRunner.runTask(tasks, this.context.projectRoot, resolvedTaskName, {
-      delimiters: this.context.taskDelimiters,
-      params,
-    });
+    await TaskRunner.runTask(
+      tasks,
+      this.context.projectRoot,
+      resolvedTaskName,
+      {
+        delimiters: this.context.taskDelimiters,
+        params,
+        force: options?.force,
+      },
+    );
   }
 
   private getNativeTargets(): Array<{ name: string; cwd: string }> {

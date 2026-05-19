@@ -3,6 +3,7 @@ import { ZapperConfig } from "../config/schemas";
 import { Context, Process, Container, Task, Link } from "../types/Context";
 import { loadState } from "../config/stateLoader";
 import { DEFAULT_INSTANCE_KEY } from "./instanceResolver";
+import { listProfileNames, resolveProfile } from "./profileResolver";
 
 /**
  * Creates a Context object from a ZapperConfig.
@@ -15,6 +16,7 @@ import { DEFAULT_INSTANCE_KEY } from "./instanceResolver";
 export function createContext(
   config: ZapperConfig,
   projectRoot: string,
+  options: { profileName?: string } = {},
 ): Context {
   // Transform processes from config format to context format
   const processes: Process[] = [];
@@ -70,64 +72,34 @@ export function createContext(
   // Load and validate state from state.json
   const state = loadState(projectRoot);
 
-  // Resolve root env/env_files to absolute paths relative to projectRoot
-  let envFiles: string[] | undefined;
-  const environmentSetNames: string[] = [];
-  const rootEnv = config.env ?? config.env_files;
-  if (rootEnv) {
-    if (Array.isArray(rootEnv)) {
-      if (state.activeEnvironment && state.activeEnvironment !== "default") {
-        throw new Error(
-          `Environment not found: ${state.activeEnvironment}. Available environments: default`,
-        );
-      }
-      if (rootEnv.length > 0) {
-        envFiles = rootEnv.map((p) =>
-          path.isAbsolute(p) ? p : path.join(projectRoot, p),
-        );
-        environmentSetNames.push("default");
-      }
-    } else {
-      const available = Object.keys(rootEnv).sort();
-      environmentSetNames.push(...available);
+  const selectedProfile = resolveProfile(config, {
+    projectRoot,
+    profileName: options.profileName,
+    selectedProfileName: state.selectedProfile,
+  });
 
-      const activeName = state.activeEnvironment || "default";
-      const activeEnvironment = rootEnv[activeName];
-
-      if (!activeEnvironment && state.activeEnvironment) {
-        throw new Error(
-          `Environment not found: ${
-            state.activeEnvironment
-          }. Available environments: ${available.join(", ")}`,
-        );
-      }
-
-      if (activeEnvironment) {
-        envFiles = activeEnvironment.map((p) =>
-          path.isAbsolute(p) ? p : path.join(projectRoot, p),
-        );
-      }
+  if (selectedProfile && selectedProfile.services !== "*") {
+    const selectedServices = new Set(selectedProfile.services);
+    for (let i = processes.length - 1; i >= 0; i -= 1) {
+      if (!selectedServices.has(processes[i].name)) processes.splice(i, 1);
+    }
+    for (let i = containers.length - 1; i >= 0; i -= 1) {
+      if (!selectedServices.has(containers[i].name)) containers.splice(i, 1);
     }
   }
 
-  // Extract all unique profiles from processes and containers
-  const profileSet = new Set<string>();
+  // Resolve root env/env_files to absolute paths relative to projectRoot
+  let envFiles: string[] | undefined;
+  const rootEnv = config.env ?? config.env_files;
+  if (selectedProfile) {
+    envFiles = selectedProfile.envFiles;
+  } else if (rootEnv && rootEnv.length > 0) {
+    envFiles = rootEnv.map((p) =>
+      path.isAbsolute(p) ? p : path.join(projectRoot, p),
+    );
+  }
 
-  // Add profiles from processes
-  processes.forEach((process) => {
-    if (Array.isArray(process.profiles)) {
-      process.profiles.forEach((profile) => profileSet.add(profile));
-    }
-  });
-
-  // Add profiles from containers
-  containers.forEach((container) => {
-    if (Array.isArray(container.profiles)) {
-      container.profiles.forEach((profile) => profileSet.add(profile));
-    }
-  });
-
-  const profiles = Array.from(profileSet).sort();
+  const profiles = listProfileNames(config);
 
   const links: Link[] = config.links ?? [];
 
@@ -135,7 +107,7 @@ export function createContext(
     projectName: config.project,
     projectRoot,
     envFiles,
-    environments: environmentSetNames,
+    environments: [],
     ports: config.ports,
     initTask: config.init_task,
     gitMethod: config.git_method,
@@ -149,6 +121,7 @@ export function createContext(
     notes: config.notes,
     links,
     profiles,
+    profile: selectedProfile,
     state,
   };
 }

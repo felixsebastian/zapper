@@ -1,4 +1,5 @@
 import { StoredVolume, ZapperState } from "../config/schemas";
+import { ServiceDockerVolume } from "../config/volumeManager";
 import { StatusResult } from "../core/getStatus";
 import { ServiceListResult } from "../core/getServiceList";
 import type {
@@ -9,6 +10,7 @@ import type {
 } from "../system";
 import type { ServiceActionName, ServiceActionReport } from "../types";
 import { Context, Task } from "../types/Context";
+import type { StackInfo } from "./StackCommand";
 
 export interface ProjectLinkResult {
   name: string;
@@ -41,8 +43,18 @@ export type CommandResult =
       profiles: string[];
     }
   | {
-      kind: "environments.list";
-      environments: string[];
+      kind: "profiles.current";
+      profile?: string;
+      selectedProfile?: string;
+      overrideProfile?: string;
+    }
+  | {
+      kind: "profiles.selected";
+      profile: string;
+    }
+  | {
+      kind: "profiles.reset";
+      profile: string;
     }
   | {
       kind: "env.service";
@@ -51,6 +63,19 @@ export type CommandResult =
   | {
       kind: "state";
       state: ZapperState;
+    }
+  | {
+      kind: "stack.id";
+      stackId: string;
+      profile: string;
+    }
+  | {
+      kind: "stack.current";
+      stack: StackInfo;
+    }
+  | {
+      kind: "stack.list";
+      stacks: StackInfo[];
     }
   | {
       kind: "config";
@@ -137,33 +162,6 @@ export type CommandResult =
       kind: "git.stash.completed";
     }
   | {
-      kind: "profiles.picker";
-      profiles: string[];
-      activeProfile?: string;
-    }
-  | {
-      kind: "profiles.enabled";
-      profile: string;
-      startedServices: string[];
-    }
-  | {
-      kind: "profiles.disabled";
-      activeProfile?: string;
-    }
-  | {
-      kind: "environments.picker";
-      environments: string[];
-      activeEnvironment?: string;
-    }
-  | {
-      kind: "environments.enabled";
-      environment: string;
-    }
-  | {
-      kind: "environments.disabled";
-      activeEnvironment?: string;
-    }
-  | {
       kind: "global.list";
       allProjects?: boolean;
       projects: Array<{
@@ -245,4 +243,12 @@ export type CommandResult =
       status: "aborted" | "completed";
       instanceKey: string;
       volumes: Record<string, StoredVolume>;
+    }
+  | {
+      kind: "volume.list";
+      instanceKey: string;
+      service: string;
+      managedOnly: boolean;
+      idOnly: boolean;
+      volumes: ServiceDockerVolume[];
     };

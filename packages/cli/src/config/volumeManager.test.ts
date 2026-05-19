@@ -6,6 +6,7 @@ import { loadState } from "./stateLoader";
 import { savePortsForInstance } from "./portsManager";
 import {
   findStaleManagedVolumes,
+  getServiceDockerVolumes,
   initializeManagedVolumes,
   resetManagedVolumesForInstance,
 } from "./volumeManager";
@@ -145,5 +146,53 @@ describe("volumeManager", () => {
       "zap.myproject.abc123.vol2",
     ]);
     expect(loadState(projectRoot).instances?.default?.volumes).toEqual({});
+  });
+
+  it("returns Docker volumes for a service without bind mounts", () => {
+    const volumes = getServiceDockerVolumes(
+      "postgres",
+      [
+        "/var/lib/postgresql/data",
+        "postgres-logs:/var/log/postgresql:ro",
+        "./init.sql:/docker-entrypoint-initdb.d/init.sql",
+        { name: "postgres-config", internal_dir: "/etc/postgresql" },
+        { internal_dir: "/var/lib/postgresql/wal", mode: "ro" },
+      ],
+      {
+        "zap.myproject.abc123.vol1": {
+          service: "postgres",
+          internal_dir: "/var/lib/postgresql/data",
+        },
+        "zap.myproject.abc123.vol2": {
+          service: "postgres",
+          internal_dir: "/var/lib/postgresql/wal",
+        },
+      },
+    );
+
+    expect(volumes).toEqual([
+      {
+        name: "zap.myproject.abc123.vol1",
+        internalDir: "/var/lib/postgresql/data",
+        managed: true,
+      },
+      {
+        name: "postgres-logs",
+        internalDir: "/var/log/postgresql",
+        mode: "ro",
+        managed: false,
+      },
+      {
+        name: "postgres-config",
+        internalDir: "/etc/postgresql",
+        managed: false,
+      },
+      {
+        name: "zap.myproject.abc123.vol2",
+        internalDir: "/var/lib/postgresql/wal",
+        mode: "ro",
+        managed: true,
+      },
+    ]);
   });
 });

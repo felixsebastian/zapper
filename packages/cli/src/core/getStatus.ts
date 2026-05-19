@@ -39,14 +39,6 @@ async function computeStatus(
   return elapsed < healthcheck ? "pending" : "up";
 }
 
-function isServiceEnabled(
-  serviceProfiles: string[] | undefined,
-  activeProfile: string | undefined,
-): boolean {
-  if (!serviceProfiles || serviceProfiles.length === 0) return true;
-  return !!activeProfile && serviceProfiles.includes(activeProfile);
-}
-
 export interface ServiceStatus {
   service: string;
   rawName: string;
@@ -117,8 +109,6 @@ export async function getStatus(
   }
 
   const projectName = context.projectName;
-  const activeProfile = context.state.activeProfile;
-
   const native: ServiceStatus[] = [];
   for (const proc of context.processes) {
     if (!matchesService(proc.name)) continue;
@@ -130,7 +120,6 @@ export async function getStatus(
     );
     const runningProcess = pm2List.find((p) => p.name === expectedPm2Name);
     const healthcheck = proc.healthcheck ?? 5;
-    const enabled = isServiceEnabled(proc.profiles, activeProfile);
 
     let status: Status = "down";
     if (runningProcess) {
@@ -146,7 +135,7 @@ export async function getStatus(
       rawName: expectedPm2Name,
       status,
       type: "native" as const,
-      enabled,
+      enabled: true,
     });
   }
 
@@ -162,7 +151,6 @@ export async function getStatus(
     const containerInfo =
       await DockerManager.getContainerInfo(expectedDockerName);
     const healthcheck = container.healthcheck ?? 5;
-    const enabled = isServiceEnabled(container.profiles, activeProfile);
 
     let status: Status = "down";
     if (containerInfo) {
@@ -178,7 +166,7 @@ export async function getStatus(
       rawName: expectedDockerName,
       status,
       type: "docker" as const,
-      enabled,
+      enabled: true,
     });
   }
 

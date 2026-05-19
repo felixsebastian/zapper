@@ -122,7 +122,7 @@ describe("E2E: Profiles Command", () => {
     }
   });
 
-  it("should list profiles, enable one, and disable it end-to-end", async () => {
+  it("should list, select, and reset profiles end-to-end", async () => {
     testProjectName = generateTestProjectName();
     testDir = fs.mkdtempSync(
       path.join(os.tmpdir(), "zapper-e2e-profiles-fixture-"),
@@ -144,36 +144,32 @@ describe("E2E: Profiles Command", () => {
     fs.writeFileSync(tempConfigPath, uniqueConfig);
 
     try {
-      const listOutput = runZapCommand(
-        "profile --list",
-        testDir,
-        tempConfigPath,
-      );
+      const listOutput = runZapCommand("profile list", testDir, tempConfigPath);
+      expect(listOutput).toContain("default");
       expect(listOutput).toContain("dev");
       expect(listOutput).toContain("prod");
 
       const listJsonOutput = runZapCommand(
-        "profile --list --json",
+        "profile list --json",
         testDir,
         tempConfigPath,
       );
-      expect(JSON.parse(listJsonOutput)).toEqual(["dev", "prod"]);
+      expect(JSON.parse(listJsonOutput)).toEqual(["default", "dev", "prod"]);
 
-      const enableOutput = runZapCommand(
-        "profile dev",
+      const useOutput = runZapCommand(
+        "profile use dev",
         testDir,
         tempConfigPath,
         {
           timeout: 45000,
         },
       );
-      expect(enableOutput).toContain("Enabling profile: dev");
-      expect(enableOutput).toContain("Starting services: frontend");
+      expect(useOutput).toContain("Selected profile: dev");
 
-      const stateAfterEnable = JSON.parse(
+      const stateAfterUse = JSON.parse(
         runZapCommand("state", testDir, tempConfigPath),
       );
-      expect(stateAfterEnable.activeProfile).toBe("dev");
+      expect(stateAfterUse.selectedProfile).toBe("dev");
 
       const statusWithDev = JSON.parse(
         runZapCommand("status --json", testDir, tempConfigPath),
@@ -184,39 +180,33 @@ describe("E2E: Profiles Command", () => {
       const frontendStatusWithDev = statusWithDev.native.find(
         (service) => service.service === "frontend",
       );
-      expect(workerStatusWithDev?.enabled).toBe(false);
+      expect(workerStatusWithDev).toBeUndefined();
       expect(frontendStatusWithDev?.enabled).toBe(true);
 
-      const disableOutput = runZapCommand(
-        "profile --disable",
+      const resetOutput = runZapCommand(
+        "profile reset",
         testDir,
         tempConfigPath,
         { timeout: 45000 },
       );
-      expect(disableOutput).toContain("Active profile disabled");
+      expect(resetOutput).toContain("Reset profile to: default");
 
-      const stateAfterDisable = JSON.parse(
+      const stateAfterReset = JSON.parse(
         runZapCommand("state", testDir, tempConfigPath),
       );
-      expect(stateAfterDisable.activeProfile).toBeUndefined();
+      expect(stateAfterReset.selectedProfile).toBeUndefined();
 
-      const statusWithoutProfile = JSON.parse(
+      const statusWithDefault = JSON.parse(
         runZapCommand("status --json", testDir, tempConfigPath),
       ) as StatusOutput;
-      const workerStatusWithoutProfile = statusWithoutProfile.native.find(
+      const workerStatusWithDefault = statusWithDefault.native.find(
         (service) => service.service === "worker",
       );
-      const frontendStatusWithoutProfile = statusWithoutProfile.native.find(
+      const frontendStatusWithDefault = statusWithDefault.native.find(
         (service) => service.service === "frontend",
       );
-      expect(workerStatusWithoutProfile?.enabled).toBe(false);
-      expect(frontendStatusWithoutProfile?.enabled).toBe(false);
-
-      const runningAfterDisable = getRunningServices(testProjectName);
-      expect(runningAfterDisable).toContain("database");
-      expect(runningAfterDisable).toContain("api");
-      expect(runningAfterDisable).not.toContain("frontend");
-      expect(runningAfterDisable).not.toContain("worker");
+      expect(workerStatusWithDefault).toBeUndefined();
+      expect(frontendStatusWithDefault).toBeUndefined();
     } finally {
       try {
         runZapCommand("down", testDir, tempConfigPath, {
@@ -228,7 +218,7 @@ describe("E2E: Profiles Command", () => {
     }
   }, 60000);
 
-  it("should start unprofiled services first, then add profiled services after enabling a profile and restarting", async () => {
+  it("should start default services, then selected profile services", async () => {
     testProjectName = generateTestProjectName();
     testDir = fs.mkdtempSync(
       path.join(os.tmpdir(), "zapper-e2e-profiles-fixture-"),
@@ -257,7 +247,9 @@ describe("E2E: Profiles Command", () => {
       expect(runningWithoutProfile).not.toContain("frontend");
       expect(runningWithoutProfile).not.toContain("worker");
 
-      runZapCommand("profile dev", testDir, tempConfigPath, { timeout: 45000 });
+      runZapCommand("profile use dev", testDir, tempConfigPath, {
+        timeout: 45000,
+      });
       runZapCommand("restart", testDir, tempConfigPath, { timeout: 45000 });
 
       const runningWithDevProfile = getRunningServices(testProjectName);

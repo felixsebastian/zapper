@@ -143,6 +143,44 @@ describe("ZodConfigValidator", () => {
     }).not.toThrow();
   });
 
+  it("should validate task runner options", () => {
+    const config = {
+      project: "myproj",
+      native: {
+        app: {
+          cmd: "npm run dev",
+        },
+      },
+      tasks: {
+        build: {
+          silent: true,
+          interactive: false,
+          preconditions: [
+            'test -n "$DATABASE_URL"',
+            { sh: "test -f package.json", msg: "Missing package.json" },
+          ],
+          status: ["test -d node_modules"],
+          cmds: [
+            { cmd: "pnpm install", silent: true },
+            {
+              task: "compile",
+              vars: { target: "production" },
+              silent: true,
+            },
+          ],
+        },
+        compile: {
+          params: [{ name: "target", required: true }],
+          cmds: [{ cmd: "pnpm build --target={{target}}", interactive: true }],
+        },
+      },
+    };
+
+    expect(() => {
+      ZodConfigValidator.validate(config);
+    }).not.toThrow();
+  });
+
   it("should reject config without project", () => {
     const config = {
       native: {
@@ -566,7 +604,7 @@ describe("ZodConfigValidator", () => {
       }).toThrow();
     });
 
-    it("should validate env_files as environment map with default", () => {
+    it("should reject env_files as environment map with default", () => {
       const config = {
         project: "myproj",
         env_files: {
@@ -582,10 +620,10 @@ describe("ZodConfigValidator", () => {
 
       expect(() => {
         ZodConfigValidator.validate(config);
-      }).not.toThrow();
+      }).toThrow();
     });
 
-    it("should allow env_files map without default", () => {
+    it("should reject env_files map without default", () => {
       const config = {
         project: "myproj",
         env_files: {
@@ -600,7 +638,7 @@ describe("ZodConfigValidator", () => {
 
       expect(() => {
         ZodConfigValidator.validate(config);
-      }).not.toThrow();
+      }).toThrow();
     });
   });
 

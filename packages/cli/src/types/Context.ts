@@ -7,6 +7,7 @@ import {
   ZapperState,
   StoredVolume,
 } from "../config/schemas";
+import type { ResolvedProfile } from "../core/profileResolver";
 
 export type { TaskParam, Link };
 
@@ -52,5 +53,6 @@ export interface Context {
   notes?: string; // Top-level project notes for `zap notes`
   links: Link[]; // Project bookmarks/links
   profiles: string[]; // All unique profiles from processes and containers
+  profile?: ResolvedProfile; // Selected stack profile when top-level profiles are configured
   state: ZapperState; // Validated state from state.json
 }

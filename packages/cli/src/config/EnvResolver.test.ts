@@ -677,8 +677,8 @@ ENV_NAME=staging
     });
   });
 
-  describe("named environment sets", () => {
-    it("should load default environment when no activeEnvironment is set", () => {
+  describe("context env file stack", () => {
+    it("should load env files from context", () => {
       const defaultEnvContent = `TEST_VALUE=default_value
 NODE_ENV=development`;
 
@@ -701,8 +701,6 @@ NODE_ENV=development`;
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: null,
-          activeProfile: null,
           services: {},
         },
       };
@@ -715,7 +713,7 @@ NODE_ENV=development`;
       });
     });
 
-    it("should load alternate environment when activeEnvironment is set", () => {
+    it("should load the selected profile env file stack from context", () => {
       const alternateEnvContent = `
 TEST_VALUE=alternate_value
 NODE_ENV=staging
@@ -743,8 +741,6 @@ NODE_ENV=staging
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: "alternate",
-          activeProfile: null,
           services: {},
         },
       };
@@ -791,8 +787,6 @@ DATABASE_URL=postgresql://localhost:5433/myapp_staging
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: "alternate",
-          activeProfile: null,
           services: {},
         },
       };
@@ -837,8 +831,6 @@ PROCESS_VAR=process_value
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: null,
-          activeProfile: null,
           services: {},
         },
       };
@@ -881,8 +873,6 @@ DATABASE_NAME=\${DATABASE_PREFIX}_production
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: null,
-          activeProfile: null,
           services: {},
         },
       };
@@ -916,8 +906,6 @@ DATABASE_NAME=\${DATABASE_PREFIX}_production
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: null,
-          activeProfile: null,
           services: {},
         },
       };
@@ -954,8 +942,6 @@ POSTGRES_PASSWORD=staging_pass
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: "staging",
-          activeProfile: null,
           services: {},
         },
       };
@@ -993,8 +979,6 @@ DEBUG_VAR=debug_value
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: "debug",
-          activeProfile: null,
           services: {},
         },
       };
@@ -1113,8 +1097,6 @@ BACKEND_URL=http://localhost:\${BACKEND_PORT}/api
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: null,
-          activeProfile: null,
           services: {},
         },
       };
@@ -1156,8 +1138,6 @@ PORT=3000
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: null,
-          activeProfile: null,
           services: {},
         },
       };
@@ -1190,8 +1170,6 @@ PORT=3000
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: null,
-          activeProfile: null,
           services: {},
         },
       };
@@ -1229,8 +1207,6 @@ MONGO_PORT=27018
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: null,
-          activeProfile: null,
           services: {},
         },
       };
@@ -1266,8 +1242,6 @@ PORT=3000
         links: [],
         profiles: [],
         state: {
-          activeEnvironment: null,
-          activeProfile: null,
           services: {},
         },
       };

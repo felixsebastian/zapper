@@ -9,7 +9,11 @@ import {
   resolveInstance,
   validateInstanceKey,
 } from "./instanceResolver";
-import { ContextNotLoadedError, ServiceNotFoundError } from "../errors";
+import {
+  ContextNotLoadedError,
+  ServiceNotFoundError,
+  TaskNotFoundError,
+} from "../errors";
 import * as fs from "fs";
 import * as path from "path";
 import { tmpdir } from "os";
@@ -201,9 +205,50 @@ native:
 
       await zapper.loadConfig(configPath, { __command: "status" });
 
-      expect(mockResolveInstance).toHaveBeenCalledWith(tempDir, undefined, {
+      expect(mockResolveInstance).toHaveBeenCalledWith(tempDir, "default", {
         autoCreate: false,
         allowMissing: true,
+      });
+    });
+
+    it("uses an isolated profile name as the stack instance key", async () => {
+      const configPath = createMinimalTempConfig();
+      mockParseYamlFile.mockReturnValue({
+        project: "test-project",
+        profiles: {
+          default: {
+            env_files: [],
+            services: "*",
+            isolate: false,
+          },
+          e2e: {
+            env_files: [],
+            services: ["api"],
+            isolate: true,
+          },
+        },
+        native: { api: { cmd: "npm start" } },
+      });
+      mockResolveInstance.mockResolvedValue({
+        instanceKey: "e2e",
+        instanceId: "inst123",
+      });
+
+      await zapper.loadConfig(configPath, {
+        __command: "up",
+        profile: "e2e",
+      });
+
+      expect(mockResolveInstance).toHaveBeenCalledWith(tempDir, "e2e", {
+        autoCreate: true,
+        allowMissing: false,
+      });
+      expect(zapper.getContext()?.instanceKey).toBe("e2e");
+      expect(zapper.getContext()?.state.stacks?.e2e).toEqual({
+        stackId: "inst123",
+        profile: "e2e",
+        ports: {},
+        volumes: {},
       });
     });
   });
@@ -282,6 +327,44 @@ native:
     });
   });
 
+  describe("runTask", () => {
+    it("throws TaskNotFoundError when no tasks are defined", async () => {
+      const configPath = createTempConfig({});
+      mockParseYamlFile.mockReturnValue({
+        project: "test-project",
+        native: { api: { cmd: "npm start" } },
+      });
+      await zapper.loadConfig(configPath);
+
+      await expect(zapper.runTask("seed")).rejects.toThrow(TaskNotFoundError);
+      await expect(zapper.runTask("seed")).rejects.toThrow(
+        "No tasks defined in config",
+      );
+    });
+
+    it("throws TaskNotFoundError when the task name or alias is unknown", async () => {
+      const configPath = createTempConfig({});
+      mockParseYamlFile.mockReturnValue({
+        project: "test-project",
+        native: { api: { cmd: "npm start" } },
+        tasks: {
+          build: {
+            aliases: ["b"],
+            cmds: ["echo build"],
+          },
+        },
+      });
+      await zapper.loadConfig(configPath);
+
+      await expect(zapper.runTask("missing")).rejects.toThrow(
+        TaskNotFoundError,
+      );
+      await expect(zapper.runTask("missing")).rejects.toThrow(
+        "Task not found: missing. Check task names or aliases",
+      );
+    });
+  });
+
   describe("orchestration methods", () => {
     let mockPlannerInstance: { getPlan: () => unknown };
     let mockPlan: unknown;
@@ -327,7 +410,6 @@ native:
           undefined,
           "test-project",
           false,
-          undefined,
         );
 
         expect(mockExecuteActions).toHaveBeenCalledWith(
@@ -356,7 +438,6 @@ native:
           ["api"], // Should resolve "backend" to "api"
           "test-project",
           false,
-          undefined,
         );
       });
 
@@ -388,7 +469,6 @@ native:
           ["nonexistent"],
           "test-project",
           false,
-          undefined,
         );
       });
 
@@ -407,7 +487,6 @@ native:
           ["api", "missing"],
           "test-project",
           false,
-          undefined,
         );
       });
     });
@@ -421,7 +500,6 @@ native:
           ["api"],
           "test-project",
           false,
-          undefined,
         );
 
         expect(mockExecuteActions).toHaveBeenCalledWith(
@@ -458,7 +536,6 @@ native:
           ["api"],
           "test-project",
           false,
-          undefined,
         );
 
         expect(mockExecuteActions).toHaveBeenCalledWith(
@@ -480,7 +557,6 @@ native:
           undefined,
           "test-project",
           false,
-          undefined,
         );
       });
 
@@ -499,7 +575,6 @@ native:
           ["api", "missing"],
           "test-project",
           false,
-          undefined,
         );
       });
     });
@@ -788,7 +863,6 @@ native:
         ["api"],
         "test-project",
         false,
-        undefined,
       );
 
       // Stop processes
@@ -798,7 +872,6 @@ native:
         ["api"],
         "test-project",
         false,
-        undefined,
       );
     });
 

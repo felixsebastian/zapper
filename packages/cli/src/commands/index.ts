@@ -13,6 +13,7 @@ export { CloneCommand } from "./CloneCommand";
 export { TaskCommand } from "./TaskCommand";
 export { ProfilesCommand } from "./ProfilesCommand";
 export { StateCommand } from "./StateCommand";
+export { StackCommand } from "./StackCommand";
 export { CheckoutCommand } from "./CheckoutCommand";
 export { PullCommand } from "./PullCommand";
 export { GitStatusCommand } from "./GitStatusCommand";

@@ -4,7 +4,11 @@ Raw documentation for agents and automation:
 
 - Full raw bundle: /llms-full.txt
 - index.md: /
-- usage.md: /usage
+- commands.md: /commands
+- configuration.md: /configuration
+- services.md: /services
+- tasks.md: /tasks
+- project-metadata.md: /project-metadata
 - instances.md: /instances
 - resource-management.md: /resource-management
 - global-registry.md: /global-registry

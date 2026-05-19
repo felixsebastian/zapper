@@ -1,127 +1,89 @@
-import { CommandHandler, CommandContext } from "./CommandHandler";
+import {
+  CommandHandler,
+  CommandContext,
+  CommandTarget,
+} from "./CommandHandler";
 import { StateManager } from "../core/StateManager";
-import { Process, Container } from "../types/Context";
 import { CommandResult } from "./CommandResult";
 
 export class ProfilesCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<CommandResult | void> {
     const { zapper, service, options } = context;
-    if (Array.isArray(service)) {
-      throw new Error("Profile command accepts a single profile name");
-    }
-
     const zapperContext = zapper.getContext();
     if (!zapperContext) {
       throw new Error("Context not loaded");
     }
 
-    // Handle --disable flag
-    if (options.disable) {
-      const stateManager = new StateManager(
-        zapper,
-        zapperContext.projectRoot,
-        options.config,
-      );
-      return await this.disableProfile(
-        stateManager,
-        zapperContext.state.activeProfile,
-      );
+    const args = this.normalizeArgs(service);
+    const action = args[0] ?? "current";
+
+    if (!zapperContext.profile && zapperContext.profiles.length === 0) {
+      throw new Error("No stack profiles configured");
     }
 
-    // Handle --list flag
-    if (options.list) {
+    if (action === "list") {
       return {
         kind: "profiles.list",
         profiles: zapperContext.profiles,
       };
     }
 
-    // Handle specific profile selection
-    if (service) {
-      if (!zapperContext.profiles.includes(service)) {
+    if (action === "current") {
+      return {
+        kind: "profiles.current",
+        profile: zapperContext.profile?.name,
+        selectedProfile: zapperContext.state.selectedProfile,
+        overrideProfile:
+          typeof options.profile === "string" ? options.profile : undefined,
+      };
+    }
+
+    if (action === "use") {
+      const profileName = args[1];
+      if (!profileName) {
+        throw new Error("Usage: zap profile use <name>");
+      }
+      if (!zapperContext.profiles.includes(profileName)) {
         throw new Error(
-          `Profile not found: ${service}. Available profiles: ${zapperContext.profiles.join(", ")}`,
+          this.notFoundMessage(profileName, zapperContext.profiles),
         );
       }
-
       const stateManager = new StateManager(
         zapper,
         zapperContext.projectRoot,
         options.config,
       );
-      return await this.enableProfile(stateManager, service);
-    }
-
-    // Handle interactive picker
-    return {
-      kind: "profiles.picker",
-      profiles: zapperContext.profiles,
-      activeProfile: zapperContext.state.activeProfile,
-    };
-  }
-
-  private async enableProfile(
-    stateManager: StateManager,
-    profileName: string,
-  ): Promise<CommandResult> {
-    // Update the active profile state (this also reloads config)
-    await stateManager.setActiveProfile(profileName);
-
-    // Get all services that have this profile from the updated context
-    const zapperContext = stateManager.getZapper().getContext();
-    if (!zapperContext) {
-      throw new Error("Context not loaded");
-    }
-    const servicesToStart: string[] = [];
-
-    // Check processes
-    zapperContext.processes.forEach((process: Process) => {
-      if (
-        Array.isArray(process.profiles) &&
-        process.profiles.includes(profileName)
-      ) {
-        servicesToStart.push(process.name);
-      }
-    });
-
-    // Check containers
-    zapperContext.containers.forEach((container: Container) => {
-      if (
-        Array.isArray(container.profiles) &&
-        container.profiles.includes(profileName)
-      ) {
-        servicesToStart.push(container.name);
-      }
-    });
-
-    if (servicesToStart.length > 0) {
-      await stateManager.getZapper().startProcesses(servicesToStart);
-    }
-    return {
-      kind: "profiles.enabled",
-      profile: profileName,
-      startedServices: servicesToStart,
-    };
-  }
-
-  private async disableProfile(
-    stateManager: StateManager,
-    currentActiveProfile?: string,
-  ): Promise<CommandResult> {
-    if (!currentActiveProfile) {
+      await stateManager.setSelectedProfile(profileName);
       return {
-        kind: "profiles.disabled",
+        kind: "profiles.selected",
+        profile: profileName,
       };
     }
 
-    // Clear the active profile state (this also reloads config)
-    await stateManager.clearActiveProfile();
+    if (action === "reset") {
+      const stateManager = new StateManager(
+        zapper,
+        zapperContext.projectRoot,
+        options.config,
+      );
+      await stateManager.clearSelectedProfile();
+      return {
+        kind: "profiles.reset",
+        profile: "default",
+      };
+    }
 
-    // Run startAll to bring system to good state (stop services that were only running due to the disabled profile)
-    await stateManager.getZapper().startProcesses(); // This will call startAll with no active profile
-    return {
-      kind: "profiles.disabled",
-      activeProfile: currentActiveProfile,
-    };
+    throw new Error(
+      `Unknown profile command: ${action}. Use: zap profile list|current|use|reset`,
+    );
+  }
+
+  private normalizeArgs(service: CommandTarget | undefined): string[] {
+    if (!service) return [];
+    return Array.isArray(service) ? service : [service];
+  }
+
+  private notFoundMessage(profile: string, profiles: string[]): string {
+    return `Profile not found: ${profile}. Available profiles: ${profiles.join(", ")}`;
   }
 }

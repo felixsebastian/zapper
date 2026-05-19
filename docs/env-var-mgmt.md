@@ -1,7 +1,8 @@
 # Environment Variable Management
 
 This document explains the environment variable model and the reasoning behind
-it. For concise syntax reference, see [usage.md](usage.md).
+it. For concise syntax reference, see [Configuration](configuration.md) and
+[Services](services.md).
 
 ## Goals
 

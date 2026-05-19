@@ -12,6 +12,13 @@ export interface ResolvedVolumes {
   namedVolumesToCreate: string[];
 }
 
+export interface ServiceDockerVolume {
+  name: string;
+  internalDir: string;
+  mode?: string;
+  managed: boolean;
+}
+
 type ContainerVolume = NonNullable<Container["volumes"]>[number];
 
 function getVolumeKey(spec: ManagedVolumeSpec): string {
@@ -393,4 +400,70 @@ export function getContainerVolumeBindings(
   }
 
   return bindings;
+}
+
+export function getServiceDockerVolumes(
+  serviceName: string,
+  volumes: Container["volumes"] | undefined,
+  managedVolumes: Record<string, StoredVolume>,
+): ServiceDockerVolume[] {
+  const dockerVolumes: ServiceDockerVolume[] = [];
+
+  for (const volume of volumes || []) {
+    if (typeof volume === "string") {
+      const parsed = parseVolumeString(volume);
+      if (!parsed.source) {
+        const volumeName = Object.entries(managedVolumes).find(
+          ([, stored]) =>
+            stored.service === serviceName &&
+            stored.internal_dir === parsed.internalDir,
+        )?.[0];
+        if (volumeName) {
+          dockerVolumes.push({
+            name: volumeName,
+            internalDir: parsed.internalDir,
+            mode: parsed.suffix,
+            managed: true,
+          });
+        }
+        continue;
+      }
+
+      if (!isBindMountSource(parsed.source)) {
+        dockerVolumes.push({
+          name: parsed.source,
+          internalDir: parsed.internalDir,
+          mode: parsed.suffix,
+          managed: false,
+        });
+      }
+      continue;
+    }
+
+    if (volume.name) {
+      dockerVolumes.push({
+        name: volume.name,
+        internalDir: volume.internal_dir,
+        mode: volume.mode,
+        managed: false,
+      });
+      continue;
+    }
+
+    const volumeName = Object.entries(managedVolumes).find(
+      ([, stored]) =>
+        stored.service === serviceName &&
+        stored.internal_dir === volume.internal_dir,
+    )?.[0];
+    if (volumeName) {
+      dockerVolumes.push({
+        name: volumeName,
+        internalDir: volume.internal_dir,
+        mode: volume.mode,
+        managed: true,
+      });
+    }
+  }
+
+  return dockerVolumes;
 }

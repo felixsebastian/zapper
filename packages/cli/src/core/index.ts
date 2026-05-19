@@ -3,3 +3,4 @@ export { Planner } from "./Planner";
 export { DependencyGraph } from "./DependencyGraph";
 export { executeActions } from "./executeActions";
 export { createContext } from "./createContext";
+export * from "./profileResolver";

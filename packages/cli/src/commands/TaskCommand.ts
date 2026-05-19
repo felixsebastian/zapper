@@ -1,5 +1,6 @@
 import { CommandHandler, CommandContext } from "./CommandHandler";
 import { CommandResult } from "./CommandResult";
+import { TaskNotFoundError } from "../errors";
 
 export class TaskCommand extends CommandHandler {
   async execute(context: CommandContext): Promise<CommandResult | void> {
@@ -23,7 +24,7 @@ export class TaskCommand extends CommandHandler {
       if (!zapperContext) throw new Error("Context not loaded");
 
       const task = zapperContext.tasks.find((t) => t.name === service);
-      if (!task) throw new Error(`Task not found: ${service}`);
+      if (!task) throw new TaskNotFoundError(service);
       return {
         kind: "tasks.params",
         task,
@@ -31,6 +32,8 @@ export class TaskCommand extends CommandHandler {
       };
     }
 
-    await zapper.runTask(service, taskParams);
+    await zapper.runTask(service, taskParams, {
+      force: Boolean(options.force),
+    });
   }
 }

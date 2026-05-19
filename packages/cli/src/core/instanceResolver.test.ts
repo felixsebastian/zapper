@@ -104,6 +104,15 @@ describe("instanceResolver", () => {
     });
   });
 
+  it("allows digit-bearing keys for profile-owned stacks", async () => {
+    const result = await resolveInstance(testDir, "e2e", {
+      autoCreate: true,
+    });
+
+    expect(result.instanceKey).toBe("e2e");
+    expect(result.instanceId).toMatch(/^[a-z0-9]{6}$/);
+  });
+
   it("sets and resolves an instance label", async () => {
     const result = setInstanceLabel(testDir, "default", "local checkout");
     const state = loadState(testDir);

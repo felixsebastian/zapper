@@ -179,12 +179,12 @@ Use quick grep checks:
 
 ```bash
 rg -n "project|env|env_files|git_method|task_delimiters|native|docker|tasks|homepage|notes|links" packages/cli/src/config/schemas.ts
-rg -n "project|env|env_files|git_method|task_delimiters|native|docker|tasks|homepage|notes|links" docs/usage.md
+rg -n "project|env|env_files|git_method|task_delimiters|native|docker|tasks|homepage|notes|links" docs/configuration.md docs/services.md docs/tasks.md docs/project-metadata.md
 ```
 
 Then do a manual contradiction pass:
 
-- If config semantics changed, confirm `docs/usage.md` examples and prose match current behavior.
+- If config semantics changed, confirm the docs website reference pages match current behavior.
 - Check CLI command names/options in docs against current CLI implementation.
 - Run `pnpm docs:build` if you changed documentation structure or need to verify the raw generated docs bundle directly.
 - Remove or correct stale statements and outdated examples.

@@ -2,64 +2,137 @@ import { ProfilesCommand } from "./ProfilesCommand";
 import { Zapper } from "../core/Zapper";
 import { vi, describe, it, expect } from "vitest";
 import { Context } from "../types";
+import { saveState } from "../config/stateLoader";
+
+vi.mock("../config/stateLoader", async () => {
+  const actual = await vi.importActual<typeof import("../config/stateLoader")>(
+    "../config/stateLoader",
+  );
+  return {
+    ...actual,
+    saveState: vi.fn(),
+  };
+});
 
 describe("ProfilesCommand", () => {
-  it("should validate profile exists in available profiles list", async () => {
-    const zapper = new Zapper();
-    const mockContext: Context = {
+  function createMockContext(overrides: Partial<Context> = {}): Context {
+    return {
       projectName: "test",
-      profiles: ["admin", "production"],
+      profiles: ["default", "e2e", "proddata"],
+      profile: {
+        name: "default",
+        envFiles: [],
+        services: "*",
+        isolate: false,
+      },
       processes: [],
       containers: [],
       tasks: [],
       environments: [],
       links: [],
       instanceKey: "default",
-      state: { activeProfile: undefined },
+      state: {},
       projectRoot: "/test",
+      ...overrides,
     };
+  }
 
-    vi.spyOn(zapper, "getContext").mockReturnValue(mockContext);
+  it("lists configured stack profiles", async () => {
+    const zapper = new Zapper();
+    vi.spyOn(zapper, "getContext").mockReturnValue(createMockContext());
 
-    const command = new ProfilesCommand();
-    const context = {
+    const result = await new ProfilesCommand().execute({
       zapper,
-      service: "admin-app", // This profile does not exist
+      service: ["list"],
       options: {},
-    };
+    });
 
-    // Should throw an error because "admin-app" is not in the profiles list
-    await expect(command.execute(context)).rejects.toThrow(
-      "Profile not found: admin-app. Available profiles: admin, production",
-    );
+    expect(result).toEqual({
+      kind: "profiles.list",
+      profiles: ["default", "e2e", "proddata"],
+    });
   });
 
-  it("should throw error when profile is not found", async () => {
+  it("shows the current resolved stack profile", async () => {
     const zapper = new Zapper();
-    const mockContext: Context = {
-      projectName: "test",
-      profiles: ["production", "development"],
-      processes: [],
-      containers: [],
-      tasks: [],
-      environments: [],
-      links: [],
-      instanceKey: "default",
-      state: { activeProfile: undefined },
-      projectRoot: "/test",
-    };
+    vi.spyOn(zapper, "getContext").mockReturnValue(
+      createMockContext({
+        profile: {
+          name: "e2e",
+          envFiles: [],
+          services: ["api"],
+          isolate: true,
+        },
+        state: { selectedProfile: "proddata" },
+      }),
+    );
 
-    vi.spyOn(zapper, "getContext").mockReturnValue(mockContext);
-
-    const command = new ProfilesCommand();
-    const context = {
+    const result = await new ProfilesCommand().execute({
       zapper,
-      service: "nonexistent",
-      options: {},
-    };
+      service: ["current"],
+      options: { profile: "e2e" },
+    });
 
-    await expect(command.execute(context)).rejects.toThrow(
-      "Profile not found: nonexistent. Available profiles: production, development",
+    expect(result).toEqual({
+      kind: "profiles.current",
+      profile: "e2e",
+      selectedProfile: "proddata",
+      overrideProfile: "e2e",
+    });
+  });
+
+  it("saves selectedProfile for profile use", async () => {
+    const zapper = new Zapper();
+    vi.spyOn(zapper, "getContext").mockReturnValue(createMockContext());
+    vi.spyOn(zapper, "loadConfig").mockResolvedValue(undefined);
+
+    const result = await new ProfilesCommand().execute({
+      zapper,
+      service: ["use", "e2e"],
+      options: {},
+    });
+
+    expect(saveState).toHaveBeenCalledWith("/test", {
+      selectedProfile: "e2e",
+    });
+    expect(result).toEqual({
+      kind: "profiles.selected",
+      profile: "e2e",
+    });
+  });
+
+  it("clears selectedProfile for profile reset", async () => {
+    const zapper = new Zapper();
+    vi.spyOn(zapper, "getContext").mockReturnValue(createMockContext());
+    vi.spyOn(zapper, "loadConfig").mockResolvedValue(undefined);
+
+    const result = await new ProfilesCommand().execute({
+      zapper,
+      service: ["reset"],
+      options: {},
+    });
+
+    expect(saveState).toHaveBeenCalledWith("/test", {
+      selectedProfile: undefined,
+    });
+    expect(result).toEqual({
+      kind: "profiles.reset",
+      profile: "default",
+    });
+  });
+
+  it("throws when profile use references an unknown profile", async () => {
+    const zapper = new Zapper();
+    vi.spyOn(zapper, "getContext").mockReturnValue(createMockContext());
+
+    await expect(
+      new ProfilesCommand().execute({
+        zapper,
+        service: ["use", "missing"],
+        options: {},
+      }),
+    ).rejects.toThrow(
+      "Profile not found: missing. Available profiles: default, e2e, proddata",
     );
   });
 });

@@ -113,9 +113,24 @@ function stripAnsi(s: string): string {
 }
 
 /** General formatting primitives */
+function headerTitle(text: string): string {
+  return color("accent", text);
+}
+
+function headerSubtitle(text: string): string {
+  return dim(`(${text})`);
+}
+
+function headerRow(segments: string[]): string {
+  return [color("accent", "=="), ...segments, color("accent", "==")].join(" ");
+}
+
 function header(title: string, subtitle?: string): string {
-  const t = subtitle ? `${title} ${dim(`(${subtitle})`)}` : title;
-  return color("accent", `== ${t} ==`);
+  return headerRow(
+    subtitle
+      ? [headerTitle(title), headerSubtitle(subtitle)]
+      : [headerTitle(title)],
+  );
 }
 
 function normalizeState(state: string): "UP" | "DOWN" | "PENDING" | "UNKNOWN" {
@@ -324,7 +339,21 @@ function table(rows: string[][], padding = 2): string {
 }
 
 function formatContextSubtitle(context: Context): string {
-  if (context.instanceId) {
+  const stackCount = Object.keys(context.state.stacks ?? {}).length;
+  const profileName = context.profile?.name;
+
+  if (profileName && profileName !== "default") {
+    if (context.instanceId && stackCount > 1) {
+      return `${context.projectName} [${profileName} - ${context.instanceId} - ${stackCount} stacks]`;
+    }
+    return `${context.projectName} [${profileName}]`;
+  }
+
+  if (context.instanceId && stackCount > 1) {
+    return `${context.projectName} [${context.instanceId} - ${stackCount} stacks]`;
+  }
+
+  if (context.instanceId && context.instanceKey !== "default") {
     const label = getInstanceDisplayLabel({
       id: context.instanceId,
       label: context.instance?.label,
@@ -333,6 +362,7 @@ function formatContextSubtitle(context: Context): string {
       label === context.instanceId ? label : `${label} (${context.instanceId})`;
     return `${context.projectName} · ${suffix}`;
   }
+
   return context.projectName;
 }
 
@@ -349,6 +379,7 @@ const knownErrorNames = new Set([
   "ConfigParseError",
   "ConfigValidationError",
   "ServiceNotFoundError",
+  "TaskNotFoundError",
   "WhitelistReferenceError",
   "ContainerNotRunningError",
   "ContainerStartError",
@@ -560,54 +591,6 @@ export const renderer = {
       containerCount: number;
     }): string {
       return `Killed ${data.pm2Count} PM2 process(es) and ${data.containerCount} container(s) across all instances for project ${data.projectName} (${data.prefix}.).`;
-    },
-
-    profileEnabledText(profile: string): string {
-      return `Enabling profile: ${profile}`;
-    },
-
-    profileNoServicesText(profile: string): string {
-      return `No services found for profile: ${profile}`;
-    },
-
-    profileStartingServicesText(services: string[]): string {
-      return `Starting services: ${services.join(", ")}`;
-    },
-
-    noActiveProfileToDisableText(): string {
-      return "No active profile to disable";
-    },
-
-    profileDisablingText(profile: string): string {
-      return `Disabling active profile: ${profile}`;
-    },
-
-    profileDisabledText(): string {
-      return "Active profile disabled";
-    },
-
-    profileAdjustingServicesText(): string {
-      return "Adjusting services to match new state...";
-    },
-
-    environmentEnabledText(environment: string): string {
-      return `Enabling environment: ${environment}`;
-    },
-
-    environmentUpdatedText(): string {
-      return "Environment updated. Restart services to apply new environment variables.";
-    },
-
-    noActiveEnvironmentToDisableText(): string {
-      return "No active environment to disable";
-    },
-
-    environmentDisablingText(environment: string): string {
-      return `Disabling active environment: ${environment}`;
-    },
-
-    environmentResetText(): string {
-      return "Environment reset to default. Restart services to apply new environment variables.";
     },
 
     noProjectsFoundText(): string {
@@ -1118,64 +1101,6 @@ export const renderer = {
 
     toJson(profiles: string[]): string[] {
       return profiles;
-    },
-
-    pickerText(profiles: string[], activeProfile?: string): string {
-      if (profiles.length === 0)
-        return `${header("Profile")}\n\n${dim("No profiles defined")}`;
-
-      const lines: string[] = [header("Profile")];
-
-      if (activeProfile) lines.push(`Active: ${bold(activeProfile)}`);
-
-      lines.push("");
-      for (const p of profiles) {
-        const isActive = p === activeProfile;
-        const mark = isActive ? color("ok", "*") : " ";
-        lines.push(`${mark} ${p}`);
-      }
-
-      lines.push("");
-      lines.push(dim("Use: zap profile <name>"));
-
-      return lines.join("\n");
-    },
-  },
-
-  environments: {
-    toText(environments: string[]): string {
-      if (environments.length === 0)
-        return `${header("Environment")}\n\n${dim("No environments defined")}`;
-      return [
-        header("Environments"),
-        "",
-        environments.map((e) => `  ${e}`).join("\n"),
-      ].join("\n");
-    },
-
-    toJson(environments: string[]): string[] {
-      return environments;
-    },
-
-    pickerText(environments: string[], activeEnvironment?: string): string {
-      if (environments.length === 0)
-        return `${header("Environment")}\n\n${dim("No environments defined")}`;
-
-      const lines: string[] = [header("Environment")];
-
-      if (activeEnvironment) lines.push(`Active: ${bold(activeEnvironment)}`);
-
-      lines.push("");
-      for (const e of environments) {
-        const isActive = e === activeEnvironment;
-        const mark = isActive ? color("ok", "*") : " ";
-        lines.push(`${mark} ${e}`);
-      }
-
-      lines.push("");
-      lines.push(dim("Use: zap env <name>"));
-
-      return lines.join("\n");
     },
   },
 

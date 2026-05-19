@@ -39,7 +39,37 @@ zap status
 zap down
 ```
 
-See the [full reference](usage.md) for every `zap.yaml` field and command.
+## Add Tasks
+
+Use tasks for one-off project commands that should share the same local
+environment.
+
+```yaml
+tasks:
+  seed:
+    preconditions:
+      - test -n "$DATABASE_URL"
+    cmds:
+      - pnpm db:seed
+
+  console:
+    interactive: true
+    silent: true
+    cmds:
+      - psql "$DATABASE_URL"
+```
+
+```bash
+zap task seed
+zap task console
+```
+
+For full reference docs, see [Commands](commands.md),
+[Configuration](configuration.md), [Services](services.md), and
+[Tasks](tasks.md).
+
+For profile-based env files, service selection, and isolated stacks, see
+[Profiles](profiles.md).
 
 For packaging and local machine runtime plans, see
 [Local Runtime Compatibility](local-runtime.md).

@@ -1,14 +1,39 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TaskRunner, TaskRegistry, TaskParams } from "./TaskRunner";
+import { TaskNotFoundError } from "../../errors";
 import * as childProcess from "child_process";
+import { EventEmitter } from "events";
 
 vi.mock("child_process", () => ({
-  execSync: vi.fn(),
+  spawn: vi.fn(),
 }));
+
+type MockChildProcess = EventEmitter & {
+  stdout: EventEmitter;
+  stderr: EventEmitter;
+};
+
+function createMockChildProcess(): MockChildProcess {
+  const child = new EventEmitter() as MockChildProcess;
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  return child;
+}
+
+function mockSuccessfulSpawn() {
+  vi.mocked(childProcess.spawn).mockImplementation(() => {
+    const child = createMockChildProcess();
+    process.nextTick(() => child.emit("close", 0, null));
+    return child as unknown as ReturnType<typeof childProcess.spawn>;
+  });
+}
 
 describe("TaskRunner", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSuccessfulSpawn();
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   });
 
   afterEach(() => {
@@ -16,7 +41,7 @@ describe("TaskRunner", () => {
   });
 
   describe("parameter interpolation", () => {
-    it("interpolates named parameters", () => {
+    it("interpolates named parameters", async () => {
       const tasks: TaskRegistry = {
         build: {
           cmds: ["echo Building {{target}}"],
@@ -29,15 +54,15 @@ describe("TaskRunner", () => {
       };
 
       const runner = new TaskRunner(tasks, "/project", { params });
-      runner.run("build");
+      await runner.run("build");
 
-      expect(childProcess.execSync).toHaveBeenCalledWith(
+      expect(childProcess.spawn).toHaveBeenCalledWith(
         "echo Building production",
-        expect.objectContaining({ cwd: "/project" }),
+        expect.objectContaining({ cwd: "/project", shell: true }),
       );
     });
 
-    it("uses default values for missing params", () => {
+    it("uses default values for missing params", async () => {
       const tasks: TaskRegistry = {
         build: {
           cmds: ["echo Building {{target}}"],
@@ -46,15 +71,15 @@ describe("TaskRunner", () => {
       };
 
       const runner = new TaskRunner(tasks, "/project");
-      runner.run("build");
+      await runner.run("build");
 
-      expect(childProcess.execSync).toHaveBeenCalledWith(
+      expect(childProcess.spawn).toHaveBeenCalledWith(
         "echo Building development",
-        expect.objectContaining({ cwd: "/project" }),
+        expect.objectContaining({ cwd: "/project", shell: true }),
       );
     });
 
-    it("overrides defaults with provided params", () => {
+    it("overrides defaults with provided params", async () => {
       const tasks: TaskRegistry = {
         build: {
           cmds: ["echo Building {{target}}"],
@@ -68,15 +93,15 @@ describe("TaskRunner", () => {
       };
 
       const runner = new TaskRunner(tasks, "/project", { params });
-      runner.run("build");
+      await runner.run("build");
 
-      expect(childProcess.execSync).toHaveBeenCalledWith(
+      expect(childProcess.spawn).toHaveBeenCalledWith(
         "echo Building staging",
-        expect.objectContaining({ cwd: "/project" }),
+        expect.objectContaining({ cwd: "/project", shell: true }),
       );
     });
 
-    it("interpolates REST with pass-through arguments", () => {
+    it("interpolates REST with pass-through arguments", async () => {
       const tasks: TaskRegistry = {
         test: {
           cmds: ["npm test {{REST}}"],
@@ -89,15 +114,15 @@ describe("TaskRunner", () => {
       };
 
       const runner = new TaskRunner(tasks, "/project", { params });
-      runner.run("test");
+      await runner.run("test");
 
-      expect(childProcess.execSync).toHaveBeenCalledWith(
+      expect(childProcess.spawn).toHaveBeenCalledWith(
         "npm test --coverage src/",
-        expect.objectContaining({ cwd: "/project" }),
+        expect.objectContaining({ cwd: "/project", shell: true }),
       );
     });
 
-    it("leaves REST empty when no args provided", () => {
+    it("leaves REST empty when no args provided", async () => {
       const tasks: TaskRegistry = {
         test: {
           cmds: ["npm test {{REST}}"],
@@ -105,15 +130,15 @@ describe("TaskRunner", () => {
       };
 
       const runner = new TaskRunner(tasks, "/project");
-      runner.run("test");
+      await runner.run("test");
 
-      expect(childProcess.execSync).toHaveBeenCalledWith(
+      expect(childProcess.spawn).toHaveBeenCalledWith(
         "npm test ",
-        expect.objectContaining({ cwd: "/project" }),
+        expect.objectContaining({ cwd: "/project", shell: true }),
       );
     });
 
-    it("uses custom delimiters", () => {
+    it("uses custom delimiters", async () => {
       const tasks: TaskRegistry = {
         build: {
           cmds: ["echo Building <<target>>"],
@@ -129,17 +154,17 @@ describe("TaskRunner", () => {
         delimiters: ["<<", ">>"],
         params,
       });
-      runner.run("build");
+      await runner.run("build");
 
-      expect(childProcess.execSync).toHaveBeenCalledWith(
+      expect(childProcess.spawn).toHaveBeenCalledWith(
         "echo Building custom",
-        expect.objectContaining({ cwd: "/project" }),
+        expect.objectContaining({ cwd: "/project", shell: true }),
       );
     });
   });
 
   describe("parameter validation", () => {
-    it("throws on missing required param", () => {
+    it("throws on missing required param", async () => {
       const tasks: TaskRegistry = {
         deploy: {
           cmds: ["echo {{env}}"],
@@ -149,12 +174,12 @@ describe("TaskRunner", () => {
 
       const runner = new TaskRunner(tasks, "/project");
 
-      expect(() => runner.run("deploy")).toThrow(
+      await expect(runner.run("deploy")).rejects.toThrow(
         "Required parameter 'env' not provided for task 'deploy'",
       );
     });
 
-    it("allows required param with default", () => {
+    it("allows required param with default", async () => {
       const tasks: TaskRegistry = {
         deploy: {
           cmds: ["echo {{env}}"],
@@ -163,12 +188,12 @@ describe("TaskRunner", () => {
       };
 
       const runner = new TaskRunner(tasks, "/project");
-      runner.run("deploy");
+      await runner.run("deploy");
 
-      expect(childProcess.execSync).toHaveBeenCalled();
+      expect(childProcess.spawn).toHaveBeenCalled();
     });
 
-    it("allows optional params to be omitted", () => {
+    it("allows optional params to be omitted", async () => {
       const tasks: TaskRegistry = {
         build: {
           cmds: ["echo {{verbose}}"],
@@ -177,11 +202,246 @@ describe("TaskRunner", () => {
       };
 
       const runner = new TaskRunner(tasks, "/project");
-      runner.run("build");
+      await runner.run("build");
 
-      expect(childProcess.execSync).toHaveBeenCalledWith(
+      expect(childProcess.spawn).toHaveBeenCalledWith(
         "echo ",
-        expect.objectContaining({ cwd: "/project" }),
+        expect.objectContaining({ cwd: "/project", shell: true }),
+      );
+    });
+  });
+
+  describe("output formatting", () => {
+    it("prints command headers brightly and command output in grey", async () => {
+      vi.mocked(childProcess.spawn).mockImplementation(() => {
+        const child = createMockChildProcess();
+        process.nextTick(() => {
+          child.stdout.emit("data", "hello\n");
+          child.emit("close", 0, null);
+        });
+        return child as unknown as ReturnType<typeof childProcess.spawn>;
+      });
+
+      const tasks: TaskRegistry = {
+        build: { cmds: ["echo hello"] },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await runner.run("build");
+
+      expect(process.stdout.write).toHaveBeenCalledWith(
+        "\u001B[1m\u001B[36mtask: [build] echo hello\u001B[0m\n",
+      );
+      expect(process.stdout.write).toHaveBeenCalledWith(
+        "\u001B[90mhello\n\u001B[0m",
+      );
+    });
+
+    it("suppresses command headers for silent tasks", async () => {
+      vi.mocked(childProcess.spawn).mockImplementation(() => {
+        const child = createMockChildProcess();
+        process.nextTick(() => {
+          child.stdout.emit("data", "hello\n");
+          child.emit("close", 0, null);
+        });
+        return child as unknown as ReturnType<typeof childProcess.spawn>;
+      });
+
+      const tasks: TaskRegistry = {
+        build: { silent: true, cmds: ["echo hello"] },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await runner.run("build");
+
+      expect(process.stdout.write).not.toHaveBeenCalledWith(
+        "\u001B[1m\u001B[36mtask: [build] echo hello\u001B[0m\n",
+      );
+      expect(process.stdout.write).toHaveBeenCalledWith(
+        "\u001B[90mhello\n\u001B[0m",
+      );
+    });
+
+    it("allows command-level silent overrides", async () => {
+      const tasks: TaskRegistry = {
+        build: { cmds: [{ cmd: "echo hello", silent: true }] },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await runner.run("build");
+
+      expect(process.stdout.write).not.toHaveBeenCalledWith(
+        "\u001B[1m\u001B[36mtask: [build] echo hello\u001B[0m\n",
+      );
+    });
+
+    it("rejects when a command exits non-zero", async () => {
+      vi.mocked(childProcess.spawn).mockImplementation(() => {
+        const child = createMockChildProcess();
+        process.nextTick(() => child.emit("close", 1, null));
+        return child as unknown as ReturnType<typeof childProcess.spawn>;
+      });
+
+      const tasks: TaskRegistry = {
+        build: { cmds: ["exit 1"] },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await expect(runner.run("build")).rejects.toThrow(
+        "Command failed with exit code 1: exit 1",
+      );
+    });
+  });
+
+  describe("interactive tasks", () => {
+    it("runs task-level interactive commands with inherited stdio", async () => {
+      const tasks: TaskRegistry = {
+        console: { interactive: true, cmds: ["node"] },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await runner.run("console");
+
+      expect(childProcess.spawn).toHaveBeenCalledWith(
+        "node",
+        expect.objectContaining({
+          cwd: "/project",
+          shell: true,
+          stdio: "inherit",
+        }),
+      );
+    });
+
+    it("runs command-level interactive commands with inherited stdio", async () => {
+      const tasks: TaskRegistry = {
+        console: { cmds: [{ cmd: "node", interactive: true }] },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await runner.run("console");
+
+      expect(childProcess.spawn).toHaveBeenCalledWith(
+        "node",
+        expect.objectContaining({ stdio: "inherit" }),
+      );
+    });
+  });
+
+  describe("preconditions", () => {
+    it("runs commands when all preconditions pass", async () => {
+      const tasks: TaskRegistry = {
+        deploy: {
+          preconditions: ['test -n "$DATABASE_URL"'],
+          cmds: ["echo deploy"],
+        },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await runner.run("deploy");
+
+      expect(childProcess.spawn).toHaveBeenNthCalledWith(
+        1,
+        'test -n "$DATABASE_URL"',
+        expect.objectContaining({ stdio: ["ignore", "ignore", "ignore"] }),
+      );
+      expect(childProcess.spawn).toHaveBeenNthCalledWith(
+        2,
+        "echo deploy",
+        expect.any(Object),
+      );
+    });
+
+    it("fails with a custom message when a precondition fails", async () => {
+      vi.mocked(childProcess.spawn).mockImplementationOnce(() => {
+        const child = createMockChildProcess();
+        process.nextTick(() => child.emit("close", 1, null));
+        return child as unknown as ReturnType<typeof childProcess.spawn>;
+      });
+
+      const tasks: TaskRegistry = {
+        deploy: {
+          preconditions: [
+            {
+              sh: "test -f ./app",
+              msg: "Application binary missing",
+            },
+          ],
+          cmds: ["echo deploy"],
+        },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await expect(runner.run("deploy")).rejects.toThrow(
+        "Application binary missing",
+      );
+      expect(childProcess.spawn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("status checks", () => {
+    it("skips commands when status checks pass", async () => {
+      const tasks: TaskRegistry = {
+        install: {
+          status: ["test -d node_modules"],
+          cmds: ["pnpm install"],
+        },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await runner.run("install");
+
+      expect(childProcess.spawn).toHaveBeenCalledTimes(1);
+      expect(childProcess.spawn).toHaveBeenCalledWith(
+        "test -d node_modules",
+        expect.objectContaining({ stdio: ["ignore", "ignore", "ignore"] }),
+      );
+    });
+
+    it("runs commands when a status check fails", async () => {
+      vi.mocked(childProcess.spawn)
+        .mockImplementationOnce(() => {
+          const child = createMockChildProcess();
+          process.nextTick(() => child.emit("close", 1, null));
+          return child as unknown as ReturnType<typeof childProcess.spawn>;
+        })
+        .mockImplementationOnce(() => {
+          const child = createMockChildProcess();
+          process.nextTick(() => child.emit("close", 0, null));
+          return child as unknown as ReturnType<typeof childProcess.spawn>;
+        });
+
+      const tasks: TaskRegistry = {
+        install: {
+          status: ["test -d node_modules"],
+          cmds: ["pnpm install"],
+        },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await runner.run("install");
+
+      expect(childProcess.spawn).toHaveBeenNthCalledWith(
+        2,
+        "pnpm install",
+        expect.any(Object),
+      );
+    });
+
+    it("runs commands with force even when status checks would pass", async () => {
+      const tasks: TaskRegistry = {
+        install: {
+          status: ["test -d node_modules"],
+          cmds: ["pnpm install"],
+        },
+      };
+
+      const runner = new TaskRunner(tasks, "/project", { force: true });
+      await runner.run("install");
+
+      expect(childProcess.spawn).toHaveBeenCalledTimes(1);
+      expect(childProcess.spawn).toHaveBeenCalledWith(
+        "pnpm install",
+        expect.any(Object),
       );
     });
   });
@@ -205,35 +465,106 @@ describe("TaskRunner", () => {
   });
 
   describe("nested tasks", () => {
-    it("executes nested task references", () => {
+    it("executes nested task references", async () => {
       const tasks: TaskRegistry = {
         build: { cmds: ["echo build"] },
         deploy: { cmds: [{ task: "build" }, "echo deploy"] },
       };
 
       const runner = new TaskRunner(tasks, "/project");
-      runner.run("deploy");
+      await runner.run("deploy");
 
-      expect(childProcess.execSync).toHaveBeenNthCalledWith(
+      expect(childProcess.spawn).toHaveBeenNthCalledWith(
         1,
         "echo build",
         expect.any(Object),
       );
-      expect(childProcess.execSync).toHaveBeenNthCalledWith(
+      expect(childProcess.spawn).toHaveBeenNthCalledWith(
         2,
         "echo deploy",
         expect.any(Object),
       );
     });
 
-    it("detects circular references", () => {
+    it("passes vars to nested task references", async () => {
+      const tasks: TaskRegistry = {
+        build: {
+          params: [{ name: "target", required: true }],
+          cmds: ["echo {{target}}"],
+        },
+        deploy: {
+          cmds: [{ task: "build", vars: { target: "production" } }],
+        },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await runner.run("deploy");
+
+      expect(childProcess.spawn).toHaveBeenCalledWith(
+        "echo production",
+        expect.any(Object),
+      );
+    });
+
+    it("interpolates nested task vars from the parent context", async () => {
+      const tasks: TaskRegistry = {
+        build: {
+          params: [{ name: "target", required: true }],
+          cmds: ["echo {{target}}"],
+        },
+        deploy: {
+          params: [{ name: "env", required: true }],
+          cmds: [{ task: "build", vars: { target: "{{env}}" } }],
+        },
+      };
+
+      const runner = new TaskRunner(tasks, "/project", {
+        params: { named: { env: "staging" }, rest: [] },
+      });
+      await runner.run("deploy");
+
+      expect(childProcess.spawn).toHaveBeenCalledWith(
+        "echo staging",
+        expect.any(Object),
+      );
+    });
+
+    it("allows nested task references to be silent", async () => {
+      const tasks: TaskRegistry = {
+        build: { cmds: ["echo build"] },
+        deploy: { cmds: [{ task: "build", silent: true }] },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await runner.run("deploy");
+
+      expect(process.stdout.write).not.toHaveBeenCalledWith(
+        "\u001B[1m\u001B[36mtask: [build] echo build\u001B[0m\n",
+      );
+    });
+
+    it("detects circular references", async () => {
       const tasks: TaskRegistry = {
         a: { cmds: [{ task: "b" }] },
         b: { cmds: [{ task: "a" }] },
       };
 
       const runner = new TaskRunner(tasks, "/project");
-      expect(() => runner.run("a")).toThrow("Circular task reference detected");
+      await expect(runner.run("a")).rejects.toThrow(
+        "Circular task reference detected",
+      );
+    });
+
+    it("throws TaskNotFoundError for missing nested task references", async () => {
+      const tasks: TaskRegistry = {
+        deploy: { cmds: [{ task: "build" }] },
+      };
+
+      const runner = new TaskRunner(tasks, "/project");
+      await expect(runner.run("deploy")).rejects.toThrow(TaskNotFoundError);
+      await expect(runner.run("deploy")).rejects.toThrow(
+        "Task not found: build. Check task names or aliases",
+      );
     });
   });
 });

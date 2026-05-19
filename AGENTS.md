@@ -8,19 +8,25 @@ A lightweight dev environment runner. Define your local dev setup in a single `z
 
 ## Documentation
 
-* **[Usage](docs/usage.md)** — Comprehensive docs, keep this up to date
+* **[Docs site / Quick Start](docs/index.md)** — VitePress entrypoint and primary user-facing quick start; update this first for important user workflows
+
+* **[Commands](docs/commands.md)**, **[Configuration](docs/configuration.md)**, **[Services](docs/services.md)**, and **[Tasks](docs/tasks.md)** — Comprehensive command and `zap.yaml` field reference; keep these in sync with supported behavior
 
 * **[CLI Development](docs/cli-development.md)** — To see how we run/test/build the CLI
 
 * **[macOS Development](docs/macos-development.md)** — To see how we build/test the menu bar app
 
-* **[Docs site](docs/index.md)** — VitePress entrypoint; raw agent docs are generated as `/llms.txt` and `/llms-full.txt`
+Raw agent docs are generated automatically from the docs website Markdown files
+as `/llms.txt` and `/llms-full.txt`.
 
 ## Documentation Freshness (Required)
 
 * Any behavior change must include doc updates in the same PR.
 
-* If `zap.yaml` behavior or supported fields change, update `docs/usage.md` before finishing.
+* If `zap.yaml` behavior or supported fields change, update the docs website before finishing:
+  * Update `docs/index.md` when the change affects a common quick-start workflow.
+  * Update `docs/commands.md`, `docs/configuration.md`, `docs/services.md`, or `docs/tasks.md` for full reference details.
+  * Do not hand-edit `docs/public/llms.txt` or `docs/public/llms-full.txt`; regenerate them through the docs build/raw script.
 
 * If release/development workflow changes, update `docs/releases.md`, `docs/cli-development.md`, and `docs/macos-development.md`.
 

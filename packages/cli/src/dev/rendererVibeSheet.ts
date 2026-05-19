@@ -21,7 +21,7 @@ function main(): void {
     projectName: "zapper-playground",
     projectRoot: process.cwd(),
     envFiles: [],
-    environments: ["default", "staging", "sandbox"],
+    environments: [],
     gitMethod: "ssh",
     taskDelimiters: ["{{", "}}"],
     instanceKey: "default",
@@ -145,7 +145,6 @@ function main(): void {
   ];
 
   const profiles = ["default", "dev", "ops"];
-  const environments = ["default", "staging", "qa"];
 
   section("Renderer Vibe Sheet");
 
@@ -171,13 +170,6 @@ function main(): void {
 
   section("Profiles");
   renderer.log.report(renderer.profiles.toText(profiles));
-  renderer.log.report(renderer.profiles.pickerText(profiles, "dev"));
-
-  section("Environments");
-  renderer.log.report(renderer.environments.toText(environments));
-  renderer.log.report(
-    renderer.environments.pickerText(environments, "staging"),
-  );
 
   section("Resource List View");
   renderer.log.report(

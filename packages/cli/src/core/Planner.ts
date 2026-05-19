@@ -8,17 +8,6 @@ import { buildServiceName } from "../utils/nameBuilder";
 export class Planner {
   constructor(private readonly config: ZapperConfig) {}
 
-  private shouldRunWithProfile(
-    serviceProfiles: string[] | undefined,
-    activeProfile?: string,
-  ): boolean {
-    if (!Array.isArray(serviceProfiles) || serviceProfiles.length === 0) {
-      return true;
-    }
-    if (!activeProfile) return false;
-    return serviceProfiles.includes(activeProfile);
-  }
-
   private getProcesses(): Process[] {
     const { native, processes } = this.config;
 
@@ -113,41 +102,20 @@ export class Planner {
     };
   }
 
-  private filterByProfile(
-    processes: Process[],
-    containers: Array<[string, Container]>,
-    activeProfile?: string,
-  ): { processes: Process[]; containers: Array<[string, Container]> } {
-    return {
-      processes: processes.filter((p) =>
-        this.shouldRunWithProfile(p.profiles, activeProfile),
-      ),
-      containers: containers.filter(([, c]) =>
-        this.shouldRunWithProfile(c.profiles, activeProfile),
-      ),
-    };
-  }
-
   async plan(
     op: "start" | "stop" | "restart",
     targets: string[] | undefined,
     projectName: string,
     forceStart = false,
-    activeProfile?: string,
     resolveTargetDependencies = true,
   ): Promise<ActionPlan> {
     if (op === "restart") {
-      const filteredServices = this.filterByProfile(
-        this.getProcesses(),
-        this.getContainers(),
-        activeProfile,
-      );
       const selectedTargets =
         targets && targets.length > 0
           ? targets
           : [
-              ...filteredServices.processes.map((p) => p.name as string),
-              ...filteredServices.containers.map(([name]) => name),
+              ...this.getProcesses().map((p) => p.name as string),
+              ...this.getContainers().map(([name]) => name),
             ];
 
       const stopPlan = await this.plan("stop", selectedTargets, projectName);
@@ -156,7 +124,6 @@ export class Planner {
         selectedTargets,
         projectName,
         true,
-        undefined,
         false,
       );
 
@@ -214,13 +181,8 @@ export class Planner {
           );
         }
       } else {
-        const filtered = this.filterByProfile(
-          allProcesses,
-          allContainers,
-          activeProfile,
-        );
-        selectedProcesses = filtered.processes;
-        selectedContainers = filtered.containers;
+        selectedProcesses = allProcesses;
+        selectedContainers = allContainers;
       }
 
       const servicesToStart = new Set<string>();
@@ -235,27 +197,11 @@ export class Planner {
         }
       }
 
-      let stopWaves: ExecutionWave[] = [];
-      if (!targets) {
-        stopWaves = await this.planProfileStops(
-          projectName,
-          activeProfile,
-          allProcesses,
-          allContainers,
-          hasPm2Process,
-          isDockerRunning,
-        );
-      }
-
       if (servicesToStart.size === 0) {
-        return { waves: stopWaves };
+        return { waves: [] };
       }
 
       const waves = graph.computeStartWaves(servicesToStart);
-
-      if (!targets) {
-        return { waves: [...stopWaves, ...waves] };
-      }
 
       return { waves };
     }
@@ -284,47 +230,5 @@ export class Planner {
     }
 
     return { waves: this.buildStopWave(servicesToStop) };
-  }
-
-  private async planProfileStops(
-    projectName: string,
-    activeProfile: string | undefined,
-    allProcesses: Process[],
-    allContainers: Array<[string, Container]>,
-    hasPm2Process: (name: string) => boolean,
-    isDockerRunning: (name: string) => Promise<boolean>,
-  ): Promise<ExecutionWave[]> {
-    // Collect services that need to be stopped (not in active profile but currently running)
-    const servicesToStop = new Set<string>();
-
-    // Find services that should be stopped (not in active profile but running)
-    for (const process of allProcesses) {
-      const shouldRun = this.shouldRunWithProfile(
-        process.profiles,
-        activeProfile,
-      );
-
-      if (!shouldRun && hasPm2Process(process.name as string)) {
-        servicesToStop.add(process.name as string);
-      }
-    }
-
-    for (const [name, container] of allContainers) {
-      const shouldRun = this.shouldRunWithProfile(
-        container.profiles,
-        activeProfile,
-      );
-
-      if (!shouldRun && (await isDockerRunning(name))) {
-        servicesToStop.add(name);
-      }
-    }
-
-    // Use DependencyGraph to compute stop waves with proper dependency ordering
-    if (servicesToStop.size === 0) {
-      return [];
-    }
-
-    return this.buildStopWave(servicesToStop);
   }
 }

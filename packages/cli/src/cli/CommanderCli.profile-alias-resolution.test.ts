@@ -24,7 +24,7 @@ describe("CommanderCli - Profile Alias Resolution", () => {
       environments: [],
       links: [],
       instanceKey: "default",
-      state: { activeProfile: undefined },
+      state: {},
       projectRoot: "/test",
     };
 

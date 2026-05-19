@@ -18,7 +18,7 @@ export default defineConfig({
     },
     nav: [
       { text: "Quick Start", link: "/" },
-      { text: "Reference", link: "/usage" },
+      { text: "Commands", link: "/commands" },
       { text: "Raw", link: "/llms-full.txt" },
     ],
     sidebar: [
@@ -26,7 +26,11 @@ export default defineConfig({
         text: "Using Zapper",
         items: [
           { text: "Quick Start", link: "/" },
-          { text: "Reference", link: "/usage" },
+          { text: "Commands", link: "/commands" },
+          { text: "Configuration", link: "/configuration" },
+          { text: "Services", link: "/services" },
+          { text: "Tasks", link: "/tasks" },
+          { text: "Project Metadata", link: "/project-metadata" },
           { text: "Instances", link: "/instances" },
           { text: "Resource Management", link: "/resource-management" },
           { text: "Global Registry Design", link: "/global-registry" },

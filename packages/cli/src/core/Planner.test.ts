@@ -49,7 +49,7 @@ function hasAction(plan: ActionPlan, type: "start" | "stop"): boolean {
   return plan.waves.some((w) => w.actions.some((a) => a.type === type));
 }
 
-describe("Planner - Profile-based StartAll", () => {
+describe("Planner - start/stop/restart planning", () => {
   let planner: Planner;
   let config: ZapperConfig;
 
@@ -60,22 +60,22 @@ describe("Planner - Profile-based StartAll", () => {
       project: "test-project",
       native: {
         api: { cmd: "npm start" },
-        frontend: { cmd: "npm run dev", profiles: ["dev"] },
-        worker: { cmd: "npm run worker", profiles: ["prod"] },
-        monitor: { cmd: "npm run monitor", profiles: ["prod", "monitoring"] },
+        frontend: { cmd: "npm run dev" },
+        worker: { cmd: "npm run worker" },
+        monitor: { cmd: "npm run monitor" },
       },
       docker: {
         cache: { image: "redis:7" },
-        database: { image: "postgres:15", profiles: ["dev", "prod"] },
-        analytics: { image: "elasticsearch:8", profiles: ["prod"] },
+        database: { image: "postgres:15" },
+        analytics: { image: "elasticsearch:8" },
       },
     };
 
     planner = new Planner(config);
   });
 
-  describe("startAll with dev profile", () => {
-    it("should start services with no profile + dev profile, stop prod-only services", async () => {
+  describe("startAll", () => {
+    it("should start every configured service that is not already running", async () => {
       mockPm2Manager.listProcesses.mockResolvedValue([
         createMockProcessInfo("zap.test-project.api", "stopped"),
         createMockProcessInfo("zap.test-project.frontend", "stopped"),
@@ -90,13 +90,7 @@ describe("Planner - Profile-based StartAll", () => {
           createMockDockerContainer("zap.test-project.analytics", "running"),
         );
 
-      const plan = await planner.plan(
-        "start",
-        undefined,
-        "test-project",
-        false,
-        "dev",
-      );
+      const plan = await planner.plan("start", undefined, "test-project");
       const actions = flattenActions(plan);
 
       expect(actions).toContainEqual({
@@ -110,16 +104,6 @@ describe("Planner - Profile-based StartAll", () => {
         name: "frontend",
       });
       expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "native",
-        name: "worker",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "native",
-        name: "monitor",
-      });
-      expect(actions).toContainEqual({
         type: "start",
         serviceType: "docker",
         name: "cache",
@@ -129,14 +113,12 @@ describe("Planner - Profile-based StartAll", () => {
         serviceType: "docker",
         name: "database",
       });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "docker",
-        name: "analytics",
-      });
+      expect(actions.some((a) => a.name === "worker")).toBe(false);
+      expect(actions.some((a) => a.name === "monitor")).toBe(false);
+      expect(actions.some((a) => a.name === "analytics")).toBe(false);
     });
 
-    it("should handle forceStart correctly with active profile", async () => {
+    it("should force start all configured services", async () => {
       mockPm2Manager.listProcesses.mockResolvedValue([
         createMockProcessInfo("zap.test-project.api", "online"),
         createMockProcessInfo("zap.test-project.frontend", "stopped"),
@@ -152,13 +134,7 @@ describe("Planner - Profile-based StartAll", () => {
           createMockDockerContainer("zap.test-project.database", "running"),
         );
 
-      const plan = await planner.plan(
-        "start",
-        undefined,
-        "test-project",
-        true,
-        "dev",
-      );
+      const plan = await planner.plan("start", undefined, "test-project", true);
       const actions = flattenActions(plan);
 
       expect(actions).toContainEqual({
@@ -193,13 +169,7 @@ describe("Planner - Profile-based StartAll", () => {
 
       mockDockerManager.getContainerInfo.mockResolvedValue(null);
 
-      const plan = await planner.plan(
-        "start",
-        undefined,
-        "test-project",
-        false,
-        "dev",
-      );
+      const plan = await planner.plan("start", undefined, "test-project");
       const actions = flattenActions(plan);
 
       expect(actions).toContainEqual({
@@ -214,6 +184,16 @@ describe("Planner - Profile-based StartAll", () => {
       });
       expect(actions).toContainEqual({
         type: "start",
+        serviceType: "native",
+        name: "worker",
+      });
+      expect(actions).toContainEqual({
+        type: "start",
+        serviceType: "native",
+        name: "monitor",
+      });
+      expect(actions).toContainEqual({
+        type: "start",
         serviceType: "docker",
         name: "cache",
       });
@@ -222,138 +202,22 @@ describe("Planner - Profile-based StartAll", () => {
         serviceType: "docker",
         name: "database",
       });
-    });
-  });
-
-  describe("startAll without active profile", () => {
-    it("should start only unprofiled services and stop profiled services when no profile is active", async () => {
-      mockPm2Manager.listProcesses.mockResolvedValue([
-        createMockProcessInfo("zap.test-project.api", "stopped"),
-        createMockProcessInfo("zap.test-project.frontend", "online"),
-        createMockProcessInfo("zap.test-project.worker", "online"),
-        createMockProcessInfo("zap.test-project.monitor", "online"),
-      ]);
-
-      mockDockerManager.getContainerInfo
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(
-          createMockDockerContainer("zap.test-project.database", "running"),
-        )
-        .mockResolvedValueOnce(
-          createMockDockerContainer("zap.test-project.analytics", "running"),
-        );
-
-      const plan = await planner.plan("start", undefined, "test-project");
-      const actions = flattenActions(plan);
-
-      // With no active profile, only unprofiled services should run.
-      // api is unprofiled and stopped, so it should be started.
-      expect(actions).toContainEqual({
-        type: "start",
-        serviceType: "native",
-        name: "api",
-      });
-      // cache is unprofiled and not running, so it should be started.
       expect(actions).toContainEqual({
         type: "start",
         serviceType: "docker",
-        name: "cache",
-      });
-      // Profiled services should be stopped if currently running.
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "native",
-        name: "frontend",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "native",
-        name: "worker",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "native",
-        name: "monitor",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "docker",
-        name: "database",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "docker",
         name: "analytics",
       });
-    });
-
-    it("should still stop profiled services when unprofiled services are already running", async () => {
-      mockPm2Manager.listProcesses.mockResolvedValue([
-        createMockProcessInfo("zap.test-project.api", "online"),
-        createMockProcessInfo("zap.test-project.frontend", "online"),
-        createMockProcessInfo("zap.test-project.worker", "online"),
-        createMockProcessInfo("zap.test-project.monitor", "online"),
-      ]);
-
-      mockDockerManager.getContainerInfo
-        .mockResolvedValueOnce(
-          createMockDockerContainer("zap.test-project.cache", "running"),
-        )
-        .mockResolvedValueOnce(
-          createMockDockerContainer("zap.test-project.database", "running"),
-        )
-        .mockResolvedValueOnce(
-          createMockDockerContainer("zap.test-project.analytics", "running"),
-        );
-
-      const plan = await planner.plan("start", undefined, "test-project");
-      const actions = flattenActions(plan);
-
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "native",
-        name: "frontend",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "native",
-        name: "worker",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "native",
-        name: "monitor",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "docker",
-        name: "database",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "docker",
-        name: "analytics",
-      });
-      expect(actions).not.toContainEqual(
-        expect.objectContaining({ type: "start" }),
-      );
     });
   });
 
   describe("targeted operations", () => {
-    it("should ignore profile filtering when targeting specific services", async () => {
+    it("should start targeted services", async () => {
       mockPm2Manager.listProcesses.mockResolvedValue([
         createMockProcessInfo("zap.test-project.api", "online"),
         createMockProcessInfo("zap.test-project.frontend", "stopped"),
       ]);
 
-      const plan = await planner.plan(
-        "start",
-        ["frontend"],
-        "test-project",
-        false,
-        "prod",
-      );
+      const plan = await planner.plan("start", ["frontend"], "test-project");
       const actions = flattenActions(plan);
 
       expect(actions).toContainEqual({
@@ -363,19 +227,13 @@ describe("Planner - Profile-based StartAll", () => {
       });
     });
 
-    it("should stop targeted services regardless of profile", async () => {
+    it("should stop targeted services", async () => {
       mockPm2Manager.listProcesses.mockResolvedValue([
         createMockProcessInfo("zap.test-project.api", "stopped"),
         createMockProcessInfo("zap.test-project.frontend", "online"),
       ]);
 
-      const plan = await planner.plan(
-        "stop",
-        ["frontend"],
-        "test-project",
-        false,
-        "dev",
-      );
+      const plan = await planner.plan("stop", ["frontend"], "test-project");
       const actions = flattenActions(plan);
 
       expect(actions).toContainEqual({
@@ -387,18 +245,12 @@ describe("Planner - Profile-based StartAll", () => {
   });
 
   describe("restart operations", () => {
-    it("should restart services with profile filtering", async () => {
+    it("should restart all services", async () => {
       mockPm2Manager.listProcesses.mockResolvedValue([
         createMockProcessInfo("zap.test-project.api", "online"),
       ]);
 
-      const plan = await planner.plan(
-        "restart",
-        undefined,
-        "test-project",
-        false,
-        "dev",
-      );
+      const plan = await planner.plan("restart", undefined, "test-project");
 
       expect(plan.waves.length).toBeGreaterThan(0);
       expect(hasAction(plan, "stop")).toBe(true);
@@ -448,68 +300,6 @@ describe("Planner - Profile-based StartAll", () => {
       expect(
         actions.some((a) => a.name === "database" && a.type === "start"),
       ).toBe(false);
-    });
-  });
-
-  describe("edge cases", () => {
-    it("should handle services with multiple profiles", async () => {
-      mockPm2Manager.listProcesses.mockResolvedValue([
-        createMockProcessInfo("zap.test-project.api", "online"),
-        createMockProcessInfo("zap.test-project.frontend", "online"),
-        createMockProcessInfo("zap.test-project.worker", "stopped"),
-        createMockProcessInfo("zap.test-project.monitor", "stopped"),
-      ]);
-
-      mockDockerManager.getContainerInfo
-        .mockResolvedValueOnce(
-          createMockDockerContainer("zap.test-project.cache", "running"),
-        )
-        .mockResolvedValueOnce(
-          createMockDockerContainer("zap.test-project.database", "running"),
-        )
-        .mockResolvedValueOnce(
-          createMockDockerContainer("zap.test-project.analytics", "running"),
-        );
-
-      const plan = await planner.plan(
-        "start",
-        undefined,
-        "test-project",
-        true,
-        "monitoring",
-      );
-      const actions = flattenActions(plan);
-
-      expect(actions).toContainEqual({
-        type: "start",
-        serviceType: "native",
-        name: "api",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "native",
-        name: "frontend",
-      });
-      expect(actions).toContainEqual({
-        type: "start",
-        serviceType: "native",
-        name: "monitor",
-      });
-      expect(actions).toContainEqual({
-        type: "start",
-        serviceType: "docker",
-        name: "cache",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "docker",
-        name: "database",
-      });
-      expect(actions).toContainEqual({
-        type: "stop",
-        serviceType: "docker",
-        name: "analytics",
-      });
     });
   });
 });

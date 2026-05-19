@@ -489,7 +489,7 @@ should wait until the command/env controls prove insufficient.
    - Let the Projects tab consume registry output.
    - Let the Orphaned Resources tab consume resource audit output.
 8. Update docs.
-   - Document implemented commands in `docs/usage.md`.
+   - Document implemented commands in the docs website command reference.
    - Keep this design doc updated as decisions become behavior.
 
 ## Risks And Mitigations

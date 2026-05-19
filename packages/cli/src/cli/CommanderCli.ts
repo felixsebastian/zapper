@@ -18,6 +18,7 @@ import {
   TaskCommand,
   ProfilesCommand,
   StateCommand,
+  StackCommand,
   CheckoutCommand,
   PullCommand,
   GitStatusCommand,
@@ -64,15 +65,18 @@ function parseTaskArgs(rawArgv: string[], taskName: string): TaskParams {
     separatorIdx >= 0 ? argsAfterTask.slice(separatorIdx + 1) : [];
 
   // Parse named args
+  const reservedTaskOptions = new Set(["force", "json", "list-params"]);
   for (const arg of namedArgs) {
     if (arg.startsWith("--")) {
       const eqIdx = arg.indexOf("=");
       if (eqIdx !== -1) {
         const key = arg.slice(2, eqIdx);
+        if (reservedTaskOptions.has(key)) continue;
         const value = arg.slice(eqIdx + 1);
         named[key] = value;
       } else {
         const key = arg.slice(2);
+        if (reservedTaskOptions.has(key)) continue;
         named[key] = "true";
       }
     }
@@ -105,8 +109,8 @@ export class CommanderCli {
     this.commandHandlers.set("clone", new CloneCommand());
     this.commandHandlers.set("task", new TaskCommand());
     this.commandHandlers.set("profile", new ProfilesCommand());
-    this.commandHandlers.set("environment", new EnvCommand());
     this.commandHandlers.set("state", new StateCommand());
+    this.commandHandlers.set("stack", new StackCommand());
     this.commandHandlers.set("git:checkout", new CheckoutCommand());
     this.commandHandlers.set("git:pull", new PullCommand());
     this.commandHandlers.set("git:status", new GitStatusCommand());
@@ -133,6 +137,7 @@ export class CommanderCli {
 
     this.program
       .option("--config <file>", "Use a specific config file")
+      .option("--profile <name>", "Use a stack profile for this invocation")
       .option("--instance <name>", "Target a named instance (default: default)")
       .option("-v, --verbose", "Increase logging verbosity")
       .option("-q, --quiet", "Reduce logging output")
@@ -272,12 +277,20 @@ export class CommanderCli {
       });
 
     this.program
-      .command("volume <subcommand>")
-      .description("Manage Zapper-generated Docker volumes (prune, reset)")
+      .command("volume <subcommand> [services...]")
+      .description(
+        "Manage Zapper-generated Docker volumes (list, prune, reset)",
+      )
+      .option("--managed", "Only list Zapper-managed generated volumes")
+      .option("--id-only", "Only print Docker volume names")
       .option("-y, --force", "Force the operation")
       .option("-j, --json", "Output command result as minified JSON")
-      .action(async (subcommand, options, command) => {
-        await this.executeCommand("volume", subcommand, command);
+      .action(async (subcommand, services, options, command) => {
+        await this.executeCommand(
+          "volume",
+          [subcommand, ...(services || [])],
+          command,
+        );
       });
 
     this.program
@@ -306,6 +319,7 @@ export class CommanderCli {
       .argument("[task]", "Task name to run")
       .option("-j, --json", "Output task list as minified JSON")
       .option("--list-params", "List parameters for the specified task")
+      .option("-f, --force", "Run task even when status checks pass")
       .allowUnknownOption()
       .allowExcessArguments()
       .action(async (task, options, command) => {
@@ -313,38 +327,15 @@ export class CommanderCli {
       });
 
     this.program
-      .command("profile")
+      .command("profile [action] [name]")
       .alias("p")
-      .description(
-        "Manage profiles: show interactive picker, enable a profile, list all profiles, or disable active profile",
-      )
-      .argument("[profile]", "Profile name to enable")
-      .option("--list", "List all available profiles")
-      .option("--disable", "Disable the currently active profile")
-      .option(
-        "-j, --json",
-        "Output profile list as minified JSON (use with --list)",
-      )
-      .action(async (profile, options, command) => {
-        await this.executeCommand("profile", profile, command);
-      });
-
-    this.program
-      .command("environment")
-      .alias("envset")
-      .description(
-        "Manage environments: show picker, enable an environment, list all environments, or disable active environment",
-      )
-      .argument("[environment]", "Environment name to enable")
-      .option("--list", "List all available environments")
-      .option("--disable", "Disable the currently active environment")
-      .option(
-        "-j, --json",
-        "Output environment list as minified JSON (use with --list)",
-      )
-      .option("--service <name>", "Show env vars for a service (env command)")
-      .action(async (environment, options, command) => {
-        await this.executeCommand("environment", environment, command);
+      .description("Manage stack profiles")
+      .option("-j, --json", "Output as minified JSON")
+      .action(async (action, name, options, command) => {
+        const service = [action, name].filter(
+          (part): part is string => typeof part === "string" && part.length > 0,
+        );
+        await this.executeCommand("profile", service, command);
       });
 
     this.program
@@ -353,6 +344,14 @@ export class CommanderCli {
       .option("-j, --json", "Output state as minified JSON")
       .action(async (options, command) => {
         await this.executeCommand("state", undefined, command);
+      });
+
+    this.program
+      .command("stack [action]")
+      .description("Inspect the selected stack id and known profile stacks")
+      .option("-j, --json", "Output as minified JSON")
+      .action(async (action, options, command) => {
+        await this.executeCommand("stack", action, command);
       });
 
     const gitCmd = this.program
@@ -449,15 +448,8 @@ export class CommanderCli {
 
     this.program
       .command("env")
-      .description(
-        "Manage environments or show resolved environment variables for a service",
-      )
-      .argument(
-        "[name]",
-        "Environment to enable or service to show environment variables for",
-      )
-      .option("--list", "List all available environments")
-      .option("--disable", "Disable the currently active environment")
+      .description("Show resolved environment variables for a service")
+      .argument("[service]", "Service to show environment variables for")
       .option("--service <name>", "Show env vars for a service")
       .option("-j, --json", "Output as minified JSON")
       .action(async (service, options, command) => {

@@ -89,4 +89,4 @@ pm2 list
 - Zapper configures PM2 with `autorestart: true` but limits `max_restarts: 2` for faster feedback in local development
 - The process tree typically looks like: PM2 -> bash wrapper -> pnpm -> tsx/vite/next -> node/esbuild
 - When PM2 kills a process, only the bash wrapper receives the signal. Children must be killed explicitly.
-- The VS Code extension spawns 5 commands per project per poll cycle: `status --json`, `task --json`, `profile --list --json`, `state`, `config --pretty`
+- The VS Code extension spawns 5 commands per project per poll cycle: `status --json`, `task --json`, `profile list --json`, `state`, `config --pretty`

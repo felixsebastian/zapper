@@ -31,31 +31,17 @@ export class StateManager {
   }
 
   /**
-   * Set the active profile and reload config.
+   * Set the selected stack profile and reload config.
    */
-  async setActiveProfile(profileName: string): Promise<void> {
-    await this.updateStateAndReload({ activeProfile: profileName });
+  async setSelectedProfile(profileName: string): Promise<void> {
+    await this.updateStateAndReload({ selectedProfile: profileName });
   }
 
   /**
-   * Clear the active profile and reload config.
+   * Clear the selected stack profile and reload config.
    */
-  async clearActiveProfile(): Promise<void> {
-    await this.updateStateAndReload({ activeProfile: undefined });
-  }
-
-  /**
-   * Set the active environment and reload config.
-   */
-  async setActiveEnvironment(environmentName: string): Promise<void> {
-    await this.updateStateAndReload({ activeEnvironment: environmentName });
-  }
-
-  /**
-   * Clear the active environment and reload config.
-   */
-  async clearActiveEnvironment(): Promise<void> {
-    await this.updateStateAndReload({ activeEnvironment: undefined });
+  async clearSelectedProfile(): Promise<void> {
+    await this.updateStateAndReload({ selectedProfile: undefined });
   }
 
   /**

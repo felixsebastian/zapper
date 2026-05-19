@@ -152,10 +152,10 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       await cleanupPm2Processes(testProjectName);
     }
     if (tempConfigPath && fs.existsSync(tempConfigPath)) {
-      // Disable any active profiles before cleanup
+      // Reset any selected profile before cleanup.
       try {
         runZapCommand(
-          `profile --disable`,
+          `profile reset`,
           fixtureDir,
           `zap-${testProjectName}.yaml`,
         );
@@ -178,7 +178,10 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
       `project: ${testProjectName}`,
     );
     if (options?.stripProfiles) {
-      uniqueConfig = uniqueConfig.replace(/\n\s+profiles:\s+\[[^\]]+\]/g, "");
+      uniqueConfig = uniqueConfig.replace(
+        /\nprofiles:\n(?: {2}.+\n)+(?=native:)/,
+        "\n",
+      );
     }
     fs.writeFileSync(tempConfigPath, uniqueConfig);
   }
@@ -408,10 +411,15 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
     it("should start only dev-profiled services with profile management", async () => {
       setupTempConfig();
 
-      // Enable dev profile first
-      runZapCommand(`profile dev`, fixtureDir, `zap-${testProjectName}.yaml`, {
-        timeout: 45000,
-      });
+      // Select dev profile first.
+      runZapCommand(
+        `profile use dev`,
+        fixtureDir,
+        `zap-${testProjectName}.yaml`,
+        {
+          timeout: 45000,
+        },
+      );
 
       // Start services (should only start dev-profiled ones)
       runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {
@@ -436,10 +444,15 @@ describe("E2E: Multi-Service Project with Dependencies and Profiles", () => {
     it("should start only prod-profiled services with profile management", async () => {
       setupTempConfig();
 
-      // Enable prod profile first
-      runZapCommand(`profile prod`, fixtureDir, `zap-${testProjectName}.yaml`, {
-        timeout: 45000,
-      });
+      // Select prod profile first.
+      runZapCommand(
+        `profile use prod`,
+        fixtureDir,
+        `zap-${testProjectName}.yaml`,
+        {
+          timeout: 45000,
+        },
+      );
 
       // Start services (should only start prod-profiled ones)
       runZapCommand(`up`, fixtureDir, `zap-${testProjectName}.yaml`, {

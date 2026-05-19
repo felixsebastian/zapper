@@ -1,5 +1,15 @@
 project: multi-service-test
 env: [.env]
+profiles:
+  default:
+    env_files: [.env]
+    services: [database, api]
+  dev:
+    env_files: [.env]
+    services: [database, api, frontend]
+  prod:
+    env_files: [.env]
+    services: [database, api, worker]
 native:
   database:
     cmd: 'node -e "console.log(\"Database started\"); setInterval(() => { console.log(\"Database heartbeat\"); }, 5000);"'
@@ -18,7 +28,6 @@ native:
     env: "*"
     depends_on:
       - api
-    profiles: [dev]
     healthcheck: 5
 
   worker:
@@ -27,4 +36,3 @@ native:
     depends_on:
       - database
       - api
-    profiles: [prod]

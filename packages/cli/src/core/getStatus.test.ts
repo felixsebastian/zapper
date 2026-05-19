@@ -50,10 +50,7 @@ function createMockDockerContainer(
   };
 }
 
-function createMockContext(
-  projectName: string = "test-project",
-  activeProfile?: string,
-): Context {
+function createMockContext(projectName: string = "test-project"): Context {
   return {
     projectName,
     projectRoot: "/test/project",
@@ -66,7 +63,6 @@ function createMockContext(
         cmd: "npm start",
         aliases: ["backend"],
         healthcheck: 10,
-        profiles: ["dev"],
       },
       {
         name: "worker",
@@ -77,7 +73,6 @@ function createMockContext(
         name: "frontend",
         cmd: "npm run dev",
         healthcheck: "http://localhost:3000/health",
-        profiles: ["dev", "staging"],
       },
     ],
     containers: [
@@ -86,7 +81,6 @@ function createMockContext(
         image: "postgres:15",
         aliases: ["db"],
         healthcheck: 15,
-        profiles: ["dev", "prod"],
       },
       {
         name: "cache",
@@ -97,15 +91,12 @@ function createMockContext(
         name: "analytics",
         image: "elasticsearch:8",
         healthcheck: "http://localhost:9200/_cluster/health",
-        profiles: ["prod"],
       },
     ],
     tasks: [],
     links: [],
-    profiles: ["dev", "prod", "staging"],
-    state: {
-      activeProfile,
-    },
+    profiles: [],
+    state: {},
   };
 }
 
@@ -277,9 +268,9 @@ describe("getStatus", () => {
       expect(apiService).toEqual({
         rawName: "zap.myproject.api",
         service: "api",
-        status: "pending", // Since no activeProfile, service with 'dev' profile is disabled
+        status: "pending",
         type: "native",
-        enabled: false, // api has 'dev' profile but no activeProfile is set
+        enabled: true,
       });
 
       const workerService = result.native.find((s) => s.service === "worker");
@@ -288,7 +279,7 @@ describe("getStatus", () => {
         service: "worker",
         status: "down",
         type: "native",
-        enabled: true, // worker has no profile, so it's enabled
+        enabled: true,
       });
     });
 
@@ -372,8 +363,8 @@ describe("getStatus", () => {
       expect(frontendService?.status).toBe("pending");
     });
 
-    it("should filter by profile when activeProfile is set", async () => {
-      const context = createMockContext("test", "dev");
+    it("should mark context services as enabled", async () => {
+      const context = createMockContext("test");
 
       mockPm2Manager.listProcesses.mockResolvedValue([
         createMockProcessInfo("zap.test.api", "online"),
@@ -385,25 +376,15 @@ describe("getStatus", () => {
       const apiService = result.native.find((s) => s.service === "api");
       const workerService = result.native.find((s) => s.service === "worker");
 
-      expect(apiService?.enabled).toBe(true); // Has 'dev' profile
-      expect(workerService?.enabled).toBe(true); // No profile specified
+      expect(apiService?.enabled).toBe(true);
+      expect(workerService?.enabled).toBe(true);
     });
 
-    it("should disable services not matching active profile", async () => {
-      const context = createMockContext("test", "prod");
-
-      mockPm2Manager.listProcesses.mockResolvedValue([
-        createMockProcessInfo("zap.test.api", "online"), // Only has 'dev' profile
-      ]);
-
-      const result = await getStatus(context);
-
-      const apiService = result.native.find((s) => s.service === "api");
-      expect(apiService?.enabled).toBe(false); // 'dev' profile doesn't match 'prod'
-    });
-
-    it("should handle services with multiple profiles", async () => {
-      const context = createMockContext("test", "staging");
+    it("should keep services enabled after top-level profile filtering has already happened", async () => {
+      const context = createMockContext("test");
+      context.processes = context.processes.filter(
+        (process) => process.name === "frontend",
+      );
 
       mockPm2Manager.listProcesses.mockResolvedValue([
         createMockProcessInfo("zap.test.frontend", "online"),
@@ -414,7 +395,10 @@ describe("getStatus", () => {
       const frontendService = result.native.find(
         (s) => s.service === "frontend",
       );
-      expect(frontendService?.enabled).toBe(true); // Has both 'dev' and 'staging' profiles
+      expect(frontendService?.enabled).toBe(true);
+      expect(result.native.map((service) => service.service)).toEqual([
+        "frontend",
+      ]);
     });
 
     it("should filter by specific service name", async () => {
@@ -478,7 +462,7 @@ describe("getStatus", () => {
         service: "database",
         status: "up", // After healthcheck delay
         type: "docker",
-        enabled: false, // database has 'dev' and 'prod' profiles but no activeProfile is set
+        enabled: true,
       });
 
       const cacheService = result.docker.find((s) => s.service === "cache");

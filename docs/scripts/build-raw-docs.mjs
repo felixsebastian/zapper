@@ -6,7 +6,11 @@ const docsDir = fileURLToPath(new URL("..", import.meta.url));
 const publicDir = join(docsDir, "public");
 const sourceOrder = [
   "index.md",
-  "usage.md",
+  "commands.md",
+  "configuration.md",
+  "services.md",
+  "tasks.md",
+  "project-metadata.md",
   "instances.md",
   "resource-management.md",
   "global-registry.md",
