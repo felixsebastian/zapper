@@ -15,6 +15,11 @@ pnpm --filter @mp-lb/zapper-landing-page lint
 pnpm --filter @mp-lb/zapper-landing-page build
 ```
 
+Do not commit a per-app `package-lock.json` here. The landing page deploy uses
+the repo root pnpm workspace metadata (`package.json`, `pnpm-workspace.yaml`,
+and `pnpm-lock.yaml`), and a stray npm lockfile can cause Vercel to pick the
+wrong package manager during deployment.
+
 ## Deployment
 
 Deployment is managed from the main repo:

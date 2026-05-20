@@ -3113,6 +3113,12 @@ The landing page lives in `apps/landing-page`, and the docs site lives in `docs`
 
 Deployment resources are managed through Terraform in `infra`. Terraform creates separate Vercel projects for the landing page and docs site, plus Cloudflare DNS records for `zapper.mp-lb.dev` and `docs.zapper.mp-lb.dev` by default.
 
+The landing page deploy is built from the repo's root pnpm workspace metadata.
+Keep the root `package.json`, `pnpm-workspace.yaml`, and `pnpm-lock.yaml` as
+the deploy source of truth, and do not commit a separate
+`apps/landing-page/package-lock.json`. A stray npm lockfile in the app
+directory can cause Vercel to detect the wrong package manager for that project.
+
 ```bash
 cd infra
 terraform init -backend-config="bucket=<gcp-project-id>-terraform-state" -backend-config="prefix=terraform/state/zapper"
