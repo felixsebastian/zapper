@@ -65,3 +65,12 @@ The promise is simple:
 One file for the local stack. One command to start it. One place to see what is
 running. Native and Docker together. Isolated instances when you need them.
 Built for humans, and shaped for agents.
+
+## Positioning
+
+This system is a local runtime orchestrator for modern development. It manages native processes, containers, service wiring, and automatic port allocation from a single declarative project definition, making it possible to run many isolated instances of the same stack simultaneously without conflicts.
+
+Unlike Docker Compose or traditional process managers, the focus is not just starting services — it is managing local application topology. Native processes and containers can interoperate seamlessly, with dynamic ports and automatic dependency wiring handled by the runtime itself.
+
+The system complements tools like Nix, mise, and Docker rather than replacing them. Those tools solve dependency installation and reproducibility; this system solves orchestration, isolation, and multi-instance local development, which becomes increasingly important in AI-native workflows.
+

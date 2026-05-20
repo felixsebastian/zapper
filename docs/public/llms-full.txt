@@ -2959,10 +2959,13 @@ pnpm remove --global zapper-cli @maplab/zapper @mp-lb/zapper     # Remove stale 
 pnpm add --global @mp-lb/zapper  # Make sure it's installed with pnpm
 pnpm install
 pnpm build
-cd packages/cli && pnpm link --global && cd ../..
+pnpm add --global "link:$(pwd)/packages/cli" --config.ignore-scripts=true
 ```
 
 After linking, your global `zap` command points to the local CLI package build. Make changes, run `pnpm build`, and test immediately.
+
+If pnpm says its global bin directory is not on your `PATH`, run `pnpm setup`
+once and restart your shell before retrying the global commands.
 
 ## Linking & Unlinking
 
@@ -2970,10 +2973,10 @@ After linking, your global `zap` command points to the local CLI package build. 
 which zap                 # Should show pnpm global path
 ls -la $(which zap)       # Should symlink to packages/cli/dist/index.js
 sed -n '1,80p' $(which zap)  # Should execute this checkout's packages/cli/dist/index.js
-pnpm list -g --depth 0    # Should show @mp-lb/zapper@link:<this checkout>
+pnpm list -g --depth 0    # Should show @mp-lb/zapper link:<this checkout>/packages/cli
 
 # Unlink when done
-pnpm unlink --global
+pnpm remove --global @mp-lb/zapper
 npm install --global @mp-lb/zapper  # Reinstall from npm
 ```
 
@@ -2983,7 +2986,7 @@ and link again:
 ```bash
 pnpm remove --global zapper-cli @maplab/zapper @mp-lb/zapper
 pnpm build
-cd packages/cli && pnpm link --global && cd ../..
+pnpm add --global "link:$(pwd)/packages/cli" --config.ignore-scripts=true
 ```
 
 ## Testing
