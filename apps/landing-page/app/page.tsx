@@ -1,7 +1,7 @@
 import { InstallSnippet } from "@/components/landing/InstallSnippet";
 import { Out, Prompt, Terminal } from "@/components/landing/Terminal";
-import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { DocsCTAButton } from "@/components/landing/DocsCTAButton";
+import { DownloadMacButton } from "@/components/landing/DownloadMacButton";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -113,19 +113,10 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3 sm:flex-nowrap">
                 <InstallSnippet command="npm i -g pm2 @mp-lb/zapper" />
-                <Button
-                  asChild
-                  variant="outline"
-                  className="h-10 shrink-0 font-mono-tight"
-                >
-                  <a
-                    href="https://docs.zapper.mp-lb.dev"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Read the docs →
-                  </a>
-                </Button>
+                <DocsCTAButton
+                  href="https://docs.zapper.mp-lb.dev"
+                  label="Read the docs →"
+                />
               </div>
             </div>
 
@@ -247,19 +238,10 @@ export default function Home() {
             </div>
 
             <div className="mt-8">
-              <Button
-                asChild
-                variant="outline"
-                className="h-10 font-mono-tight"
-              >
-                <a
-                  href="https://docs.zapper.mp-lb.dev/llms-full.txt"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Read the agent docs →
-                </a>
-              </Button>
+              <DocsCTAButton
+                href="https://docs.zapper.mp-lb.dev/llms-full.txt"
+                label="Read the agent docs →"
+              />
             </div>
           </div>
         </section>
@@ -280,16 +262,7 @@ export default function Home() {
                 commands stay in sync.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Button
-                  asChild
-                  variant="default"
-                  className="h-10 font-mono-tight"
-                >
-                  <a href="/download/mac">
-                    <Download aria-hidden="true" />
-                    Download for Mac
-                  </a>
-                </Button>
+                <DownloadMacButton />
               </div>
             </div>
             <div className="w-full max-w-[420px] overflow-hidden rounded-lg border border-border bg-background shadow-2xl lg:mx-auto">

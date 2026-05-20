@@ -1,5 +1,6 @@
 import { env } from "node:process";
 import { NextResponse } from "next/server";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,14 @@ function findMacAsset(assets: GitHubReleaseAsset[]): GitHubReleaseAsset | null {
 export async function GET() {
   const repo = getRepo();
   const stableDownloadUrl = `https://github.com/${repo}/releases/latest/download/Zapper-macOS.zip`;
+
+  const posthog = getPostHogClient();
+  posthog.capture({
+    distinctId: "anonymous",
+    event: "mac_download_initiated",
+    properties: { repo },
+  });
+
   const response = await fetch(
     `https://api.github.com/repos/${repo}/releases/latest`,
     {

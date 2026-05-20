@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import posthog from "posthog-js";
 
 interface InstallSnippetProps {
   command: string;
@@ -17,6 +18,7 @@ export const InstallSnippet = ({ command, className }: InstallSnippetProps) => {
       await navigator.clipboard.writeText(command);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
+      posthog.capture("install_command_copied", { command });
     } catch {
       // ignore
     }
