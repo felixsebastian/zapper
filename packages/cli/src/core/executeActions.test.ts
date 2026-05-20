@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import path from "path";
 import { executeActions } from "./executeActions";
 import { ZapperConfig } from "../utils";
 import { DockerManager } from "./docker";
@@ -119,6 +122,7 @@ describe("executeActions", () => {
     vi.mocked(Pm2Executor).mockImplementation(() => mockPm2Executor as any);
 
     vi.mocked(DockerManager.createVolume).mockResolvedValue(undefined);
+    vi.mocked(DockerManager.buildImage).mockResolvedValue(undefined);
     vi.mocked(DockerManager.startContainerAsync).mockResolvedValue(12345);
     vi.mocked(DockerManager.stopContainer).mockResolvedValue(undefined);
   });
@@ -504,6 +508,83 @@ describe("executeActions", () => {
           configDir: "/config/dir",
         },
       );
+    });
+
+    it("should build Docker images and mount env-backed secrets", async () => {
+      process.env.TEST_DB_PASSWORD = "secret-value";
+      const projectRoot = mkdtempSync(path.join(tmpdir(), "zapper-actions-"));
+      const mockContainer = {
+        build: {
+          context: "./api",
+          dockerfile: "Dockerfile.dev",
+          target: "dev",
+          args: { NODE_ENV: "development" },
+        },
+        volumes: [
+          {
+            type: "volume" as const,
+            source: "cache",
+            target: "/cache",
+            read_only: true,
+          },
+        ],
+        secrets: ["db_password"],
+      };
+
+      vi.mocked(findContainer).mockReturnValue(["api", mockContainer]);
+
+      const plan: ActionPlan = {
+        waves: [
+          {
+            actions: [
+              {
+                type: "start",
+                serviceType: "docker",
+                name: "api",
+                healthcheck: 0,
+              },
+            ],
+          },
+        ],
+      };
+
+      await executeActions(
+        {
+          ...mockConfig,
+          volumes: { cache: { name: "shared-cache" } },
+          secrets: { db_password: { env: "TEST_DB_PASSWORD" } },
+        },
+        "test-project",
+        projectRoot,
+        plan,
+      );
+
+      expect(DockerManager.buildImage).toHaveBeenCalledWith({
+        context: path.join(projectRoot, "api"),
+        dockerfile: path.join(projectRoot, "api", "Dockerfile.dev"),
+        target: "dev",
+        args: { NODE_ENV: "development" },
+        tag: "zap.test-project.api:dev",
+      });
+      expect(DockerManager.createVolume).toHaveBeenCalledWith("shared-cache");
+      expect(DockerManager.startContainerAsync).toHaveBeenCalledWith(
+        "zap.test-project.api",
+        expect.objectContaining({
+          image: "zap.test-project.api:dev",
+          volumes: [
+            "shared-cache:/cache:ro",
+            `${path.join(projectRoot, ".zap", "secrets", "db_password")}:/run/secrets/db_password:ro`,
+          ],
+        }),
+        {
+          projectName: "test-project",
+          serviceName: "api",
+          configDir: projectRoot,
+        },
+      );
+
+      delete process.env.TEST_DB_PASSWORD;
+      rmSync(projectRoot, { recursive: true, force: true });
     });
   });
 

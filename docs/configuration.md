@@ -40,6 +40,12 @@ native:
 docker:
   # container definitions
 
+volumes:
+  # top-level Docker volume declarations
+
+secrets:
+  # top-level Docker secret declarations
+
 tasks:
   # task definitions
 
@@ -61,6 +67,8 @@ links:
 - `task_delimiters` changes task template delimiters.
 - `native` defines local PM2-managed processes.
 - `docker` and `containers` define Docker-managed services.
+- `volumes` declares reusable Docker named volumes.
+- `secrets` declares local file/env-backed secrets for Docker services.
 - `processes` is accepted as a legacy process form.
 - `tasks` defines one-off commands.
 - `homepage`, `links`, and `notes` expose project metadata to CLI and tools.
@@ -97,6 +105,30 @@ alias, but new configs should prefer `env`.
 
 See [Environment Variable Management](env-var-mgmt.md) for detailed resolution
 rules.
+
+## Config Interpolation
+
+String values inside service, task, metadata, build, watch, volume, and secret
+configuration support shell-style interpolation from the resolved root env
+stack, assigned ports, and the current process environment:
+
+```yaml
+env: [.env]
+
+docker:
+  api:
+    image: myapp/api:${API_TAG:-dev}
+    ports:
+      - "${API_PORT?API_PORT is required}:3000"
+```
+
+Supported forms:
+
+- `${VAR}` expands to the variable value or an empty string.
+- `${VAR:-default}` uses `default` when the variable is unset or empty.
+- `${VAR?message}` fails config loading with `message` when the variable is
+  unset or empty.
+- `$$` emits a literal `$`.
 
 ## Port Assignment
 

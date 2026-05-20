@@ -298,7 +298,7 @@ function buildServiceEntries(
           container.volumes,
           stateVolumes || {},
         ),
-        cmd: container.command || container.image,
+        cmd: container.command || container.image || "docker build",
       };
     },
   );

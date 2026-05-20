@@ -16,6 +16,7 @@ export type Command =
   | "down"
   | "kill"
   | "restart"
+  | "watch"
   | "status"
   | "ls"
   | "logs"

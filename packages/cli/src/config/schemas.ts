@@ -28,8 +28,22 @@ export const VolumeSchema = z
   })
   .strict();
 
+const MountSchema = z
+  .object({
+    type: z.enum(["bind", "volume"]).optional(),
+    source: z.string().min(1, "Mount source cannot be empty").optional(),
+    target: z
+      .string()
+      .min(1, "Mount target cannot be empty")
+      .startsWith("/", "Mount target must be an absolute path"),
+    read_only: z.boolean().optional(),
+    mode: z.string().min(1, "Mount mode cannot be empty").optional(),
+  })
+  .strict();
+
 export const ContainerVolumeSchema = z.union([
   VolumeSchema,
+  MountSchema,
   z
     .string()
     .min(1, "Volume cannot be empty")
@@ -106,6 +120,43 @@ const HealthcheckSchema = z
   .union([z.number(), z.string().url("Healthcheck must be a valid URL")])
   .optional();
 
+const BuildSchema = z.union([
+  z.string().min(1, "Build context cannot be empty"),
+  z
+    .object({
+      context: z.string().min(1, "Build context cannot be empty"),
+      dockerfile: z.string().min(1, "Dockerfile cannot be empty").optional(),
+      target: z.string().min(1, "Build target cannot be empty").optional(),
+      args: z.record(z.string(), z.string()).optional(),
+    })
+    .strict(),
+]);
+
+const WatchSchema = z
+  .array(
+    z
+      .object({
+        path: z.string().min(1, "Watch path cannot be empty"),
+        action: z.enum(["restart", "rebuild"]),
+      })
+      .strict(),
+  )
+  .optional();
+
+const ServiceSecretSchema = z.union([
+  z.string().min(1, "Secret name cannot be empty"),
+  z
+    .object({
+      source: z.string().min(1, "Secret source cannot be empty"),
+      target: z
+        .string()
+        .min(1, "Secret target cannot be empty")
+        .startsWith("/", "Secret target must be an absolute path")
+        .optional(),
+    })
+    .strict(),
+]);
+
 export const ProcessSchema = z
   .object({
     name: z.string().optional(),
@@ -125,7 +176,8 @@ export const ProcessSchema = z
 export const ContainerSchema = z
   .object({
     name: z.string().optional(),
-    image: z.string().min(1, "Image cannot be empty"),
+    image: z.string().min(1, "Image cannot be empty").optional(),
+    build: BuildSchema.optional(),
     ports: z.array(z.string().min(1, "Port cannot be empty")).optional(),
     env: EnvSchema.optional(),
     volumes: z.array(ContainerVolumeSchema).optional(),
@@ -137,8 +189,34 @@ export const ContainerSchema = z
     resolvedEnv: z.record(z.string(), z.string()).optional(),
     healthcheck: HealthcheckSchema,
     depends_on: z.array(validNameSchema).optional(),
+    watch: WatchSchema,
+    secrets: z.array(ServiceSecretSchema).optional(),
+  })
+  .strict()
+  .refine((container) => container.image || container.build, {
+    message: "Docker service must define image or build",
+    path: ["image"],
+  });
+
+const TopLevelVolumeSchema = z
+  .object({
+    name: z.string().min(1, "Volume name cannot be empty").optional(),
+    external: z.boolean().optional(),
   })
   .strict();
+
+const SecretSchema = z.union([
+  z.string().min(1, "Secret file path cannot be empty"),
+  z
+    .object({
+      file: z.string().min(1, "Secret file path cannot be empty").optional(),
+      env: z.string().min(1, "Secret env var cannot be empty").optional(),
+    })
+    .strict()
+    .refine((secret) => !!secret.file !== !!secret.env, {
+      message: "Secret must define exactly one of file or env",
+    }),
+]);
 
 export const TaskCmdSchema = z.union([
   z.string(),
@@ -225,6 +303,8 @@ export const ZapperConfigSchema = processValidation(
         native: z.record(validNameSchema, ProcessSchema).optional(),
         docker: z.record(validNameSchema, ContainerSchema).optional(),
         containers: z.record(validNameSchema, ContainerSchema).optional(),
+        volumes: z.record(validNameSchema, TopLevelVolumeSchema).optional(),
+        secrets: z.record(validNameSchema, SecretSchema).optional(),
         processes: z.array(ProcessSchema).optional(),
         tasks: z.record(validNameSchema, TaskSchema).optional(),
         homepage: z.string().min(1).optional(),
@@ -284,6 +364,8 @@ export const ZapperStateSchema = z.object({
 export type Process = z.infer<typeof ProcessSchema>;
 export type Container = z.infer<typeof ContainerSchema>;
 export type Volume = z.infer<typeof VolumeSchema>;
+export type TopLevelVolume = z.infer<typeof TopLevelVolumeSchema>;
+export type Secret = z.infer<typeof SecretSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type TaskParam = z.infer<typeof TaskParamSchema>;
 export type Link = z.infer<typeof LinkSchema>;

@@ -399,17 +399,21 @@ project goal changes.
 
 ## Suggested Roadmap
 
-1. Add Docker `build` support with a narrow local-dev subset.
-2. Add richer `depends_on` conditions that apply to both native and Docker
+Implemented first-pass support:
+
+- Docker `build` support with a narrow local-dev subset.
+- Docker service watch actions for `restart` and `rebuild`.
+- Config interpolation defaults and required-value errors.
+- Top-level `volumes` and richer service mount syntax around existing
+  instance-scoped volume behavior.
+- Mounted local secrets for Docker services.
+
+Still open:
+
+1. Add richer `depends_on` conditions that apply to both native and Docker
    services.
-3. Add Docker service watch actions for `restart` and `rebuild`.
-4. Add config interpolation defaults and required-value errors.
-5. Design top-level `volumes` and richer service mount syntax around existing
-   instance-scoped volume behavior.
-6. Add mounted local secrets if the env system continues to be the only way to
-   deliver sensitive values.
-7. Add service-context tasks for `run`/`exec`-style workflows.
-8. Consider explicit config `include` only after the core model settles.
+2. Add service-context tasks for `run`/`exec`-style workflows.
+3. Consider explicit config `include` only after the core model settles.
 
 ## Non-Goals
 

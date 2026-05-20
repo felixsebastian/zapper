@@ -49,6 +49,12 @@ Full Docker service shape:
 docker:
   postgres:
     image: postgres:15
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile.dev
+      target: dev
+      args:
+        POSTGRES_VERSION: "15"
     aliases: [db, pg]
     ports:
       - 5432:5432
@@ -61,14 +67,42 @@ docker:
     command: postgres -c log_statement=all
     depends_on: [other]
     healthcheck: 10
+    watch:
+      - path: ./postgres
+        action: rebuild
+    secrets:
+      - db_password
 ```
 
-- `image` is required.
+- `image` names the image to run. It is required unless `build` is set.
+- `build` builds an image from local source before the container starts.
 - `ports` use `host:container` mappings and support `${VAR}` interpolation.
 - `env` controls env routing for the container.
 - `volumes` supports managed volumes, named volumes, and bind mounts.
 - `networks` passes Docker network names.
 - `command` overrides the image command.
+- `watch` is used by `zap watch` for local restart/rebuild loops.
+- `secrets` grants the service access to top-level Docker secrets.
+
+When `build` is set without `image`, Zapper tags the local image as
+`zap.<project>.<service>:dev`.
+
+Supported `build` forms:
+
+```yaml
+docker:
+  api:
+    build: ./api
+
+  worker:
+    image: myapp-worker:dev
+    build:
+      context: ./worker
+      dockerfile: Dockerfile.dev
+      target: dev
+      args:
+        NODE_ENV: development
+```
 
 ## Environment Routing
 
@@ -157,9 +191,16 @@ zap profile reset
 
 ## Docker Volumes
 
-Zapper supports Compose-style mounts plus a managed volume form.
+Zapper supports Compose-style mounts, top-level named volumes, and a managed
+volume form.
 
 ```yaml
+volumes:
+  shared-cache:
+    name: myapp-cache
+  external-data:
+    external: true
+
 docker:
   postgres:
     image: postgres:15
@@ -167,11 +208,20 @@ docker:
       - /var/lib/postgresql/data
       - /var/lib/postgresql/wal:ro
       - postgres-logs:/var/log/postgresql
+      - shared-cache:/cache:ro
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
       - internal_dir: /var/lib/postgresql/wal
         mode: ro
       - name: postgres-config
         internal_dir: /etc/postgresql
+      - type: bind
+        source: ./fixtures
+        target: /fixtures
+        read_only: true
+      - type: volume
+        source: external-data
+        target: /data
+        read_only: true
 ```
 
 When a volume entry is only a container path, or an object without `name`,
@@ -180,8 +230,9 @@ in `.zap/state.json`. Each instance gets its own generated volume for the same
 service/path pair.
 
 Explicit named volumes keep Compose-style behavior and are shared anywhere that
-name is reused. Bind mounts such as `./init.sql:/container/path` are omitted
-from `zap volume list`.
+name is reused. Top-level `volumes` can map a logical name to a Docker volume
+`name`, or mark it `external` so Zapper does not explicitly create it. Bind
+mounts such as `./init.sql:/container/path` are omitted from `zap volume list`.
 
 ```bash
 zap volume list postgres
@@ -194,6 +245,62 @@ zap volume reset
 `zap volume prune` deletes generated Docker volumes that are still in state but
 no longer appear in `zap.yaml`. `zap volume reset` forgets generated assignments
 without deleting Docker volumes.
+
+## Docker Secrets
+
+Top-level `secrets` define local secret material, and Docker services opt in
+per secret. Secrets are mounted read-only under `/run/secrets/<name>` unless a
+service-specific target is provided.
+
+```yaml
+secrets:
+  db_password:
+    env: POSTGRES_PASSWORD
+  stripe_key:
+    file: .secrets/stripe_key
+
+docker:
+  postgres:
+    image: postgres:15
+    secrets:
+      - db_password
+
+  api:
+    image: myapp-api:dev
+    secrets:
+      - source: stripe_key
+        target: /run/secrets/stripe/api_key
+```
+
+Env-backed secrets are written to `.zap/secrets/` with owner-only permissions
+before the container starts. File-backed secrets are mounted directly from the
+project root.
+
+## Docker Watch
+
+`zap watch` starts the selected watched Docker services, then watches their
+configured paths.
+
+```yaml
+docker:
+  api:
+    image: myapp-api:dev
+    build: ./api
+    watch:
+      - path: ./api/src
+        action: rebuild
+      - path: ./api/config
+        action: restart
+```
+
+```bash
+zap watch
+zap watch api
+```
+
+`restart` calls `docker restart` for the running container. `rebuild` runs the
+normal Zapper restart path, so services with `build` rebuild their local image
+before the new container starts.
 
 ## Common Docker Examples
 

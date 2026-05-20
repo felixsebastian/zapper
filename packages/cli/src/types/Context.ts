@@ -6,6 +6,8 @@ import {
   Link,
   ZapperState,
   StoredVolume,
+  TopLevelVolume,
+  Secret,
 } from "../config/schemas";
 import type { ResolvedProfile } from "../core/profileResolver";
 
@@ -48,6 +50,8 @@ export interface Context {
   // Services organized by type with names included
   processes: Process[]; // Combines native and processes from config
   containers: Container[]; // Combines docker and containers from config
+  volumes?: Record<string, TopLevelVolume>; // Top-level Docker volume declarations
+  secrets?: Record<string, Secret>; // Top-level Docker secret declarations
   tasks: Task[]; // Tasks from config
   homepage?: string; // Primary app URL for `zap launch` with no args
   notes?: string; // Top-level project notes for `zap notes`

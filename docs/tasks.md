@@ -74,6 +74,10 @@ such as database shells, REPLs, SSH sessions, and CLIs that prompt for
 authentication. Interactive commands inherit stdio directly and skip Zapper's
 output recoloring.
 
+`interactive` on a task or command controls the spawned command's stdio. It is
+different from `zap task --interactive`, which prompts for missing required
+parameters before execution.
+
 ```yaml
 tasks:
   console:
@@ -116,22 +120,72 @@ tasks:
 
 ```bash
 zap task deploy --env=staging
+zap task deploy --interactive
 ```
+
+Without `--interactive`, missing required params fail fast. With
+`--interactive`, Zapper prompts for missing required params and then runs the
+task with the provided answers.
 
 ## Pass-Through Arguments
 
-Use <code v-pre>{{REST}}</code> to forward extra CLI arguments:
+Use <code v-pre>{{ARGS}}</code> to forward extra CLI arguments with shell
+quoting:
 
 ```yaml
 tasks:
   test:
     cmds:
-      - "pnpm vitest {{REST}}"
+      - "pnpm vitest {{ARGS}}"
 ```
 
 ```bash
 zap task test -- --coverage src/
 ```
+
+`{{ARGS}}` and `{{CLI_ARGS}}` shell-quote each argument independently, so paths
+with spaces and quotes survive better in shell commands. `{{REST}}` remains
+available as the older raw joined string for backward compatibility.
+
+## Special Vars
+
+Tasks can use built-in template vars:
+
+```yaml
+tasks:
+  inspect:
+    cmds:
+      - 'echo "project={{PROJECT}} task={{TASK}}"'
+      - 'echo "root={{ROOT_DIR}} cwd={{CWD}} instance={{INSTANCE}}"'
+```
+
+| Var        | Value                                     |
+| ---------- | ----------------------------------------- |
+| `ROOT_DIR` | Project root containing the loaded config |
+| `CWD`      | Resolved working directory for the task   |
+| `TASK`     | Current task name                         |
+| `PROJECT`  | Current Zapper project name               |
+| `INSTANCE` | Current instance key                      |
+| `REST`     | Raw pass-through args joined with spaces  |
+| `ARGS`     | Shell-quoted pass-through args            |
+| `CLI_ARGS` | Alias for `ARGS`                          |
+
+Built-in vars are also available when interpolating nested task `vars`,
+preconditions, and status checks.
+
+## Task Context Env
+
+Every task command receives task context through environment variables:
+
+```bash
+ZAPPER_ROOT
+ZAPPER_CWD
+ZAPPER_TASK
+ZAPPER_PROJECT
+ZAPPER_INSTANCE
+```
+
+Use these from scripts that should not depend on template interpolation.
 
 ## Nested Tasks
 
@@ -213,6 +267,12 @@ For tooling integration, get parameter info as JSON:
 
 ```bash
 zap task build --list-params
+```
+
+Task aliases can be used here as well:
+
+```bash
+zap t b --list-params
 ```
 
 ```json

@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import readline from "readline";
 import { renderer } from "../../ui/renderer";
 import * as path from "path";
 import Mustache from "mustache";
@@ -68,6 +69,12 @@ export interface TaskRunnerOptions {
   delimiters?: [string, string];
   params?: TaskParams;
   force?: boolean;
+  promptMissingParams?: boolean;
+  promptParam?: (taskName: string, param: TaskParam) => Promise<string>;
+  context?: {
+    projectName?: string;
+    instanceKey?: string;
+  };
 }
 
 interface ExecutionContext {
@@ -81,6 +88,10 @@ export class TaskRunner {
   private delimiters: [string, string];
   private params: TaskParams;
   private force: boolean;
+  private promptMissingParams: boolean;
+  private promptParam?: (taskName: string, param: TaskParam) => Promise<string>;
+  private projectName?: string;
+  private instanceKey?: string;
 
   constructor(
     tasks: TaskRegistry,
@@ -92,6 +103,10 @@ export class TaskRunner {
     this.delimiters = options.delimiters || ["{{", "}}"];
     this.params = options.params || { named: {}, rest: [] };
     this.force = Boolean(options.force);
+    this.promptMissingParams = Boolean(options.promptMissingParams);
+    this.promptParam = options.promptParam;
+    this.projectName = options.context?.projectName;
+    this.instanceKey = options.context?.instanceKey;
   }
 
   private resolveCwd(tCwd?: string): string {
@@ -99,11 +114,18 @@ export class TaskRunner {
     return path.isAbsolute(tCwd) ? tCwd : path.join(this.baseCwd, tCwd);
   }
 
-  private interpolate(
-    cmd: string,
+  private shellQuoteArg(value: string): string {
+    if (value.length === 0) return "''";
+    if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) return value;
+    return `'${value.replace(/'/g, `'\\''`)}'`;
+  }
+
+  private buildInterpolationContext(
+    taskName: string,
     taskParams: TaskParam[] | undefined,
     params: TaskParams,
-  ): string {
+    cwd: string,
+  ): Record<string, string> {
     // Build context from params, applying defaults
     const context: Record<string, string> = {};
 
@@ -123,6 +145,32 @@ export class TaskRunner {
 
     // Add REST as joined string
     context["REST"] = params.rest.join(" ");
+    context["ARGS"] = params.rest
+      .map((arg) => this.shellQuoteArg(arg))
+      .join(" ");
+    context["CLI_ARGS"] = context["ARGS"];
+    context["ROOT_DIR"] = this.baseCwd;
+    context["CWD"] = cwd;
+    context["TASK"] = taskName;
+    context["PROJECT"] = this.projectName || "";
+    context["INSTANCE"] = this.instanceKey || "";
+
+    return context;
+  }
+
+  private interpolate(
+    cmd: string,
+    taskParams: TaskParam[] | undefined,
+    params: TaskParams,
+    taskName: string,
+    cwd: string,
+  ): string {
+    const context = this.buildInterpolationContext(
+      taskName,
+      taskParams,
+      params,
+      cwd,
+    );
 
     // Set custom delimiters for Mustache
     Mustache.tags = this.delimiters;
@@ -138,17 +186,52 @@ export class TaskRunner {
     }
   }
 
-  private validateParams(
+  private async defaultPromptParam(
+    taskName: string,
+    param: TaskParam,
+  ): Promise<string> {
+    const label = param.desc ? `${param.name} (${param.desc})` : param.name;
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    try {
+      return await new Promise((resolve) => {
+        rl.question(`${taskName}.${label}: `, (answer) => resolve(answer));
+      });
+    } finally {
+      rl.close();
+    }
+  }
+
+  private async validateParams(
     taskName: string,
     taskParams: TaskParam[] | undefined,
     params: TaskParams,
     warnUnknown: boolean,
-  ): void {
-    if (!taskParams) return;
+  ): Promise<TaskParams> {
+    if (!taskParams) return params;
+
+    const nextParams: TaskParams = {
+      named: { ...params.named },
+      rest: params.rest,
+    };
 
     for (const param of taskParams) {
       if (param.required && param.default === undefined) {
-        if (!(param.name in params.named)) {
+        if (!(param.name in nextParams.named)) {
+          if (this.promptMissingParams) {
+            const value = await (this.promptParam || this.defaultPromptParam)(
+              taskName,
+              param,
+            );
+            if (value.length > 0) {
+              nextParams.named[param.name] = value;
+              continue;
+            }
+          }
+
           throw new Error(
             `Required parameter '${param.name}' not provided for task '${taskName}'`,
           );
@@ -156,20 +239,23 @@ export class TaskRunner {
       }
     }
 
-    if (!warnUnknown) return;
+    if (!warnUnknown) return nextParams;
 
     // Warn about unknown params
     const knownParams = new Set(taskParams.map((p) => p.name));
-    for (const key of Object.keys(params.named)) {
+    for (const key of Object.keys(nextParams.named)) {
       if (
         !knownParams.has(key) &&
         key !== "json" &&
         key !== "list-params" &&
-        key !== "force"
+        key !== "force" &&
+        key !== "interactive"
       ) {
         renderer.log.warn(`Unknown parameter '${key}' for task '${taskName}'`);
       }
     }
+
+    return nextParams;
   }
 
   private writeCommand(name: string, command: string): void {
@@ -264,13 +350,20 @@ export class TaskRunner {
           ? `Precondition failed for task '${taskName}': ${command}`
           : precondition.msg ||
             `Precondition failed for task '${taskName}': ${command}`;
-      const interpolated = this.interpolate(command, task.params, params);
+      const interpolated = this.interpolate(
+        command,
+        task.params,
+        params,
+        taskName,
+        cwd,
+      );
       const passed = await this.runCheckCommand(interpolated, cwd, env);
       if (!passed) throw new Error(message);
     }
   }
 
   private async isUpToDate(
+    taskName: string,
     task: Task,
     cwd: string,
     env: NodeJS.ProcessEnv,
@@ -279,7 +372,13 @@ export class TaskRunner {
     if (!task.status || task.status.length === 0) return false;
 
     for (const command of task.status) {
-      const interpolated = this.interpolate(command, task.params, params);
+      const interpolated = this.interpolate(
+        command,
+        task.params,
+        params,
+        taskName,
+        cwd,
+      );
       const passed = await this.runCheckCommand(interpolated, cwd, env);
       if (!passed) return false;
     }
@@ -288,15 +387,33 @@ export class TaskRunner {
   }
 
   private interpolateVars(
+    taskName: string,
     vars: Record<string, string> | undefined,
     taskParams: TaskParam[] | undefined,
     params: TaskParams,
+    cwd: string,
   ): Record<string, string> {
     const result: Record<string, string> = {};
     for (const [key, value] of Object.entries(vars || {})) {
-      result[key] = this.interpolate(value, taskParams, params);
+      result[key] = this.interpolate(value, taskParams, params, taskName, cwd);
     }
     return result;
+  }
+
+  private taskEnv(
+    task: Task,
+    taskName: string,
+    cwd: string,
+  ): NodeJS.ProcessEnv {
+    return {
+      ...process.env,
+      ...(task.resolvedEnv || {}),
+      ZAPPER_ROOT: this.baseCwd,
+      ZAPPER_CWD: cwd,
+      ZAPPER_TASK: taskName,
+      ZAPPER_PROJECT: this.projectName || "",
+      ZAPPER_INSTANCE: this.instanceKey || "",
+    } as NodeJS.ProcessEnv;
   }
 
   private async execTask(
@@ -313,30 +430,22 @@ export class TaskRunner {
     }
 
     const task = this.tasks[name];
-
-    this.validateParams(
+    const cwd = this.resolveCwd(task.cwd);
+    const params = await this.validateParams(
       name,
       task.params,
       execution.params,
       stack.length === 0,
     );
 
-    const env = {
-      ...process.env,
-      ...(task.resolvedEnv || {}),
-    } as NodeJS.ProcessEnv;
-
-    const cwd = this.resolveCwd(task.cwd);
+    const env = this.taskEnv(task, name, cwd);
     renderer.log.info(
       `Running task: ${name}${task.desc ? ` — ${task.desc}` : ""}`,
     );
 
-    await this.runPreconditions(name, task, cwd, env, execution.params);
+    await this.runPreconditions(name, task, cwd, env, params);
 
-    if (
-      !this.force &&
-      (await this.isUpToDate(task, cwd, env, execution.params))
-    ) {
+    if (!this.force && (await this.isUpToDate(name, task, cwd, env, params))) {
       renderer.log.info(`Task '${name}' is up to date`);
       return;
     }
@@ -346,7 +455,9 @@ export class TaskRunner {
         const interpolatedCmd = this.interpolate(
           cmd,
           task.params,
-          execution.params,
+          params,
+          name,
+          cwd,
         );
         await this.runCommand(name, interpolatedCmd, cwd, env, {
           silent: execution.silent || task.silent,
@@ -356,7 +467,9 @@ export class TaskRunner {
         const interpolatedCmd = this.interpolate(
           cmd.cmd,
           task.params,
-          execution.params,
+          params,
+          name,
+          cwd,
         );
         await this.runCommand(name, interpolatedCmd, cwd, env, {
           silent: execution.silent || task.silent || cmd.silent,
@@ -364,17 +477,19 @@ export class TaskRunner {
         });
       } else if (cmd && typeof cmd === "object" && "task" in cmd) {
         const vars = this.interpolateVars(
+          name,
           cmd.vars,
           task.params,
-          execution.params,
+          params,
+          cwd,
         );
         await this.execTask(cmd.task, [...stack, name], {
           params: {
             named: {
-              ...execution.params.named,
+              ...params.named,
               ...vars,
             },
-            rest: execution.params.rest,
+            rest: params.rest,
           },
           silent: execution.silent || cmd.silent,
         });
@@ -402,13 +517,16 @@ export class TaskRunner {
     task: Task,
     delimiters: [string, string] = ["{{", "}}"],
   ): boolean {
-    const restPattern = `${delimiters[0]}REST${delimiters[1]}`;
+    const restPatterns = ["REST", "ARGS", "CLI_ARGS"].map(
+      (name) => `${delimiters[0]}${name}${delimiters[1]}`,
+    );
     return task.cmds.some(
       (cmd) =>
-        (typeof cmd === "string" && cmd.includes(restPattern)) ||
+        (typeof cmd === "string" &&
+          restPatterns.some((pattern) => cmd.includes(pattern))) ||
         (typeof cmd === "object" &&
           "cmd" in cmd &&
-          cmd.cmd.includes(restPattern)),
+          restPatterns.some((pattern) => cmd.cmd.includes(pattern))),
     );
   }
 }

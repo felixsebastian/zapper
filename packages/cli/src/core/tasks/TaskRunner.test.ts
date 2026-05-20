@@ -122,6 +122,46 @@ describe("TaskRunner", () => {
       );
     });
 
+    it("interpolates ARGS with shell-quoted pass-through arguments", async () => {
+      const tasks: TaskRegistry = {
+        test: {
+          cmds: ["npm test {{ARGS}}"],
+        },
+      };
+
+      const params: TaskParams = {
+        named: {},
+        rest: ["--coverage", "path with spaces", "can't", ""],
+      };
+
+      const runner = new TaskRunner(tasks, "/project", { params });
+      await runner.run("test");
+
+      expect(childProcess.spawn).toHaveBeenCalledWith(
+        "npm test --coverage 'path with spaces' 'can'\\''t' ''",
+        expect.objectContaining({ cwd: "/project", shell: true }),
+      );
+    });
+
+    it("interpolates special task vars", async () => {
+      const tasks: TaskRegistry = {
+        inspect: {
+          cwd: "./tools",
+          cmds: ["echo {{ROOT_DIR}} {{CWD}} {{TASK}} {{PROJECT}} {{INSTANCE}}"],
+        },
+      };
+
+      const runner = new TaskRunner(tasks, "/project", {
+        context: { projectName: "myapp", instanceKey: "e2e" },
+      });
+      await runner.run("inspect");
+
+      expect(childProcess.spawn).toHaveBeenCalledWith(
+        "echo /project /project/tools inspect myapp e2e",
+        expect.objectContaining({ cwd: "/project/tools", shell: true }),
+      );
+    });
+
     it("leaves REST empty when no args provided", async () => {
       const tasks: TaskRegistry = {
         test: {
@@ -173,6 +213,49 @@ describe("TaskRunner", () => {
       };
 
       const runner = new TaskRunner(tasks, "/project");
+
+      await expect(runner.run("deploy")).rejects.toThrow(
+        "Required parameter 'env' not provided for task 'deploy'",
+      );
+    });
+
+    it("prompts for missing required params in interactive mode", async () => {
+      const tasks: TaskRegistry = {
+        deploy: {
+          cmds: ["echo {{env}}"],
+          params: [{ name: "env", required: true }],
+        },
+      };
+
+      const promptParam = vi.fn().mockResolvedValue("staging");
+      const runner = new TaskRunner(tasks, "/project", {
+        promptMissingParams: true,
+        promptParam,
+      });
+      await runner.run("deploy");
+
+      expect(promptParam).toHaveBeenCalledWith("deploy", {
+        name: "env",
+        required: true,
+      });
+      expect(childProcess.spawn).toHaveBeenCalledWith(
+        "echo staging",
+        expect.objectContaining({ cwd: "/project", shell: true }),
+      );
+    });
+
+    it("still fails when an interactive prompt returns an empty required param", async () => {
+      const tasks: TaskRegistry = {
+        deploy: {
+          cmds: ["echo {{env}}"],
+          params: [{ name: "env", required: true }],
+        },
+      };
+
+      const runner = new TaskRunner(tasks, "/project", {
+        promptMissingParams: true,
+        promptParam: vi.fn().mockResolvedValue(""),
+      });
 
       await expect(runner.run("deploy")).rejects.toThrow(
         "Required parameter 'env' not provided for task 'deploy'",
@@ -327,6 +410,38 @@ describe("TaskRunner", () => {
     });
   });
 
+  describe("task context env", () => {
+    it("passes task context through ZAPPER_* env vars", async () => {
+      const tasks: TaskRegistry = {
+        inspect: {
+          cwd: "tools",
+          resolvedEnv: { EXISTING: "value" },
+          cmds: ["env"],
+        },
+      };
+
+      const runner = new TaskRunner(tasks, "/project", {
+        context: { projectName: "myapp", instanceKey: "abc123" },
+      });
+      await runner.run("inspect");
+
+      expect(childProcess.spawn).toHaveBeenCalledWith(
+        "env",
+        expect.objectContaining({
+          cwd: "/project/tools",
+          env: expect.objectContaining({
+            EXISTING: "value",
+            ZAPPER_ROOT: "/project",
+            ZAPPER_CWD: "/project/tools",
+            ZAPPER_TASK: "inspect",
+            ZAPPER_PROJECT: "myapp",
+            ZAPPER_INSTANCE: "abc123",
+          }),
+        }),
+      );
+    });
+  });
+
   describe("preconditions", () => {
     it("runs commands when all preconditions pass", async () => {
       const tasks: TaskRegistry = {
@@ -449,6 +564,11 @@ describe("TaskRunner", () => {
   describe("taskAcceptsRest", () => {
     it("returns true when task has REST placeholder", () => {
       const task = { cmds: ["npm test {{REST}}"] };
+      expect(TaskRunner.taskAcceptsRest(task)).toBe(true);
+    });
+
+    it("returns true when task has ARGS placeholder", () => {
+      const task = { cmds: ["npm test {{ARGS}}"] };
       expect(TaskRunner.taskAcceptsRest(task)).toBe(true);
     });
 

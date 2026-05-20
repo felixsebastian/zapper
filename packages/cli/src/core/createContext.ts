@@ -116,6 +116,8 @@ export function createContext(
     instance: undefined,
     processes,
     containers,
+    volumes: config.volumes ?? {},
+    secrets: config.secrets ?? {},
     tasks,
     homepage: config.homepage,
     notes: config.notes,

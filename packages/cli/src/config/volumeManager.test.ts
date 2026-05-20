@@ -9,6 +9,7 @@ import {
   getServiceDockerVolumes,
   initializeManagedVolumes,
   resetManagedVolumesForInstance,
+  resolveContainerVolumes,
 } from "./volumeManager";
 
 describe("volumeManager", () => {
@@ -194,5 +195,50 @@ describe("volumeManager", () => {
         managed: true,
       },
     ]);
+  });
+
+  it("resolves top-level volume names and rich mount objects", () => {
+    const projectRoot = makeTempDir();
+
+    const resolved = resolveContainerVolumes({
+      projectRoot,
+      projectName: "myproject",
+      instanceKey: "default",
+      instanceId: "abc123",
+      serviceName: "api",
+      topLevelVolumes: {
+        cache: { name: "shared-cache" },
+        external_data: { external: true },
+      },
+      volumes: [
+        "cache:/cache:ro",
+        {
+          type: "volume",
+          source: "external_data",
+          target: "/data",
+          read_only: true,
+        },
+        {
+          type: "bind",
+          source: "./fixtures",
+          target: "/fixtures",
+          read_only: true,
+        },
+        {
+          target: "/generated",
+          read_only: true,
+        },
+      ],
+    });
+
+    expect(resolved).toEqual({
+      bindings: [
+        "shared-cache:/cache:ro",
+        "external_data:/data:ro",
+        "./fixtures:/fixtures:ro",
+        "zap.myproject.abc123.vol1:/generated:ro",
+      ],
+      namedVolumesToCreate: ["shared-cache", "zap.myproject.abc123.vol1"],
+    });
   });
 });

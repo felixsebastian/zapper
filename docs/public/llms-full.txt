@@ -124,12 +124,18 @@ zap down backend
 zap restart
 zap restart api
 zap r api worker
+zap watch
+zap watch api
 ```
 
 `zap up`, `zap down`, and `zap restart` accept service names and service
 aliases. Unknown names are reported, and valid names in the same command still
 run. `zap up <service>` starts dependencies first. `zap restart <service>`
 restarts only the targeted service.
+
+`zap watch` starts Docker services that define `watch` rules and keeps running.
+When a watched path changes, Zapper either restarts the container or rebuilds
+and restarts it based on the rule action.
 
 ## Status And Logs
 
@@ -160,10 +166,13 @@ zap task build --target=prod
 zap task test -- --coverage
 zap task build --list-params
 zap task seed --force
+zap task deploy --interactive
 ```
 
 `zap run` is an alias for `zap task`. `--force` runs a task even when its
-status checks say it is already up to date.
+status checks say it is already up to date. `--interactive` prompts for missing
+required task parameters instead of failing immediately. Task aliases work
+anywhere a task name is accepted, including `--list-params`.
 
 See [Tasks](tasks.md) for task configuration.
 
@@ -349,6 +358,12 @@ native:
 docker:
   # container definitions
 
+volumes:
+  # top-level Docker volume declarations
+
+secrets:
+  # top-level Docker secret declarations
+
 tasks:
   # task definitions
 
@@ -370,6 +385,8 @@ links:
 - `task_delimiters` changes task template delimiters.
 - `native` defines local PM2-managed processes.
 - `docker` and `containers` define Docker-managed services.
+- `volumes` declares reusable Docker named volumes.
+- `secrets` declares local file/env-backed secrets for Docker services.
 - `processes` is accepted as a legacy process form.
 - `tasks` defines one-off commands.
 - `homepage`, `links`, and `notes` expose project metadata to CLI and tools.
@@ -406,6 +423,30 @@ alias, but new configs should prefer `env`.
 
 See [Environment Variable Management](env-var-mgmt.md) for detailed resolution
 rules.
+
+## Config Interpolation
+
+String values inside service, task, metadata, build, watch, volume, and secret
+configuration support shell-style interpolation from the resolved root env
+stack, assigned ports, and the current process environment:
+
+```yaml
+env: [.env]
+
+docker:
+  api:
+    image: myapp/api:${API_TAG:-dev}
+    ports:
+      - "${API_PORT?API_PORT is required}:3000"
+```
+
+Supported forms:
+
+- `${VAR}` expands to the variable value or an empty string.
+- `${VAR:-default}` uses `default` when the variable is unset or empty.
+- `${VAR?message}` fails config loading with `message` when the variable is
+  unset or empty.
+- `$$` emits a literal `$`.
 
 ## Port Assignment
 
@@ -538,6 +579,12 @@ Full Docker service shape:
 docker:
   postgres:
     image: postgres:15
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile.dev
+      target: dev
+      args:
+        POSTGRES_VERSION: "15"
     aliases: [db, pg]
     ports:
       - 5432:5432
@@ -550,14 +597,42 @@ docker:
     command: postgres -c log_statement=all
     depends_on: [other]
     healthcheck: 10
+    watch:
+      - path: ./postgres
+        action: rebuild
+    secrets:
+      - db_password
 ```
 
-- `image` is required.
+- `image` names the image to run. It is required unless `build` is set.
+- `build` builds an image from local source before the container starts.
 - `ports` use `host:container` mappings and support `${VAR}` interpolation.
 - `env` controls env routing for the container.
 - `volumes` supports managed volumes, named volumes, and bind mounts.
 - `networks` passes Docker network names.
 - `command` overrides the image command.
+- `watch` is used by `zap watch` for local restart/rebuild loops.
+- `secrets` grants the service access to top-level Docker secrets.
+
+When `build` is set without `image`, Zapper tags the local image as
+`zap.<project>.<service>:dev`.
+
+Supported `build` forms:
+
+```yaml
+docker:
+  api:
+    build: ./api
+
+  worker:
+    image: myapp-worker:dev
+    build:
+      context: ./worker
+      dockerfile: Dockerfile.dev
+      target: dev
+      args:
+        NODE_ENV: development
+```
 
 ## Environment Routing
 
@@ -646,9 +721,16 @@ zap profile reset
 
 ## Docker Volumes
 
-Zapper supports Compose-style mounts plus a managed volume form.
+Zapper supports Compose-style mounts, top-level named volumes, and a managed
+volume form.
 
 ```yaml
+volumes:
+  shared-cache:
+    name: myapp-cache
+  external-data:
+    external: true
+
 docker:
   postgres:
     image: postgres:15
@@ -656,11 +738,20 @@ docker:
       - /var/lib/postgresql/data
       - /var/lib/postgresql/wal:ro
       - postgres-logs:/var/log/postgresql
+      - shared-cache:/cache:ro
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
       - internal_dir: /var/lib/postgresql/wal
         mode: ro
       - name: postgres-config
         internal_dir: /etc/postgresql
+      - type: bind
+        source: ./fixtures
+        target: /fixtures
+        read_only: true
+      - type: volume
+        source: external-data
+        target: /data
+        read_only: true
 ```
 
 When a volume entry is only a container path, or an object without `name`,
@@ -669,8 +760,9 @@ in `.zap/state.json`. Each instance gets its own generated volume for the same
 service/path pair.
 
 Explicit named volumes keep Compose-style behavior and are shared anywhere that
-name is reused. Bind mounts such as `./init.sql:/container/path` are omitted
-from `zap volume list`.
+name is reused. Top-level `volumes` can map a logical name to a Docker volume
+`name`, or mark it `external` so Zapper does not explicitly create it. Bind
+mounts such as `./init.sql:/container/path` are omitted from `zap volume list`.
 
 ```bash
 zap volume list postgres
@@ -683,6 +775,62 @@ zap volume reset
 `zap volume prune` deletes generated Docker volumes that are still in state but
 no longer appear in `zap.yaml`. `zap volume reset` forgets generated assignments
 without deleting Docker volumes.
+
+## Docker Secrets
+
+Top-level `secrets` define local secret material, and Docker services opt in
+per secret. Secrets are mounted read-only under `/run/secrets/<name>` unless a
+service-specific target is provided.
+
+```yaml
+secrets:
+  db_password:
+    env: POSTGRES_PASSWORD
+  stripe_key:
+    file: .secrets/stripe_key
+
+docker:
+  postgres:
+    image: postgres:15
+    secrets:
+      - db_password
+
+  api:
+    image: myapp-api:dev
+    secrets:
+      - source: stripe_key
+        target: /run/secrets/stripe/api_key
+```
+
+Env-backed secrets are written to `.zap/secrets/` with owner-only permissions
+before the container starts. File-backed secrets are mounted directly from the
+project root.
+
+## Docker Watch
+
+`zap watch` starts the selected watched Docker services, then watches their
+configured paths.
+
+```yaml
+docker:
+  api:
+    image: myapp-api:dev
+    build: ./api
+    watch:
+      - path: ./api/src
+        action: rebuild
+      - path: ./api/config
+        action: restart
+```
+
+```bash
+zap watch
+zap watch api
+```
+
+`restart` calls `docker restart` for the running container. `rebuild` runs the
+normal Zapper restart path, so services with `build` rebuild their local image
+before the new container starts.
 
 ## Common Docker Examples
 
@@ -787,6 +935,10 @@ such as database shells, REPLs, SSH sessions, and CLIs that prompt for
 authentication. Interactive commands inherit stdio directly and skip Zapper's
 output recoloring.
 
+`interactive` on a task or command controls the spawned command's stdio. It is
+different from `zap task --interactive`, which prompts for missing required
+parameters before execution.
+
 ```yaml
 tasks:
   console:
@@ -829,22 +981,72 @@ tasks:
 
 ```bash
 zap task deploy --env=staging
+zap task deploy --interactive
 ```
+
+Without `--interactive`, missing required params fail fast. With
+`--interactive`, Zapper prompts for missing required params and then runs the
+task with the provided answers.
 
 ## Pass-Through Arguments
 
-Use <code v-pre>{{REST}}</code> to forward extra CLI arguments:
+Use <code v-pre>{{ARGS}}</code> to forward extra CLI arguments with shell
+quoting:
 
 ```yaml
 tasks:
   test:
     cmds:
-      - "pnpm vitest {{REST}}"
+      - "pnpm vitest {{ARGS}}"
 ```
 
 ```bash
 zap task test -- --coverage src/
 ```
+
+`{{ARGS}}` and `{{CLI_ARGS}}` shell-quote each argument independently, so paths
+with spaces and quotes survive better in shell commands. `{{REST}}` remains
+available as the older raw joined string for backward compatibility.
+
+## Special Vars
+
+Tasks can use built-in template vars:
+
+```yaml
+tasks:
+  inspect:
+    cmds:
+      - 'echo "project={{PROJECT}} task={{TASK}}"'
+      - 'echo "root={{ROOT_DIR}} cwd={{CWD}} instance={{INSTANCE}}"'
+```
+
+| Var        | Value                                     |
+| ---------- | ----------------------------------------- |
+| `ROOT_DIR` | Project root containing the loaded config |
+| `CWD`      | Resolved working directory for the task   |
+| `TASK`     | Current task name                         |
+| `PROJECT`  | Current Zapper project name               |
+| `INSTANCE` | Current instance key                      |
+| `REST`     | Raw pass-through args joined with spaces  |
+| `ARGS`     | Shell-quoted pass-through args            |
+| `CLI_ARGS` | Alias for `ARGS`                          |
+
+Built-in vars are also available when interpolating nested task `vars`,
+preconditions, and status checks.
+
+## Task Context Env
+
+Every task command receives task context through environment variables:
+
+```bash
+ZAPPER_ROOT
+ZAPPER_CWD
+ZAPPER_TASK
+ZAPPER_PROJECT
+ZAPPER_INSTANCE
+```
+
+Use these from scripts that should not depend on template interpolation.
 
 ## Nested Tasks
 
@@ -926,6 +1128,12 @@ For tooling integration, get parameter info as JSON:
 
 ```bash
 zap task build --list-params
+```
+
+Task aliases can be used here as well:
+
+```bash
+zap t b --list-params
 ```
 
 ```json

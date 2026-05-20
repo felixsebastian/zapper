@@ -472,7 +472,7 @@ private struct ProjectStack: Identifiable {
     var detailRows: [StackDetailRow] {
         [
             StackDetailRow(label: "Path", value: project.projectRoot),
-            StackDetailRow(label: "Instance", value: instanceIdentity)
+            StackDetailRow(label: "Stack ID", value: instanceIdentity)
         ]
     }
 
@@ -1004,7 +1004,7 @@ private struct StackMoreButton: NSViewRepresentable {
             menu.addItem(copyConfigPathItem)
 
             let copyInstanceIDItem = NSMenuItem(
-                title: "Copy Instance ID",
+                title: "Copy Stack ID",
                 action: #selector(copyInstanceID),
                 keyEquivalent: ""
             )

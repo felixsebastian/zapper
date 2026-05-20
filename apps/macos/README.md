@@ -5,9 +5,9 @@ Native macOS menu bar app for the local Zapper system view.
 The app uses a bundled Zapper CLI runtime and reads `zap system projects --json`.
 It does not read `.zap` state or `zap.yaml` files directly.
 
-The dashboard lists stacks, where each stack is one project instance. Default
-instances show as the project name; non-default instances show as
-`myproj (test)`. Stack rows show a running-service summary with a small status
+The dashboard lists stacks. The default stack shows as the project name;
+profile-owned stacks show as `myproj (test)`. Stack rows show a running-service
+summary with a small status
 LED and expose start, stop, and Open actions. Pinning lives in the stack
 overflow menu. The Open control is hidden
 when no homepage or project links are configured, opens directly when there is

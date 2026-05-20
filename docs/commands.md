@@ -31,12 +31,18 @@ zap down backend
 zap restart
 zap restart api
 zap r api worker
+zap watch
+zap watch api
 ```
 
 `zap up`, `zap down`, and `zap restart` accept service names and service
 aliases. Unknown names are reported, and valid names in the same command still
 run. `zap up <service>` starts dependencies first. `zap restart <service>`
 restarts only the targeted service.
+
+`zap watch` starts Docker services that define `watch` rules and keeps running.
+When a watched path changes, Zapper either restarts the container or rebuilds
+and restarts it based on the rule action.
 
 ## Status And Logs
 
@@ -67,10 +73,13 @@ zap task build --target=prod
 zap task test -- --coverage
 zap task build --list-params
 zap task seed --force
+zap task deploy --interactive
 ```
 
 `zap run` is an alias for `zap task`. `--force` runs a task even when its
-status checks say it is already up to date.
+status checks say it is already up to date. `--interactive` prompts for missing
+required task parameters instead of failing immediately. Task aliases work
+anywhere a task name is accepted, including `--list-params`.
 
 See [Tasks](tasks.md) for task configuration.
 

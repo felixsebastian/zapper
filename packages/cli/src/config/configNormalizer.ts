@@ -19,6 +19,8 @@ export interface RawConfig {
   bare_metal?: Record<string, unknown>;
   docker?: Record<string, unknown>;
   containers?: Record<string, unknown>;
+  volumes?: Record<string, unknown>;
+  secrets?: Record<string, unknown>;
   processes?: unknown[];
   tasks?: Record<string, unknown>;
   homepage?: string;

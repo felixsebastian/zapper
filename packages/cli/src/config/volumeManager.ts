@@ -1,4 +1,4 @@
-import { Container, StoredVolume, Volume } from "./schemas";
+import { Container, StoredVolume, TopLevelVolume, Volume } from "./schemas";
 import { loadState, updateState } from "./stateLoader";
 import { DEFAULT_INSTANCE_KEY, ensureInstance } from "../core/instanceResolver";
 
@@ -20,6 +20,7 @@ export interface ServiceDockerVolume {
 }
 
 type ContainerVolume = NonNullable<Container["volumes"]>[number];
+type MountVolume = Extract<ContainerVolume, { target: string }>;
 
 function getVolumeKey(spec: ManagedVolumeSpec): string {
   return `${spec.serviceName}:${spec.internalDir}`;
@@ -213,6 +214,11 @@ export function pruneStaleManagedVolumesForInstance(
 }
 
 function isPathOnlyVolume(volume: ContainerVolume): boolean {
+  if (typeof volume !== "string" && "target" in volume) {
+    return (
+      !volume.source && (volume.type === undefined || volume.type === "volume")
+    );
+  }
   if (typeof volume !== "string") return !volume.name;
   const parsed = parseVolumeString(volume);
   return !parsed.source && parsed.internalDir.startsWith("/");
@@ -246,6 +252,44 @@ function isBindMountSource(source: string): boolean {
   );
 }
 
+function isMountVolume(volume: ContainerVolume): volume is MountVolume {
+  return typeof volume !== "string" && "target" in volume;
+}
+
+function mountMode(volume: MountVolume): string | undefined {
+  if (volume.read_only) return volume.mode ? `${volume.mode},ro` : "ro";
+  return volume.mode;
+}
+
+function renderMountVolume(volume: MountVolume): string {
+  if (!volume.source) {
+    return appendMode(volume.target, mountMode(volume));
+  }
+  return appendMode(`${volume.source}:${volume.target}`, mountMode(volume));
+}
+
+function mountSourceNeedsVolumeCreate(volume: MountVolume): string | null {
+  if (!volume.source || volume.type === "bind") {
+    return null;
+  }
+  if (isBindMountSource(volume.source)) return null;
+  return volume.source;
+}
+
+function resolveTopLevelVolumeName(
+  source: string,
+  topLevelVolumes?: Record<string, TopLevelVolume>,
+): string {
+  return topLevelVolumes?.[source]?.name || source;
+}
+
+function shouldCreateNamedVolume(
+  logicalName: string,
+  topLevelVolumes?: Record<string, TopLevelVolume>,
+): boolean {
+  return !topLevelVolumes?.[logicalName]?.external;
+}
+
 export function collectManagedVolumeSpecs(
   containers: Array<{ name: string; volumes?: Container["volumes"] }>,
 ): ManagedVolumeSpec[] {
@@ -258,7 +302,9 @@ export function collectManagedVolumeSpecs(
       const internalDir =
         typeof volume === "string"
           ? parseVolumeString(volume).internalDir
-          : volume.internal_dir;
+          : isMountVolume(volume)
+            ? volume.target
+            : volume.internal_dir;
       specs.push({ serviceName: container.name, internalDir });
     }
   }
@@ -273,6 +319,7 @@ export function resolveContainerVolumes({
   instanceId,
   serviceName,
   volumes,
+  topLevelVolumes,
 }: {
   projectRoot: string;
   projectName: string;
@@ -280,6 +327,7 @@ export function resolveContainerVolumes({
   instanceId: string;
   serviceName: string;
   volumes?: Container["volumes"];
+  topLevelVolumes?: Record<string, TopLevelVolume>;
 }): ResolvedVolumes {
   const bindings: string[] = [];
   const namedVolumesToCreate: string[] = [];
@@ -293,19 +341,58 @@ export function resolveContainerVolumes({
         continue;
       }
 
-      bindings.push(volume);
       if (!isBindMountSource(parsed.source)) {
-        namedVolumesToCreate.push(parsed.source);
+        const resolvedName = resolveTopLevelVolumeName(
+          parsed.source,
+          topLevelVolumes,
+        );
+        bindings.push(
+          appendMode(`${resolvedName}:${parsed.internalDir}`, parsed.suffix),
+        );
+        if (shouldCreateNamedVolume(parsed.source, topLevelVolumes)) {
+          namedVolumesToCreate.push(resolvedName);
+        }
+      } else {
+        bindings.push(volume);
+      }
+      continue;
+    }
+
+    if (isMountVolume(volume)) {
+      if (!volume.source && volume.type !== "bind") {
+        managedSpecs.push({ serviceName, internalDir: volume.target });
+        continue;
+      }
+      const sourceVolume = mountSourceNeedsVolumeCreate(volume);
+      if (sourceVolume) {
+        const resolvedName = resolveTopLevelVolumeName(
+          sourceVolume,
+          topLevelVolumes,
+        );
+        bindings.push(
+          appendMode(`${resolvedName}:${volume.target}`, mountMode(volume)),
+        );
+        if (shouldCreateNamedVolume(sourceVolume, topLevelVolumes)) {
+          namedVolumesToCreate.push(resolvedName);
+        }
+      } else {
+        bindings.push(renderMountVolume(volume));
       }
       continue;
     }
 
     const namedVolume = volume as Volume;
     if (namedVolume.name) {
-      namedVolumesToCreate.push(namedVolume.name);
+      const resolvedName = resolveTopLevelVolumeName(
+        namedVolume.name,
+        topLevelVolumes,
+      );
+      if (shouldCreateNamedVolume(namedVolume.name, topLevelVolumes)) {
+        namedVolumesToCreate.push(resolvedName);
+      }
       bindings.push(
         appendMode(
-          `${namedVolume.name}:${namedVolume.internal_dir}`,
+          `${resolvedName}:${namedVolume.internal_dir}`,
           namedVolume.mode,
         ),
       );
@@ -336,12 +423,17 @@ export function resolveContainerVolumes({
           const parsed = parseVolumeString(volume);
           return !parsed.source && parsed.internalDir === spec.internalDir;
         }
+        if (isMountVolume(volume)) {
+          return !volume.source && volume.target === spec.internalDir;
+        }
         return !volume.name && volume.internal_dir === spec.internalDir;
       });
       const mode =
         typeof sourceVolume === "string"
           ? parseVolumeString(sourceVolume).suffix
-          : sourceVolume?.mode;
+          : sourceVolume && isMountVolume(sourceVolume)
+            ? mountMode(sourceVolume)
+            : sourceVolume?.mode;
       bindings.push(appendMode(`${volumeName}:${spec.internalDir}`, mode));
     }
   }
@@ -376,6 +468,25 @@ export function getContainerVolumeBindings(
         volumeName
           ? appendMode(`${volumeName}:${parsed.internalDir}`, parsed.suffix)
           : appendMode(parsed.internalDir, parsed.suffix),
+      );
+      continue;
+    }
+
+    if (isMountVolume(volume)) {
+      if (volume.source) {
+        bindings.push(renderMountVolume(volume));
+        continue;
+      }
+
+      const volumeName = Object.entries(managedVolumes).find(
+        ([, stored]) =>
+          stored.service === serviceName &&
+          stored.internal_dir === volume.target,
+      )?.[0];
+      bindings.push(
+        volumeName
+          ? appendMode(`${volumeName}:${volume.target}`, mountMode(volume))
+          : appendMode(volume.target, mountMode(volume)),
       );
       continue;
     }
@@ -434,6 +545,35 @@ export function getServiceDockerVolumes(
           name: parsed.source,
           internalDir: parsed.internalDir,
           mode: parsed.suffix,
+          managed: false,
+        });
+      }
+      continue;
+    }
+
+    if (isMountVolume(volume)) {
+      if (!volume.source) {
+        const volumeName = Object.entries(managedVolumes).find(
+          ([, stored]) =>
+            stored.service === serviceName &&
+            stored.internal_dir === volume.target,
+        )?.[0];
+        if (volumeName) {
+          dockerVolumes.push({
+            name: volumeName,
+            internalDir: volume.target,
+            mode: mountMode(volume),
+            managed: true,
+          });
+        }
+        continue;
+      }
+
+      if (volume.type !== "bind" && !isBindMountSource(volume.source)) {
+        dockerVolumes.push({
+          name: volume.source,
+          internalDir: volume.target,
+          mode: mountMode(volume),
           managed: false,
         });
       }

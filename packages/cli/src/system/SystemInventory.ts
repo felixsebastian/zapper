@@ -62,11 +62,14 @@ async function loadProjectInstance(
 ): Promise<SystemProjectInstanceStatus> {
   const registryInstance = project.instances[instanceKey];
   const instanceId = registryInstance?.id || "";
+  const profileOption =
+    instanceKey === "default" ? {} : { profile: instanceKey };
   try {
     const zapper = new Zapper();
     await zapper.loadConfig(project.configPath, {
       __command: "system",
       __skipSystemRegistryTouch: true,
+      ...profileOption,
       instance: instanceKey,
     });
     const context = zapper.getContext();

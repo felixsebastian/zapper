@@ -1,4 +1,6 @@
-import { ZapperConfig } from "../utils";
+import { mkdirSync, writeFileSync } from "fs";
+import path from "path";
+import { ZapperConfig, Container } from "../utils";
 import { DockerManager } from "./docker";
 import { Pm2Executor } from "./process/Pm2Executor";
 import {
@@ -24,6 +26,97 @@ import {
 } from "../system/SystemRegistry";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function slugifyImagePart(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9_.-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "service"
+  );
+}
+
+export function getDockerImageName(
+  projectName: string,
+  serviceName: string,
+  container: Container,
+): string {
+  return (
+    container.image ||
+    `zap.${slugifyImagePart(projectName)}.${slugifyImagePart(serviceName)}:dev`
+  );
+}
+
+function resolveBuildConfig(
+  projectRoot: string,
+  image: string,
+  build: Container["build"],
+) {
+  if (!build) return undefined;
+  if (typeof build === "string") {
+    return {
+      context: path.resolve(projectRoot, build),
+      tag: image,
+    };
+  }
+  const context = path.resolve(projectRoot, build.context);
+  return {
+    context,
+    dockerfile: build.dockerfile
+      ? path.resolve(context, build.dockerfile)
+      : undefined,
+    target: build.target,
+    args: build.args,
+    tag: image,
+  };
+}
+
+function resolveSecretVolumes({
+  projectRoot,
+  secrets,
+  serviceSecrets,
+}: {
+  projectRoot: string;
+  secrets?: ZapperConfig["secrets"];
+  serviceSecrets?: Container["secrets"];
+}): string[] {
+  const volumes: string[] = [];
+  for (const serviceSecret of serviceSecrets || []) {
+    const source =
+      typeof serviceSecret === "string" ? serviceSecret : serviceSecret.source;
+    const target =
+      typeof serviceSecret === "string"
+        ? `/run/secrets/${source}`
+        : serviceSecret.target || `/run/secrets/${source}`;
+    const secret = secrets?.[source];
+    if (!secret) throw new Error(`Secret not found: ${source}`);
+
+    if (typeof secret === "string") {
+      volumes.push(`${path.resolve(projectRoot, secret)}:${target}:ro`);
+      continue;
+    }
+
+    if (secret.file) {
+      volumes.push(`${path.resolve(projectRoot, secret.file)}:${target}:ro`);
+      continue;
+    }
+
+    if (secret.env) {
+      const value = process.env[secret.env];
+      if (value === undefined) {
+        throw new Error(
+          `Secret ${source} references missing environment variable ${secret.env}`,
+        );
+      }
+      const secretDir = path.join(projectRoot, ".zap", "secrets");
+      mkdirSync(secretDir, { recursive: true, mode: 0o700 });
+      const secretPath = path.join(secretDir, source);
+      writeFileSync(secretPath, value, { mode: 0o600 });
+      volumes.push(`${secretPath}:${target}:ro`);
+    }
+  }
+  return volumes;
+}
 
 async function checkHealthUrl(url: string): Promise<boolean> {
   try {
@@ -123,6 +216,11 @@ async function executeAction(
 
     if (action.type === "start") {
       const ports = Array.isArray(c.ports) ? c.ports : [];
+      const image = getDockerImageName(projectName, name, c);
+      const buildConfig = resolveBuildConfig(configDir || ".", image, c.build);
+      if (buildConfig) {
+        await DockerManager.buildImage(buildConfig);
+      }
       const resolvedVolumes = resolveContainerVolumes({
         projectRoot: configDir || ".",
         projectName,
@@ -130,6 +228,7 @@ async function executeAction(
         instanceId: instanceId || DEFAULT_INSTANCE_KEY,
         serviceName: name,
         volumes: c.volumes,
+        topLevelVolumes: runtimeConfig.volumes,
       });
 
       for (const vol of resolvedVolumes.namedVolumesToCreate) {
@@ -137,6 +236,11 @@ async function executeAction(
       }
 
       const envMap = c.resolvedEnv || {};
+      const secretVolumes = resolveSecretVolumes({
+        projectRoot: configDir || ".",
+        secrets: runtimeConfig.secrets,
+        serviceSecrets: c.secrets,
+      });
 
       const labels = {
         "com.docker.compose.project": projectName,
@@ -159,9 +263,9 @@ async function executeAction(
       await DockerManager.startContainerAsync(
         dockerName,
         {
-          image: c.image,
+          image,
           ports,
-          volumes: resolvedVolumes.bindings,
+          volumes: [...resolvedVolumes.bindings, ...secretVolumes],
           networks: c.networks,
           environment: envMap,
           command: c.command,

@@ -9,6 +9,7 @@ import {
   DownCommand,
   KillCommand,
   RestartCommand,
+  WatchCommand,
   StatusCommand,
   ListCommand,
   LogsCommand,
@@ -65,7 +66,12 @@ function parseTaskArgs(rawArgv: string[], taskName: string): TaskParams {
     separatorIdx >= 0 ? argsAfterTask.slice(separatorIdx + 1) : [];
 
   // Parse named args
-  const reservedTaskOptions = new Set(["force", "json", "list-params"]);
+  const reservedTaskOptions = new Set([
+    "force",
+    "interactive",
+    "json",
+    "list-params",
+  ]);
   for (const arg of namedArgs) {
     if (arg.startsWith("--")) {
       const eqIdx = arg.indexOf("=");
@@ -101,6 +107,7 @@ export class CommanderCli {
     this.commandHandlers.set("down", new DownCommand());
     this.commandHandlers.set("kill", new KillCommand());
     this.commandHandlers.set("restart", new RestartCommand());
+    this.commandHandlers.set("watch", new WatchCommand());
     this.commandHandlers.set("status", new StatusCommand());
     this.commandHandlers.set("ls", new ListCommand());
     this.commandHandlers.set("logs", new LogsCommand());
@@ -194,6 +201,17 @@ export class CommanderCli {
       .option("--jsonl", "Stream command events as JSON Lines")
       .action(async (services, options, command) => {
         await this.executeCommand("restart", services, command);
+      });
+
+    this.program
+      .command("watch")
+      .alias("w")
+      .description(
+        "Watch Docker service paths and restart or rebuild on changes",
+      )
+      .argument("[services...]", "Services to watch")
+      .action(async (services, options, command) => {
+        await this.executeCommand("watch", services, command);
       });
 
     this.program
@@ -320,6 +338,7 @@ export class CommanderCli {
       .option("-j, --json", "Output task list as minified JSON")
       .option("--list-params", "List parameters for the specified task")
       .option("-f, --force", "Run task even when status checks pass")
+      .option("--interactive", "Prompt for missing required task parameters")
       .allowUnknownOption()
       .allowExcessArguments()
       .action(async (task, options, command) => {

@@ -65,6 +65,49 @@ describe("ZodConfigValidator", () => {
     }).not.toThrow();
   });
 
+  it("should validate Docker build, watch, secrets, and rich mounts", () => {
+    const config = {
+      project: "myproj",
+      volumes: {
+        cache: { name: "shared-cache" },
+      },
+      secrets: {
+        db_password: { env: "POSTGRES_PASSWORD" },
+      },
+      docker: {
+        api: {
+          build: {
+            context: "./api",
+            dockerfile: "Dockerfile.dev",
+            target: "dev",
+            args: {
+              NODE_ENV: "development",
+            },
+          },
+          volumes: [
+            {
+              type: "bind",
+              source: "./api",
+              target: "/app",
+              read_only: true,
+            },
+            {
+              type: "volume",
+              source: "cache",
+              target: "/cache",
+            },
+          ],
+          watch: [{ path: "./api/src", action: "rebuild" }],
+          secrets: ["db_password"],
+        },
+      },
+    };
+
+    expect(() => {
+      ZodConfigValidator.validate(config);
+    }).not.toThrow();
+  });
+
   it("should validate correct config with both native and docker", () => {
     const config = {
       project: "myproj",

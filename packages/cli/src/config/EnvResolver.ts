@@ -103,6 +103,12 @@ export class EnvResolver {
     const hasGlobalEnvSource =
       Array.isArray(resolvedContext.envFiles) &&
       resolvedContext.envFiles.length > 0;
+    const interpolationEnv = {
+      ...process.env,
+      ...mergedEnvFromFiles,
+    } as Record<string, string>;
+
+    this.interpolateContextStrings(resolvedContext, interpolationEnv);
 
     for (const proc of resolvedContext.processes) {
       this.resolveProcessEnv(
@@ -153,6 +159,83 @@ export class EnvResolver {
     }
 
     return resolvedContext;
+  }
+
+  private static interpolateContextStrings(
+    context: Context,
+    env: Record<string, string>,
+  ): void {
+    for (const proc of context.processes) {
+      this.interpolateObjectStrings(proc, env, new Set(["env", "resolvedEnv"]));
+    }
+    for (const container of context.containers) {
+      this.interpolateObjectStrings(
+        container,
+        env,
+        new Set(["env", "resolvedEnv"]),
+      );
+    }
+    for (const task of context.tasks) {
+      this.interpolateObjectStrings(task, env, new Set(["env", "resolvedEnv"]));
+    }
+    context.homepage = context.homepage
+      ? this.expandConfigString(context.homepage, env)
+      : context.homepage;
+    context.notes = context.notes
+      ? this.expandConfigString(context.notes, env)
+      : context.notes;
+    for (const link of context.links) {
+      link.url = this.expandConfigString(link.url, env);
+    }
+  }
+
+  private static interpolateObjectStrings(
+    value: unknown,
+    env: Record<string, string>,
+    skipKeys: Set<string>,
+  ): unknown {
+    if (typeof value === "string") return this.expandConfigString(value, env);
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i += 1) {
+        value[i] = this.interpolateObjectStrings(value[i], env, skipKeys);
+      }
+      return value;
+    }
+    if (!value || typeof value !== "object") return value;
+    for (const [key, child] of Object.entries(value)) {
+      if (skipKeys.has(key)) continue;
+      (value as Record<string, unknown>)[key] = this.interpolateObjectStrings(
+        child,
+        env,
+        skipKeys,
+      );
+    }
+    return value;
+  }
+
+  private static expandConfigString(
+    value: string,
+    env: Record<string, string>,
+  ): string {
+    const sentinel = "\0ZAPPER_DOLLAR\0";
+    return value
+      .replace(/\$\$/g, sentinel)
+      .replace(
+        /\$\{([A-Za-z_][A-Za-z0-9_]*)(?:(:-|\?)([^}]*))?\}/g,
+        (_match, name: string, operator?: string, operand?: string) => {
+          const envValue = env[name];
+          const hasValue = envValue !== undefined && envValue !== "";
+          if (operator === ":-") return hasValue ? envValue : operand || "";
+          if (operator === "?") {
+            if (hasValue) return envValue;
+            throw new Error(
+              operand || `Missing required config variable ${name}`,
+            );
+          }
+          return envValue ?? "";
+        },
+      )
+      .replace(new RegExp(sentinel, "g"), "$");
   }
 
   private static expandString(

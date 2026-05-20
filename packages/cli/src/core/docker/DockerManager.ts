@@ -15,6 +15,14 @@ interface DockerConfig {
   labels?: Record<string, string>;
 }
 
+export interface DockerBuildConfig {
+  context: string;
+  dockerfile?: string;
+  target?: string;
+  args?: Record<string, string>;
+  tag: string;
+}
+
 export interface DockerContainer {
   id: string;
   name: string;
@@ -124,6 +132,21 @@ export class DockerManager {
     args.push(config.image);
     if (config.command) args.push(config.command);
     return args;
+  }
+
+  static async buildImage(config: DockerBuildConfig): Promise<void> {
+    await ensureDockerAvailable();
+
+    const args = ["build", "-t", config.tag];
+    if (config.dockerfile) args.push("-f", config.dockerfile);
+    if (config.target) args.push("--target", config.target);
+    if (config.args) {
+      for (const [key, value] of Object.entries(config.args)) {
+        args.push("--build-arg", `${key}=${value}`);
+      }
+    }
+    args.push(config.context);
+    await runDocker(args);
   }
 
   static async startContainer(

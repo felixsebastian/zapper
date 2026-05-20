@@ -4,6 +4,7 @@ export { UpCommand } from "./UpCommand";
 export { DownCommand } from "./DownCommand";
 export { KillCommand } from "./KillCommand";
 export { RestartCommand } from "./RestartCommand";
+export { WatchCommand } from "./WatchCommand";
 export { StatusCommand } from "./StatusCommand";
 export { ListCommand } from "./ListCommand";
 export { LogsCommand } from "./LogsCommand";

@@ -23,7 +23,8 @@ export class TaskCommand extends CommandHandler {
       const zapperContext = zapper.getContext();
       if (!zapperContext) throw new Error("Context not loaded");
 
-      const task = zapperContext.tasks.find((t) => t.name === service);
+      const resolvedTaskName = zapper.resolveTaskName(service);
+      const task = zapperContext.tasks.find((t) => t.name === resolvedTaskName);
       if (!task) throw new TaskNotFoundError(service);
       return {
         kind: "tasks.params",
@@ -34,6 +35,7 @@ export class TaskCommand extends CommandHandler {
 
     await zapper.runTask(service, taskParams, {
       force: Boolean(options.force),
+      promptMissingParams: Boolean(options.interactive),
     });
   }
 }

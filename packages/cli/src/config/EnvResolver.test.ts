@@ -572,6 +572,46 @@ API_PORT=3000
       expect(result.homepage).toBe("http://localhost:3000");
     });
 
+    it("should interpolate config strings with defaults and required values", () => {
+      const envContent = `
+API_TAG=dev
+CACHE_DIR=.cache
+      `;
+      const envFile = createTempFile(envContent, ".env");
+
+      const context = {
+        projectName: "test",
+        projectRoot: process.cwd(),
+        envFiles: [envFile],
+        processes: [],
+        containers: [
+          {
+            name: "api",
+            image: "myapp/api:${API_TAG}",
+            build: {
+              context: "./api",
+              target: "${BUILD_TARGET:-local}",
+            },
+            volumes: ["${CACHE_DIR?cache required}:/cache:ro"],
+          },
+        ],
+        tasks: [],
+        links: [],
+        environments: ["default"],
+        profiles: [],
+        state: {},
+      } as Context;
+
+      const result = EnvResolver.resolveContext(context);
+
+      expect(result.containers[0].image).toBe("myapp/api:dev");
+      expect(
+        typeof result.containers[0].build === "object" &&
+          result.containers[0].build.target,
+      ).toBe("local");
+      expect(result.containers[0].volumes).toEqual([".cache:/cache:ro"]);
+    });
+
     it("should interpolate ${VAR} in top-level link URLs", () => {
       const envContent = `
 API_PORT=3000

@@ -59,12 +59,11 @@ struct ZapperCLI {
             let zapPath = try Self.resolveZapPath()
             let output = try Self.run(
                 executable: zapPath,
-                arguments: [
-                    "--config", configPath,
-                    "--instance", instanceKey,
-                    "home",
-                    "--json"
-                ]
+                arguments: Self.stackArguments(configPath: configPath, instanceKey: instanceKey)
+                    + [
+                        "home",
+                        "--json"
+                    ]
             )
             do {
                 return try JSONDecoder().decode(ZapperHomeResponse.self, from: output).value
@@ -79,12 +78,11 @@ struct ZapperCLI {
             let zapPath = try Self.resolveZapPath()
             let output = try Self.run(
                 executable: zapPath,
-                arguments: [
-                    "--config", configPath,
-                    "--instance", instanceKey,
-                    "links",
-                    "--json"
-                ]
+                arguments: Self.stackArguments(configPath: configPath, instanceKey: instanceKey)
+                    + [
+                        "links",
+                        "--json"
+                    ]
             )
             do {
                 return try JSONDecoder().decode([ZapperProjectLink].self, from: output)
@@ -102,11 +100,8 @@ struct ZapperCLI {
     ) async throws {
         try await Task.detached(priority: .userInitiated) {
             let zapPath = try Self.resolveZapPath()
-            var arguments = [
-                "--config", configPath,
-                "--instance", instanceKey,
-                action.rawValue
-            ]
+            var arguments = Self.stackArguments(configPath: configPath, instanceKey: instanceKey)
+                + [action.rawValue]
             if let service {
                 arguments.append(service)
             }
@@ -168,6 +163,15 @@ struct ZapperCLI {
         }
 
         throw ZapperCLIError.notFound
+    }
+
+    private static func stackArguments(configPath: String, instanceKey: String) -> [String] {
+        var arguments = ["--config", configPath]
+        if instanceKey != "default" {
+            arguments += ["--profile", instanceKey]
+        }
+        arguments += ["--instance", instanceKey]
+        return arguments
     }
 
     private static func isExecutable(_ path: String) -> Bool {

@@ -303,6 +303,11 @@ export class Zapper {
     return Object.fromEntries(aliasToName);
   }
 
+  resolveTaskName(name: string): string | undefined {
+    const resolved = this.buildTaskAliasMap()[name];
+    return resolved;
+  }
+
   // Helper method to create a legacy config for backwards compatibility
   // TODO: Remove this once all components are updated to use Context
   private createLegacyConfig(): ZapperConfig {
@@ -354,6 +359,8 @@ export class Zapper {
       git_method: this.context.gitMethod,
       native,
       docker,
+      volumes: this.context.volumes ?? {},
+      secrets: this.context.secrets ?? {},
       tasks,
       instanceId: this.context.instanceId,
       instanceKey: this.context.instanceKey,
@@ -457,6 +464,103 @@ export class Zapper {
       ...emptyServiceActionReport("restart", processNames),
       ...executionReport,
     };
+  }
+
+  async watchServices(serviceNames?: string[]): Promise<void> {
+    if (!this.context) throw new ContextNotLoadedError();
+
+    const canonical = this.resolveActionTargets(serviceNames);
+    const selected = new Set(canonical);
+    const containers = this.context.containers.filter((container) => {
+      if (!container.watch || container.watch.length === 0) return false;
+      return (
+        !canonical || canonical.length === 0 || selected.has(container.name)
+      );
+    });
+
+    if (containers.length === 0) {
+      throw new Error(
+        serviceNames && serviceNames.length > 0
+          ? "No selected Docker services define watch rules"
+          : "No Docker services define watch rules",
+      );
+    }
+
+    await this.startProcesses(containers.map((container) => container.name));
+
+    const watchers: fs.FSWatcher[] = [];
+    const pending = new Map<string, NodeJS.Timeout>();
+    const pendingActions = new Map<string, "restart" | "rebuild">();
+
+    const schedule = (serviceName: string, action: "restart" | "rebuild") => {
+      const previous = pendingActions.get(serviceName);
+      pendingActions.set(
+        serviceName,
+        previous === "rebuild" || action === "rebuild" ? "rebuild" : "restart",
+      );
+      const existing = pending.get(serviceName);
+      if (existing) clearTimeout(existing);
+      pending.set(
+        serviceName,
+        setTimeout(async () => {
+          pending.delete(serviceName);
+          const nextAction = pendingActions.get(serviceName) || "restart";
+          pendingActions.delete(serviceName);
+          renderer.log.info(
+            nextAction === "rebuild"
+              ? `Rebuilding ${serviceName} after file change...`
+              : `Restarting ${serviceName} after file change...`,
+          );
+          if (nextAction === "rebuild") {
+            await this.restartProcesses([serviceName]);
+          } else {
+            await DockerManager.restartContainer(
+              buildServiceName(
+                this.context!.projectName,
+                serviceName,
+                this.context!.instanceId,
+              ),
+            );
+          }
+        }, 250),
+      );
+    };
+
+    for (const container of containers) {
+      for (const rule of container.watch || []) {
+        const watchPath = path.isAbsolute(rule.path)
+          ? rule.path
+          : path.join(this.context.projectRoot, rule.path);
+        if (!fs.existsSync(watchPath)) {
+          renderer.log.warn(
+            `Watch path does not exist for ${container.name}: ${rule.path}`,
+          );
+          continue;
+        }
+        watchers.push(
+          fs.watch(watchPath, { recursive: true }, () => {
+            schedule(container.name, rule.action);
+          }),
+        );
+        renderer.log.info(
+          `Watching ${rule.path} for ${container.name} (${rule.action})`,
+        );
+      }
+    }
+
+    if (watchers.length === 0) {
+      throw new Error("No watch paths could be opened");
+    }
+
+    await new Promise<void>((resolve) => {
+      const stop = () => {
+        for (const watcher of watchers) watcher.close();
+        for (const timeout of pending.values()) clearTimeout(timeout);
+        resolve();
+      };
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+    });
   }
 
   private resolveProjectNameForKill(projectName?: string): string {
@@ -633,7 +737,7 @@ export class Zapper {
   async runTask(
     taskName: string,
     params?: { named: Record<string, string>; rest: string[] },
-    options?: { force?: boolean },
+    options?: { force?: boolean; promptMissingParams?: boolean },
   ): Promise<void> {
     if (!this.context) throw new ContextNotLoadedError();
 
@@ -665,6 +769,11 @@ export class Zapper {
         delimiters: this.context.taskDelimiters,
         params,
         force: options?.force,
+        promptMissingParams: options?.promptMissingParams,
+        context: {
+          projectName: this.context.projectName,
+          instanceKey: this.context.instanceKey,
+        },
       },
     );
   }
